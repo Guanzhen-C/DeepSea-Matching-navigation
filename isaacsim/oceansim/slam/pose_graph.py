@@ -764,6 +764,7 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         self.global_final_cost = 0.0
         self.rebuilds = 0
         self.global_only_factor_count = 0
+        self._global_only_factor_ids: set[tuple[str, int]] = set()
         self.global_anchor_bridge_updates = 0
         self.global_anchor_bridge_max_translation_m = 0.0
         self.global_anchor_bridge_max_abs_yaw_deg = 0.0
@@ -985,6 +986,14 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         # immediately before marginalization instead of leaving its raw seed.
         self.poses = self._pose_array_from_values(values, self.poses)
 
+    def _mark_global_only_factor(
+        self, category: str, factor: PoseGraphEdge | PoseGraphPrior
+    ) -> None:
+        """Record a unique factor that cannot enter the live lag window."""
+
+        self._global_only_factor_ids.add((category, id(factor)))
+        self.global_only_factor_count = len(self._global_only_factor_ids)
+
     def _bridge_global_anchor_to_fixed_lag_window(self) -> None:
         """Apply a cross-window global constraint as a rigid map anchor.
 
@@ -1165,7 +1174,7 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
                 graph.add(self._edge_factor(edge))
                 emitted_edges.add(edge_index)
             else:
-                self.global_only_factor_count += 1
+                self._mark_global_only_factor("edge", edge)
         for prior_index, prior in pending_priors:
             if prior_index in emitted_priors:
                 continue
@@ -1174,7 +1183,7 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
                 graph.add(self._prior_factor(prior))
                 emitted_priors.add(prior_index)
             else:
-                self.global_only_factor_count += 1
+                self._mark_global_only_factor("prior", prior)
         update_once(graph, values, timestamps)
         self.fixed_lag_active_variables = len(self._fixed_lag_active_keys)
         self.fixed_lag_marginalized_variables = max(
@@ -1184,6 +1193,10 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
     def _rebuild(self) -> None:
         self.rebuilds += 1
         self._new_solvers()
+        # Recompute this set from the rebuilt live smoother so repeated
+        # external edits cannot double-count old factors.
+        self._global_only_factor_ids.clear()
+        self.global_only_factor_count = 0
         all_graph = self._gtsam.NonlinearFactorGraph()
         all_values = self._gtsam.Values()
         if self.poses.shape[0]:
@@ -1223,6 +1236,8 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
                 keys = {self._key(edge.source), self._key(edge.target)}
                 if keys.issubset(available):
                     graph.add(self._edge_factor(edge))
+                else:
+                    self._mark_global_only_factor("edge", edge)
             for prior in priors_by_target.get(index, ()):
                 graph.add(self._prior_factor(prior))
             if graph.size() == 0:

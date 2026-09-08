@@ -334,6 +334,37 @@ def test_external_relocalization_seed_forces_a_safe_solver_rebuild() -> None:
     assert np.isfinite(graph.global_isam_poses).all()
 
 
+def test_rebuild_bridges_a_new_cross_window_factor_exactly_once() -> None:
+    graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
+    _add_chain(graph, 8)
+
+    # A relocalization seed edits existing values, so the next optimize must
+    # rebuild both solvers.  Commit a long-baseline factor in that same update:
+    # its old endpoint has already left the live two-second window.
+    graph.poses[5:, 1] += 1.0
+    graph.add_edge(
+        0,
+        7,
+        np.array([6.5, 0.2, 0.01]),
+        np.diag([25.0, 25.0, 100.0]),
+        kind="relocalization",
+    )
+    graph.optimize()
+
+    assert graph.rebuilds == 1
+    assert graph.global_only_factor_count == 1
+    assert graph.global_anchor_bridge_updates == 1
+    np.testing.assert_allclose(
+        graph.poses[-1], graph.global_isam_poses[-1], atol=1.0e-10
+    )
+
+    # A later update may reapply the persistent map anchor, but the unique
+    # global-only factor count must not grow simply because the graph ran again.
+    graph.optimize()
+    assert graph.global_only_factor_count == 1
+    assert np.isfinite(graph.poses).all()
+
+
 def test_old_to_live_loop_anchors_window_without_reviving_old_key() -> None:
     graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
     _add_chain(graph, 8)
