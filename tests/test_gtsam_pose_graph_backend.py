@@ -403,11 +403,18 @@ def test_old_to_live_loop_anchors_window_without_reviving_old_key() -> None:
 
 def test_rank_deficient_acoustic_information_is_not_given_fake_rank() -> None:
     graph = GTSAMPlanarPoseGraph(_gtsam_config())
-    information = np.diag([16.0, 0.0, 0.0])
-    noise = graph._noise_model(information)
-    recovered = np.asarray(noise.R()).T @ np.asarray(noise.R())
-    np.testing.assert_allclose(recovered, information, atol=1e-12)
-    assert np.linalg.matrix_rank(recovered, tol=1e-10) == 1
+    basis, _ = np.linalg.qr(
+        np.array([[1.0, 2.0, 3.0], [-2.0, 1.0, 0.5], [0.3, -0.7, 2.0]])
+    )
+    information_matrices = (
+        np.diag([16.0, 0.0, 0.0]),
+        basis @ np.diag([25.0, 4.0, 0.0]) @ basis.T,
+    )
+    for expected_rank, information in enumerate(information_matrices, start=1):
+        noise = graph._noise_model(information)
+        recovered = np.asarray(noise.R()).T @ np.asarray(noise.R())
+        np.testing.assert_allclose(recovered, information, atol=2.0e-12)
+        assert np.linalg.matrix_rank(recovered, tol=1.0e-10) == expected_rank
 
 
 def test_acoustic_frontend_constructs_identical_factors_for_both_solvers() -> None:
