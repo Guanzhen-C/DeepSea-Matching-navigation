@@ -230,6 +230,9 @@ class PoseGraphDiagnostics:
     fixed_lag_active_variables: int = 0
     fixed_lag_marginalized_variables: int = 0
     fixed_lag_global_only_factors: int = 0
+    global_anchor_bridge_updates: int = 0
+    global_anchor_bridge_max_translation_m: float = 0.0
+    global_anchor_bridge_max_abs_yaw_deg: float = 0.0
     optimizer_rebuilds: int = 0
     global_isam_initial_cost: float = 0.0
     global_isam_final_cost: float = 0.0
@@ -448,6 +451,25 @@ class PlanarPoseGraph:
             "full_history_diagnostic_poses": getattr(
                 self, "global_isam_poses", np.empty((0, 3), dtype=np.float64)
             ).tolist(),
+            "global_anchor_bridge": {
+                "updates": int(
+                    getattr(self, "global_anchor_bridge_updates", 0)
+                ),
+                "maximum_translation_m": float(
+                    getattr(
+                        self,
+                        "global_anchor_bridge_max_translation_m",
+                        0.0,
+                    )
+                ),
+                "maximum_abs_yaw_deg": float(
+                    getattr(
+                        self,
+                        "global_anchor_bridge_max_abs_yaw_deg",
+                        0.0,
+                    )
+                ),
+            },
             "objective_configuration": {
                 "terrain_prior_robust_kernel": (
                     self.config.terrain_prior_robust_kernel
@@ -674,8 +696,10 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
     public ``poses`` used by online ``map->odom`` correction.  Once a pose is
     marginalized, its last fixed-lag estimate remains in that array.  A second
     iSAM2 instance retains the complete graph for old-node constraints and a
-    separately reported full-history diagnostic solution; it is deliberately
-    not substituted for the fixed-lag online estimate.
+    separately reported full-history diagnostic solution.  If a newly arrived
+    factor spans beyond the lag, only its solved rigid map anchor is transferred
+    to the live window; the complete trajectory is never substituted for the
+    fixed-lag online estimate.
 
     No silent NumPy fallback is provided.  If GTSAM is unavailable, creating
     the production acoustic graph fails with an actionable dependency error.
@@ -740,6 +764,9 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         self.global_final_cost = 0.0
         self.rebuilds = 0
         self.global_only_factor_count = 0
+        self.global_anchor_bridge_updates = 0
+        self.global_anchor_bridge_max_translation_m = 0.0
+        self.global_anchor_bridge_max_abs_yaw_deg = 0.0
         self._new_solvers()
 
     @property
@@ -957,6 +984,47 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         # every chronological backlog step preserves a pose's last estimate
         # immediately before marginalization instead of leaving its raw seed.
         self.poses = self._pose_array_from_values(values, self.poses)
+
+    def _bridge_global_anchor_to_fixed_lag_window(self) -> None:
+        """Apply a cross-window global constraint as a rigid map anchor.
+
+        Fixed-lag marginalization cannot later revive an old loop endpoint.
+        The complete iSAM2 graph can still solve that constraint.  When such a
+        factor has actually arrived, transfer only the latest global-to-window
+        SE(2) transform to all live smoother poses.  Their relative geometry is
+        unchanged and historical marginalized poses are not overwritten.
+        """
+
+        if self.global_only_factor_count <= 0 or not self._fixed_lag_active_keys:
+            return
+        active_indices = [
+            index
+            for index in range(self.poses.shape[0])
+            if self._key(index) in self._fixed_lag_active_keys
+        ]
+        if not active_indices or self.global_isam_poses.shape != self.poses.shape:
+            return
+        anchor = active_indices[-1]
+        fixed_anchor = self.poses[anchor].copy()
+        global_anchor = self.global_isam_poses[anchor]
+        yaw_delta = float(wrap_angle(global_anchor[2] - fixed_anchor[2]))
+        c, s = np.cos(yaw_delta), np.sin(yaw_delta)
+        rotation = np.array([[c, -s], [s, c]], dtype=np.float64)
+        translation = global_anchor[:2] - rotation @ fixed_anchor[:2]
+        for index in active_indices:
+            self.poses[index, :2] = rotation @ self.poses[index, :2] + translation
+            self.poses[index, 2] = wrap_angle(
+                self.poses[index, 2] + yaw_delta
+            )
+        self.global_anchor_bridge_updates += 1
+        self.global_anchor_bridge_max_translation_m = max(
+            self.global_anchor_bridge_max_translation_m,
+            float(np.linalg.norm(translation)),
+        )
+        self.global_anchor_bridge_max_abs_yaw_deg = max(
+            self.global_anchor_bridge_max_abs_yaw_deg,
+            abs(float(np.rad2deg(yaw_delta))),
+        )
 
     def _incremental_global_update(self):
         graph = self._gtsam.NonlinearFactorGraph()
@@ -1211,8 +1279,10 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         )
         self.global_final_cost = self._cost(self.global_isam_poses)
         # ``_incremental_fixed_lag_update`` and ``_rebuild`` already copied
-        # each live-window estimate into public poses.  Do not overwrite those
-        # with the complete-graph diagnostic estimate here.
+        # each live-window estimate into public poses. A long-baseline factor
+        # that cannot enter the bounded window contributes only one rigid map
+        # anchor; it never replaces the window's relative trajectory shape.
+        self._bridge_global_anchor_to_fixed_lag_window()
         self.final_cost = self._cost(self.poses)
         self.optimization_runs += 1
         self.optimization_boundaries.append(
@@ -2841,6 +2911,23 @@ class AcousticPoseGraph:
             ),
             global_isam_final_cost=float(
                 getattr(self.graph, "global_final_cost", 0.0)
+            ),
+            global_anchor_bridge_updates=getattr(
+                self.graph, "global_anchor_bridge_updates", 0
+            ),
+            global_anchor_bridge_max_translation_m=float(
+                getattr(
+                    self.graph,
+                    "global_anchor_bridge_max_translation_m",
+                    0.0,
+                )
+            ),
+            global_anchor_bridge_max_abs_yaw_deg=float(
+                getattr(
+                    self.graph,
+                    "global_anchor_bridge_max_abs_yaw_deg",
+                    0.0,
+                )
             ),
         )
 

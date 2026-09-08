@@ -4674,6 +4674,10 @@ def main() -> int:
                                 diagnostics.pose_graph
                                 .fixed_lag_marginalized_variables
                             ),
+                            "pose_graph_global_anchor_bridge_updates": (
+                                diagnostics.pose_graph
+                                .global_anchor_bridge_updates
+                            ),
                             "terrain_matches_accepted": terrain_match_accepts,
                             "terrain_priors_accepted": terrain_prior_accepts,
                             "backscatter_matches_accepted": int(
@@ -5205,7 +5209,8 @@ def main() -> int:
                     (
                         "GTSAM IncrementalFixedLagSmoother active-window "
                         "estimate; marginalized poses retain their last "
-                        "online value"
+                        "online value, while confirmed cross-window factors "
+                        "supply a rigid global map anchor"
                     )
                     if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
                     else (
@@ -5308,7 +5313,8 @@ def main() -> int:
                     ARGS.pose_graph_isam_relinearize_skip
                 ),
                 "online_output_source": (
-                    "incremental_fixed_lag_active_window"
+                    "incremental_fixed_lag_active_window_with_rigid_"
+                    "global_anchor_for_cross_window_factors"
                     if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
                     else "numpy_batch_full_graph"
                 ),
@@ -6475,6 +6481,17 @@ def main() -> int:
             ),
             "pose_graph_optimizer_rebuilds": (
                 diagnostics.pose_graph.optimizer_rebuilds
+            ),
+            "pose_graph_global_anchor_bridge_updates": (
+                diagnostics.pose_graph.global_anchor_bridge_updates
+            ),
+            "pose_graph_global_anchor_bridge_max_translation_m": (
+                diagnostics.pose_graph
+                .global_anchor_bridge_max_translation_m
+            ),
+            "pose_graph_global_anchor_bridge_max_abs_yaw_deg": (
+                diagnostics.pose_graph
+                .global_anchor_bridge_max_abs_yaw_deg
             ),
             "pose_graph_global_isam_initial_cost": (
                 diagnostics.pose_graph.global_isam_initial_cost

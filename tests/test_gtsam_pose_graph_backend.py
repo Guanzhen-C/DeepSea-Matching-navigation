@@ -12,6 +12,7 @@ from oceansim.slam import (
     GTSAMPlanarPoseGraph,
     PlanarPoseGraph,
     PoseGraphConfig,
+    PoseGraphEdge,
 )
 from oceansim.slam.pose_graph import (
     _edge_error_and_jacobians,
@@ -288,6 +289,78 @@ def test_fixed_lag_consumes_backlog_longer_than_window_chronologically() -> None
     assert graph.global_only_factor_count == 1
     assert np.isfinite(graph.poses).all()
     assert np.isfinite(graph.global_isam_poses).all()
+
+
+def test_fixed_lag_accepts_duplicate_timestamps_from_pose_only_image_nodes() -> None:
+    graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
+    information = np.diag([100.0, 100.0, 400.0])
+    timestamps = (0.0, 1.0, 1.0, 2.0, 3.0, 3.0, 4.0)
+    for index, timestamp in enumerate(timestamps):
+        graph.add_pose(np.array([float(index), 0.0, 0.0]), timestamp=timestamp)
+        if index:
+            graph.add_edge(
+                index - 1,
+                index,
+                np.array([1.0, 0.0, 0.0]),
+                information,
+                kind="odometry",
+            )
+    graph.optimize()
+
+    assert graph.fixed_lag_active_variables == 4
+    assert graph.fixed_lag_marginalized_variables == 3
+    assert np.isfinite(graph.poses).all()
+
+
+def test_external_relocalization_seed_forces_a_safe_solver_rebuild() -> None:
+    graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
+    _add_chain(graph, 8)
+    old_edge = graph.edges[-1]
+    graph.poses[5:, 0] -= 0.4
+    graph.edges[-1] = PoseGraphEdge(
+        source=old_edge.source,
+        target=old_edge.target,
+        measurement=old_edge.measurement + np.array([-0.1, 0.05, 0.01]),
+        information=old_edge.information,
+        kind=old_edge.kind,
+        score=old_edge.score,
+    )
+    graph.optimize()
+
+    assert graph.rebuilds == 1
+    assert graph.fixed_lag_active_variables == 3
+    assert graph.fixed_lag_marginalized_variables == 5
+    assert np.isfinite(graph.poses).all()
+    assert np.isfinite(graph.global_isam_poses).all()
+
+
+def test_old_to_live_loop_anchors_window_without_reviving_old_key() -> None:
+    graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
+    _add_chain(graph, 8)
+    online_before = graph.poses.copy()
+    global_before = graph.global_isam_poses.copy()
+    graph.add_edge(
+        0,
+        7,
+        np.array([6.5, 0.2, 0.01]),
+        np.diag([25.0, 25.0, 100.0]),
+        kind="relocalization",
+    )
+    graph.optimize()
+
+    assert graph.global_only_factor_count == 1
+    assert graph.fixed_lag_active_variables == 3
+    np.testing.assert_allclose(graph.poses[:5], online_before[:5], atol=1.0e-10)
+    np.testing.assert_allclose(
+        graph.poses[-1], graph.global_isam_poses[-1], atol=1.0e-10
+    )
+    np.testing.assert_allclose(
+        _relative_pose2(graph.poses[5], graph.poses[7]),
+        _relative_pose2(online_before[5], online_before[7]),
+        atol=1.0e-10,
+    )
+    assert graph.global_anchor_bridge_updates == 1
+    assert not np.allclose(graph.global_isam_poses, global_before)
 
 
 def test_rank_deficient_acoustic_information_is_not_given_fake_rank() -> None:

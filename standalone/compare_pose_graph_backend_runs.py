@@ -446,6 +446,15 @@ def main() -> int:
         "candidate_global_only_factors": candidate.get(
             "pose_graph_fixed_lag_global_only_factors"
         ),
+        "candidate_global_anchor_bridge_updates": candidate.get(
+            "pose_graph_global_anchor_bridge_updates"
+        ),
+        "candidate_global_anchor_bridge_max_translation_m": candidate.get(
+            "pose_graph_global_anchor_bridge_max_translation_m"
+        ),
+        "candidate_global_anchor_bridge_max_abs_yaw_deg": candidate.get(
+            "pose_graph_global_anchor_bridge_max_abs_yaw_deg"
+        ),
         "wall_time_s": _metric_pair(
             baseline.get("wall_time_s"), candidate.get("wall_time_s")
         ),
