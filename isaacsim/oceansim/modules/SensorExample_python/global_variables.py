@@ -18,7 +18,8 @@ EXTENSION_DESCRIPTION = "This is unified example demonstrating various OceanSim 
 'Manual control: w:x+, s:x-, a:y+, d:y-, up:z+, down:z-, \n' \
 'i:pitch-, k:pitch+, j:yaw+, l:yaw-, left:row-, right:row+. \n' \
 'Straight line: Robot will travel to local x direction with v=0.5m/s. \n' \
-'No control: Robot will remain static.'
+'No control: Robot will remain static.\n' \
+'Multibeam and side-scan live views open dedicated windows and draw acoustic returns in the 3D viewport.'
 
 
 EXTENSION_LINK = "https://umfieldrobotics.github.io/OceanSim/"

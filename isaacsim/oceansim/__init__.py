@@ -1,26 +1,53 @@
-# Modules are UI extensions and have to be imported separately for UI to work properly
-# import omni.kit.app
+"""OceanSim package.
 
-# app = omni.kit.app.get_app()
-# ext_manager = app.get_extension_manager()
-# ext_id = "isaacsim.oceansim"
+Isaac/Kit modules are loaded lazily so dependency-free utilities such as the
+SLAM estimator can also be imported by ROS tools and unit tests outside Kit.
+"""
 
-# # Toggle extension state
-# if ext_manager.is_extension_enabled(ext_id):
-#     ext_manager.set_extension_enabled(ext_id, False)
-#     print(f"EXTENSION {ext_id} DEACTIVATED")
-# else:
-#     ext_manager.set_extension_enabled(ext_id, True)
-#     print(f"EXTENSION {ext_id} ACTIVATED")
-from .sensors import *
-from .utils import *
-from .watersurface import *
-from .writers import UWCam_KittiWriter
+from __future__ import annotations
+
+from importlib import import_module
+
+
+_LAZY_EXPORTS = {
+    "BarometerSensor": (".sensors.BarometerSensor", "BarometerSensor"),
+    "BathymetricSideScanSonarSensor": (
+        ".sensors.BathymetricSideScanSonarSensor",
+        "BathymetricSideScanSonarSensor",
+    ),
+    "DVLsensor": (".sensors.DVLsensor", "DVLsensor"),
+    "ImagingSonarSensor": (
+        ".sensors.ImagingSonarSensor",
+        "ImagingSonarSensor",
+    ),
+    "MultibeamEchosounderSensor": (
+        ".sensors.MultibeamEchosounderSensor",
+        "MultibeamEchosounderSensor",
+    ),
+    "SideScanSonarSensor": (
+        ".sensors.SideScanSonarSensor",
+        "SideScanSonarSensor",
+    ),
+    "UW_Camera": (".sensors.UW_Camera", "UW_Camera"),
+    "WaterSurface": (".watersurface.WaterSurface", "WaterSurface"),
+    "UWCam_KittiWriter": (".writers.UWCam_KittiWriter", "UWCam_KittiWriter"),
+}
+
+
+def __getattr__(name: str):
+    target = _LAZY_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute_name = target
+    value = getattr(import_module(module_name, __name__), attribute_name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "sensors",
+    "slam",
     "utils",
     "watersurface",
     "writers",
+    *_LAZY_EXPORTS,
 ]
-

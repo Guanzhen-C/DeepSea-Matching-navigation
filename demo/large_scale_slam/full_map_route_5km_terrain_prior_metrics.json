@@ -1,0 +1,719 @@
+{
+  "algorithm": "OceanSim acoustic FAST-LIVO2 adaptation with absolute bathymetric terrain-map factors",
+  "algorithm_tracks": {
+    "dead_reckoning_imu_dvl_depth": "IMU propagation with DVL velocity and pressure depth",
+    "local_acoustic_esikf": "self-built surfel/intensity-map relative acoustic ESIKF; no prior-map correction",
+    "online_global_slam": "online pose graph including accepted loop, intensity, and absolute bathymetric terrain factors",
+    "final_optimized_global_slam": "the same global factor graph after consuming every accepted factor in a final optimization"
+  },
+  "sensors": [
+    "IMU",
+    "DVL",
+    "pressure_depth",
+    "integrated_bathymetric_side_scan"
+  ],
+  "sonar_acquisition_model": "single_launch_sparse_bathymetry_dense_coregistered_backscatter",
+  "simulation_clock_model": "exact application-clock sensor events; kinematic AUV pose; zero-order-held IMU propagation to asynchronous sonar timestamps; Isaac physics timeline is not the navigation time base",
+  "scene_m": [
+    29205.0,
+    17665.0
+  ],
+  "terrain_source": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+  "terrain_resolution_m": 5.0,
+  "terrain_matching_reference": {
+    "enabled": true,
+    "map_role": "georeferenced prior bathymetry",
+    "source_product": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+    "resolution_m": 5.0,
+    "uses_simulator_truth_pose": false,
+    "simulation_and_matcher_share_source_dem": true
+  },
+  "terrain_source_shape_pixels": [
+    3534,
+    5842
+  ],
+  "terrain_geographically_cropped": false,
+  "terrain_valid_measured_cells": 11296546,
+  "terrain_display_stride": 32,
+  "sonar_terrain_stride": 1,
+  "measured_backscatter_coverage_fraction": 0.9866050206850837,
+  "bounds_utm_m": {
+    "west": 583530.0,
+    "east": 612740.0,
+    "south": 4060670.0,
+    "north": 4078340.0
+  },
+  "vehicle": "LSTS/OceanScan LAUV",
+  "sonar_profile": {
+    "mode": "standard",
+    "rows_per_side_per_ping": 8,
+    "along_track_sample_spacing_m": 0.15,
+    "along_track_coverage_per_ping_m": 1.2,
+    "constant_resolution_breakpoint_m": 60.0,
+    "near_range_along_track_resolution_m": 0.15,
+    "horizontal_beam_opening_deg": 0.14,
+    "range_sample_spacing_m": 0.02,
+    "range_resolution_m": 0.025,
+    "maximum_range_m": 250.0,
+    "range_bins_per_side": 12500,
+    "manufacturer": null,
+    "model": null,
+    "acoustic_frequency_hz": null,
+    "ping_rate_hz": null,
+    "vertical_beam_opening_deg": null,
+    "pulse_duration_s": null,
+    "receiver_bandwidth_hz": null,
+    "source_level_db_re_1upa_at_1m": null,
+    "bathymetry_accuracy_m": null,
+    "intensity_unit": null,
+    "vehicle_speed_m_s": null,
+    "operating_altitude_m": null,
+    "line_spacing_m": null,
+    "full_swath_width_m": null,
+    "schema": "oceansim.bathymetric_sidescan.v2.profile/1",
+    "source_document": "\u591a\u6ce2\u675f\u6d4b\u6df1\u4fa7\u626b\u4f5c\u4e1a\u53ca\u6210\u50cfV2.docx",
+    "source_document_sha256": "d078dbfae5776192a3f84d186c9a22b29859e53ee1502a187ab6ba4170be4866",
+    "source_device_identified": false,
+    "far_range_resolution_equation": "sin(radians(horizontal_beam_opening_deg)) * range_m",
+    "source_ambiguities": [
+      "R is not consistently distinguished as slant or ground range",
+      "250 m is not explicitly identified as per-side or full-swath width",
+      "eight along-track beams are represented here as image rows",
+      "2 cm sampling is not explicitly identified before or after slant correction"
+    ],
+    "unprovided_fields": [
+      "acoustic_frequency_hz",
+      "bathymetry_accuracy_m",
+      "full_swath_width_m",
+      "intensity_unit",
+      "line_spacing_m",
+      "manufacturer",
+      "model",
+      "operating_altitude_m",
+      "ping_rate_hz",
+      "pulse_duration_s",
+      "receiver_bandwidth_hz",
+      "source_level_db_re_1upa_at_1m",
+      "vehicle_speed_m_s",
+      "vertical_beam_opening_deg"
+    ]
+  },
+  "sonar_profile_interpretation": {
+    "maximum_range": "treated as per-side slant range",
+    "along_track_rows": "modelled as eight parallel virtual footprint centres per side, spaced by the documented along-track sample interval",
+    "along_track_row_center_offsets_m": [
+      -0.525,
+      -0.375,
+      -0.22499999999999998,
+      -0.075,
+      0.075,
+      0.22499999999999998,
+      0.375,
+      0.525
+    ],
+    "along_track_coverage_boundaries_m": [
+      -0.6,
+      0.6
+    ],
+    "terrain_resolution_limit_m": 5.0,
+    "warning": "2 cm output sampling and 2.5 cm documented sensor resolution do not create independent centimetre-scale seabed information from the 5 m source raster"
+  },
+  "sonar_simulation_assumptions": {
+    "sound_speed_mps": 1500.0,
+    "ping_rate_hz": 1.5,
+    "vertical_fan_width_deg": 170.0,
+    "horizontal_beam_opening_deg": 0.14,
+    "along_track_footprint_model": "parallel virtual row centres; finite 0.14 deg aperture is recorded but not coherently integrated",
+    "center_frequency_hz": null,
+    "range_noise_std_m": 0.028,
+    "attenuation_coefficient_per_m": 0.003,
+    "installation_translation_body_m": [
+      0.1,
+      0.0,
+      -0.15
+    ],
+    "installation_orientation_body_rpy_deg": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "survey_speed_mps": 1.5,
+  "survey_pattern": "full-map-route",
+  "survey_period_s": 48231.13237190622,
+  "survey_laps_completed": 0.0746405863383157,
+  "survey_travelled_distance_m": 5399.981544377776,
+  "survey_route_completion_fraction": 0.07464033123860014,
+  "survey_route_file": "/home/cgz/OceanSim/standalone/../data/monterey_canyon_full_5m/full_map_traversal_route.json",
+  "survey_route_definition": {
+    "purpose": "whole_map_traversal",
+    "coverage_claim": "largest_joint_measured_connected_region_extent",
+    "joint_valid_mask": "bathymetry_valid_mask AND backscatter_valid_mask",
+    "planning_clearance_m": 500.0,
+    "required_validation_clearance_m": 250.0,
+    "coarse_planning_grid_m": 50.0,
+    "planner": "four-neighbour A* through cardinal extrema of the largest eroded connected component",
+    "polyline_simplification": "Ramer-Douglas-Peucker, 100 m tolerance, followed by finite-width U-turn replacement at four boundary extrema",
+    "smoothing": "periodic Chaikin corner cutting followed by periodic Catmull-Rom interpolation",
+    "smoothing_iterations": 4,
+    "closed": true,
+    "validated_horizontal_path_length_m": 71678.545,
+    "validated_constant_altitude_3d_path_length_m": 72813.473,
+    "validated_envelope_m": [
+      22750.195,
+      16384.466
+    ],
+    "validated_minimum_joint_clearance_m": 301.654,
+    "validated_maximum_horizontal_curvature_per_m": 0.0142394083,
+    "validated_minimum_horizontal_turn_radius_m": 70.228,
+    "safe_component_extent_fraction": {
+      "x": 0.970779,
+      "y": 0.95425
+    },
+    "recommended_flight_profile": {
+      "speed_mps": 1.5,
+      "minimum_navigation_surface_altitude_m": 40.0,
+      "maximum_pitch_deg": 12.0,
+      "validated_3d_path_length_m": 72346.699,
+      "validated_period_s": 48231.132,
+      "raw_seabed_altitude_range_m": [
+        32.391,
+        178.964
+      ],
+      "pitch_range_deg": [
+        -11.909,
+        11.909
+      ],
+      "note": "A periodic slope-limited vertical look-ahead envelope starts climbs before steep terrain; altitude therefore varies while remaining inside the 250 m sonar range."
+    },
+    "note": "The raster rectangle contains NoData. Disconnected islands cannot be reached without crossing NoData, so they are excluded from a physically valid continuous mission."
+  },
+  "survey_center_m": null,
+  "survey_amplitude_m": null,
+  "survey_pattern_yaw_deg": null,
+  "survey_altitude_m": 40.0,
+  "survey_maximum_pitch_deg": 12.0,
+  "survey_route_validation": {
+    "sample_count": 8192,
+    "period_s": 48231.13237190622,
+    "path_length_m": 72346.69855785933,
+    "x_range_m": [
+      -14025.09765625,
+      8725.140380859375
+    ],
+    "y_range_m": [
+      -8139.370918273926,
+      8245.121765136719
+    ],
+    "auv_depth_range_m": [
+      15.677743688009244,
+      1004.6624649983969
+    ],
+    "seabed_depth_range_m": [
+      56.24207979190309,
+      1111.2253540680904
+    ],
+    "altitude_range_m": [
+      32.39079793303432,
+      178.96399362221268
+    ],
+    "pitch_range_deg": [
+      -11.90882490206504,
+      11.90877398670704
+    ],
+    "bathymetry_fully_valid": true,
+    "backscatter_fully_valid": true,
+    "bathymetry_min_clearance_m": 351.84105860126584,
+    "backscatter_min_clearance_m": 301.65404478276446,
+    "maximum_horizontal_curvature_per_m": 0.014239408292493105,
+    "validation_sample_count": 62812,
+    "validation_max_spacing_m": 1.25,
+    "waypoint_count": 57
+  },
+  "ping_rate_hz": 1.5,
+  "sonar_beams": 96,
+  "slam_sparse_bathymetry_rays_per_ping": 96,
+  "documented_sidescan_rows_per_side_per_ping": 8,
+  "sidescan_imaging_rays_per_side": 2048,
+  "sidescan_imaging_rays_per_side_per_row": 256,
+  "sidescan_imaging_rays_per_ping": 4096,
+  "sidescan_slam_sample_stride": 8,
+  "shared_rays_per_ping": 4192,
+  "sonar_swath_width_deg": 170.0,
+  "sidescan_range_bins_per_side": 12500,
+  "sidescan_range_sample_spacing_m": 0.02,
+  "sidescan_documented_range_resolution_m": 0.025,
+  "sidescan_maximum_range_m": 250.0,
+  "intensity_reference_delay_pings": 45,
+  "intensity_group_pings": 5,
+  "intensity_factor_min_interval_s": 300.0,
+  "intensity_factor_optimize_interval": 20,
+  "intensity_updates_enabled": true,
+  "terrain_map_matching_enabled": true,
+  "terrain_match_window_pings": 30,
+  "terrain_match_translation_window_m": 30.0,
+  "terrain_match_yaw_window_deg": 8.0,
+  "terrain_prior_optimize_interval": 5,
+  "terrain_match_attempts": 59,
+  "accepted_terrain_matches": 59,
+  "rejected_terrain_matches": 0,
+  "accepted_terrain_prior_factors": 59,
+  "terrain_match_rejection_reasons": {},
+  "terrain_match_observable_rank_counts": {
+    "r3_t2_yaw1": 59
+  },
+  "mean_accepted_terrain_rmse_before_m": 1.124068267655333,
+  "mean_accepted_terrain_rmse_after_m": 0.225364825001715,
+  "mean_accepted_terrain_translation_correction_m": 5.620702170483782,
+  "mean_accepted_terrain_yaw_correction_deg": -0.1023026170832269,
+  "maximum_accepted_terrain_translation_correction_m": 23.99231380068865,
+  "maximum_accepted_terrain_abs_yaw_correction_deg": 3.1073785896104833,
+  "terrain_matching_wall_time_s": 10.988916925969534,
+  "terrain_matching_mean_time_ms": 186.2528292537209,
+  "last_terrain_match": {
+    "accepted": true,
+    "rejection_reason": null,
+    "correspondences": 768,
+    "inliers": 766,
+    "observable_rank": 3,
+    "translation_observable_rank": 2,
+    "yaw_observable": true,
+    "rmse_before_m": 1.05268295283032,
+    "rmse_after_m": 0.34136016621123316,
+    "reduced_chi_square": 0.41955572482813,
+    "innovation_nis_diagnostic_only": 235.73754421575995,
+    "translation_correction_m": 2.398306257551671,
+    "yaw_correction_deg": -1.1399242151542315
+  },
+  "sonar_backend": "Warp CUDA (cuda:0)",
+  "sonar_backend_gpu": true,
+  "sonar_mesh_triangles": 22566165,
+  "sonar_bvh_build_ms": 139.79169505182654,
+  "sonar_mean_cast_ms": 0.6762048654153765,
+  "sonar_cast_calls": 5401,
+  "sonar_backend_verification": {},
+  "slam_association_backend": "Warp CUDA (cuda:0)",
+  "slam_max_points": 384,
+  "slam_voxel_size_m": 5.0,
+  "intensity_voxel_size_m": 5.0,
+  "map_insert_stride": 2,
+  "trajectory_sample_interval_s": 0.2,
+  "mbes_group_pings": 3,
+  "association_map_half_extent_m": 275.0,
+  "slam_association_gpu": true,
+  "slam_association_warmup_ms": 4.132594098336995,
+  "slam_association_mean_ms": 1.6778505577469638,
+  "slam_association_calls": 7468,
+  "slam_gpu_call_mean_ms": 1.632575704492296,
+  "slam_association_gpu_calls": 7468,
+  "slam_association_cpu_fallbacks": 0,
+  "sim_time_s": 3600.0,
+  "wall_time_s": 317.67345857806504,
+  "requested_time_scale": 3600.0,
+  "achieved_time_scale_including_startup": 11.332391447352226,
+  "frames": 60,
+  "imu_rate_hz": 50.0,
+  "imu_samples": 180000,
+  "dvl_rate_hz": 5.0,
+  "dvl_samples": 18000,
+  "depth_rate_hz": 10.0,
+  "depth_samples": 36000,
+  "pings": 5401,
+  "mbes_map_points": 242547,
+  "mbes_total_committed_points": 242547,
+  "mbes_association_map_voxels": 1138,
+  "mbes_map_voxels": 56296,
+  "mbes_mature_surfels": 24439,
+  "sidescan_lines": 5401,
+  "integrated_sonar_pings": 5401,
+  "coregistered_intensity_samples": 2564473,
+  "legacy_range_attached_intensity_samples": 0,
+  "accepted_geometry_updates": 1633,
+  "rejected_geometry_updates": 163,
+  "accepted_intensity_updates": 0,
+  "accepted_local_intensity_updates": 0,
+  "accepted_local_intensity_updates_with_graph_factor": 0,
+  "accepted_local_intensity_updates_without_graph_factor": 0,
+  "accepted_graph_seeded_intensity_updates": 0,
+  "rejected_intensity_updates": 1071,
+  "committed_geometry_groups": 1800,
+  "quarantined_geometry_groups": 0,
+  "committed_intensity_batches": 1071,
+  "quarantined_intensity_batches": 0,
+  "sonar_rejection_reasons": {
+    "residual_not_improved": 161,
+    "insufficient_correspondences": 2
+  },
+  "sonar_observable_rank_counts": {
+    "r2_t1": 868,
+    "r3_t1": 883,
+    "r1_t1": 11,
+    "r0_t0": 2,
+    "r3_t0": 28,
+    "r1_t0": 1,
+    "r2_t0": 3
+  },
+  "intensity_rejection_reasons": {
+    "insufficient_correspondences": 1071
+  },
+  "intensity_planar_rank_counts": {
+    "r0": 1071
+  },
+  "mean_accepted_intensity_correlation": 0.0,
+  "minimum_accepted_intensity_correlation": 0.0,
+  "mean_accepted_intensity_overlap": 0.0,
+  "cumulative_intensity_translation_correction_m": 0.0,
+  "cumulative_intensity_rotation_correction_deg": 0.0,
+  "pending_intensity_batches": 9,
+  "pending_intensity_points": 20955,
+  "intensity_map_points": 2543050,
+  "intensity_map_cells": 76915,
+  "formed_intensity_strips": 1080,
+  "skipped_intensity_strips": 0,
+  "last_intensity_strip_span_m": 3.9778910676527315,
+  "keyframes": 60,
+  "loop_edges": 0,
+  "relocalization_edges": 0,
+  "terrain_prior_edges": 59,
+  "pose_graph_accepted_terrain_priors": 59,
+  "pose_graph_rejected_terrain_priors": 0,
+  "terrain_prior_factor_rejection_reasons": {},
+  "last_terrain_prior_factor_rejection_reason": null,
+  "intensity_factor_edges": 0,
+  "rejected_intensity_factors": 0,
+  "throttled_intensity_factors": 0,
+  "intensity_factor_rejection_reasons": {},
+  "last_intensity_factor_rejection_reason": null,
+  "last_intensity_prefit_performed": false,
+  "last_intensity_prefit_chi2": 0.0,
+  "last_intensity_prefit_dof": 0,
+  "pose_graph_optimization_runs": 12,
+  "local_error_m": 295.32941517674146,
+  "global_error_m": 1.2727231702372561,
+  "position_error_statistics": {
+    "definition": "unaligned Euclidean position error at synchronized 1.5 Hz acoustic ping times, including the t=0 ping/initialization sample exactly once",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 5401,
+      "rmse_3d_m": 150.92847761887518,
+      "mean_3d_m": 116.71415915571373,
+      "median_3d_m": 91.53020232943258,
+      "p95_3d_m": 258.4787388633435,
+      "p99_3d_m": 268.28632165958663,
+      "max_3d_m": 272.8236944828577,
+      "final_3d_m": 88.45496598538728,
+      "horizontal_rmse_m": 150.92847732203563,
+      "vertical_rmse_m": 0.00946589075855373,
+      "final_horizontal_m": 88.45496573760316,
+      "final_vertical_m": 0.006620836130025509
+    },
+    "local_acoustic_esikf": {
+      "samples": 5401,
+      "rmse_3d_m": 132.38611962517408,
+      "mean_3d_m": 93.41676466138773,
+      "median_3d_m": 55.499685936332,
+      "p95_3d_m": 270.8858985090055,
+      "p99_3d_m": 290.5783096445046,
+      "max_3d_m": 295.32941517674146,
+      "final_3d_m": 295.32941517674146,
+      "horizontal_rmse_m": 132.38611928409864,
+      "vertical_rmse_m": 0.009503015362550006,
+      "final_horizontal_m": 295.32941508230255,
+      "final_vertical_m": 0.007468680743045297
+    },
+    "online_global_slam": {
+      "samples": 5401,
+      "rmse_3d_m": 6.600491583300333,
+      "mean_3d_m": 4.864858471483604,
+      "median_3d_m": 3.0892511800053106,
+      "p95_3d_m": 15.028730134141803,
+      "p99_3d_m": 19.64635849382721,
+      "max_3d_m": 23.904724953459773,
+      "final_3d_m": 3.5430862114443213,
+      "horizontal_rmse_m": 6.600484742344123,
+      "vertical_rmse_m": 0.009503015362550006,
+      "final_horizontal_m": 3.5430783395988907,
+      "final_vertical_m": 0.007468680743045297
+    },
+    "final_optimized_global_slam": {
+      "samples": 5401,
+      "rmse_3d_m": 0.6277950779027216,
+      "mean_3d_m": 0.5312003059649476,
+      "median_3d_m": 0.4600210697074203,
+      "p95_3d_m": 1.1223020684887859,
+      "p99_3d_m": 1.3786192261646393,
+      "max_3d_m": 1.5528486504780914,
+      "final_3d_m": 1.2727231702372561,
+      "horizontal_rmse_m": 0.6277223478324823,
+      "vertical_rmse_m": 0.00955582914039229,
+      "final_horizontal_m": 1.272701255938223,
+      "final_vertical_m": 0.007468680743045297
+    },
+    "translation_rpe_by_truth_distance": {
+      "dead_reckoning_imu_dvl_depth": {
+        "100m": {
+          "samples": 5300,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.85985433680061,
+          "rmse_translation_m": 16.74573974644946,
+          "mean_translation_m": 13.164471616536183,
+          "p95_translation_m": 30.65987740814963,
+          "max_translation_m": 61.67463630602046
+        },
+        "1000m": {
+          "samples": 4400,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": 1000.9975575771215,
+          "rmse_translation_m": 96.4708038126707,
+          "mean_translation_m": 80.36287617943843,
+          "p95_translation_m": 159.54979350797484,
+          "max_translation_m": 176.8504014680098
+        },
+        "10000m": {
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": 0.0,
+          "rmse_translation_m": 0.0,
+          "mean_translation_m": 0.0,
+          "p95_translation_m": 0.0,
+          "max_translation_m": 0.0
+        }
+      },
+      "local_acoustic_esikf": {
+        "100m": {
+          "samples": 5300,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.85985433680061,
+          "rmse_translation_m": 7.042016151697297,
+          "mean_translation_m": 6.046008804917977,
+          "p95_translation_m": 9.953660734981751,
+          "max_translation_m": 10.716634236978226
+        },
+        "1000m": {
+          "samples": 4400,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": 1000.9975575771215,
+          "rmse_translation_m": 68.69322678701901,
+          "mean_translation_m": 59.47437420664308,
+          "p95_translation_m": 94.46367781949623,
+          "max_translation_m": 95.28611412914594
+        },
+        "10000m": {
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": 0.0,
+          "rmse_translation_m": 0.0,
+          "mean_translation_m": 0.0,
+          "p95_translation_m": 0.0,
+          "max_translation_m": 0.0
+        }
+      },
+      "online_global_slam": {
+        "100m": {
+          "samples": 5300,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.85985433680061,
+          "rmse_translation_m": 5.081874373627934,
+          "mean_translation_m": 3.4468343403919315,
+          "p95_translation_m": 13.790528173900992,
+          "max_translation_m": 19.883785016851263
+        },
+        "1000m": {
+          "samples": 4400,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": 1000.9975575771215,
+          "rmse_translation_m": 7.356642048953583,
+          "mean_translation_m": 5.574885304976273,
+          "p95_translation_m": 14.767934806255703,
+          "max_translation_m": 23.54265472239435
+        },
+        "10000m": {
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": 0.0,
+          "rmse_translation_m": 0.0,
+          "mean_translation_m": 0.0,
+          "p95_translation_m": 0.0,
+          "max_translation_m": 0.0
+        }
+      },
+      "final_optimized_global_slam": {
+        "100m": {
+          "samples": 5300,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.85985433680061,
+          "rmse_translation_m": 0.5050278581929131,
+          "mean_translation_m": 0.4241100996316024,
+          "p95_translation_m": 0.9846540453206517,
+          "max_translation_m": 1.3085086251025126
+        },
+        "1000m": {
+          "samples": 4400,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": 1000.9975575771215,
+          "rmse_translation_m": 0.8652687845280368,
+          "mean_translation_m": 0.7713169213347913,
+          "p95_translation_m": 1.4618943023747852,
+          "max_translation_m": 1.9559966220995673
+        },
+        "10000m": {
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": 0.0,
+          "rmse_translation_m": 0.0,
+          "mean_translation_m": 0.0,
+          "p95_translation_m": 0.0,
+          "max_translation_m": 0.0
+        }
+      }
+    },
+    "five_kilometre_segments": {
+      "dead_reckoning_imu_dvl_depth": [
+        {
+          "samples": 5001,
+          "rmse_3d_m": 152.48795707573797,
+          "mean_3d_m": 115.94467750771521,
+          "median_3d_m": 88.46616796861207,
+          "p95_3d_m": 259.13468671985106,
+          "p99_3d_m": 268.35670955951304,
+          "max_3d_m": 272.8236944828577,
+          "final_3d_m": 171.13782708637987,
+          "horizontal_rmse_m": 152.4879567783655,
+          "vertical_rmse_m": 0.009523205232191129,
+          "final_horizontal_m": 171.13782560762976,
+          "final_vertical_m": 0.022497558774546178,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 5000.0
+        },
+        {
+          "samples": 400,
+          "rmse_3d_m": 129.8598329636591,
+          "mean_3d_m": 126.33460345981518,
+          "median_3d_m": 126.78022671670952,
+          "p95_3d_m": 172.8625932189518,
+          "p99_3d_m": 176.69021822343808,
+          "max_3d_m": 178.0599126910344,
+          "final_3d_m": 88.45496598538728,
+          "horizontal_rmse_m": 129.85983267105132,
+          "vertical_rmse_m": 0.008717567978414264,
+          "final_horizontal_m": 88.45496573760316,
+          "final_vertical_m": 0.006620836130025509,
+          "start_distance_m": 5000.0,
+          "stop_distance_m": 5399.981544377776
+        }
+      ],
+      "local_acoustic_esikf": [
+        {
+          "samples": 5001,
+          "rmse_3d_m": 112.99775656585652,
+          "mean_3d_m": 78.7090737967813,
+          "median_3d_m": 37.95746625696975,
+          "p95_3d_m": 233.0723979914916,
+          "p99_3d_m": 253.57508934989715,
+          "max_3d_m": 258.6769832684818,
+          "final_3d_m": 258.6769832684818,
+          "horizontal_rmse_m": 112.99775616164551,
+          "vertical_rmse_m": 0.009557712728203107,
+          "final_horizontal_m": 258.6769824390089,
+          "final_vertical_m": 0.0207154800826288,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 5000.0
+        },
+        {
+          "samples": 400,
+          "rmse_3d_m": 277.50292729049056,
+          "mean_3d_m": 277.29966969612974,
+          "median_3d_m": 277.8161269255872,
+          "p95_3d_m": 293.52769617732116,
+          "p99_3d_m": 295.034665872366,
+          "max_3d_m": 295.32941517674146,
+          "final_3d_m": 295.32941517674146,
+          "horizontal_rmse_m": 277.5029271512622,
+          "vertical_rmse_m": 0.008790480611257739,
+          "final_horizontal_m": 295.32941508230255,
+          "final_vertical_m": 0.007468680743045297,
+          "start_distance_m": 5000.0,
+          "stop_distance_m": 5399.981544377776
+        }
+      ],
+      "online_global_slam": [
+        {
+          "samples": 5001,
+          "rmse_3d_m": 6.8340294042441885,
+          "mean_3d_m": 5.095265907078694,
+          "median_3d_m": 3.230556255783113,
+          "p95_3d_m": 15.260562364938703,
+          "p99_3d_m": 19.907465996978033,
+          "max_3d_m": 23.904724953459773,
+          "final_3d_m": 1.2946422603021492,
+          "horizontal_rmse_m": 6.834022720784705,
+          "vertical_rmse_m": 0.009557712728203107,
+          "final_horizontal_m": 1.2944765162200527,
+          "final_vertical_m": 0.0207154800826288,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 5000.0
+        },
+        {
+          "samples": 400,
+          "rmse_3d_m": 2.0833353087371598,
+          "mean_3d_m": 1.9841895079559841,
+          "median_3d_m": 1.7123854354344423,
+          "p95_3d_m": 3.251196743332215,
+          "p99_3d_m": 3.429383629858275,
+          "max_3d_m": 3.5430862114443213,
+          "final_3d_m": 3.5430862114443213,
+          "horizontal_rmse_m": 2.08331676326035,
+          "vertical_rmse_m": 0.008790480611257739,
+          "final_horizontal_m": 3.5430783395988907,
+          "final_vertical_m": 0.007468680743045297,
+          "start_distance_m": 5000.0,
+          "stop_distance_m": 5399.981544377776
+        }
+      ],
+      "final_optimized_global_slam": [
+        {
+          "samples": 5001,
+          "rmse_3d_m": 0.6313731214311136,
+          "mean_3d_m": 0.5311920497844719,
+          "median_3d_m": 0.4523233827139017,
+          "p95_3d_m": 1.1260257517338936,
+          "p99_3d_m": 1.382107877181106,
+          "max_3d_m": 1.5528486504780914,
+          "final_3d_m": 0.8457166525501054,
+          "horizontal_rmse_m": 0.6313000694990043,
+          "vertical_rmse_m": 0.009604203049704179,
+          "final_horizontal_m": 0.8454381864765232,
+          "final_vertical_m": 0.02170090430934124,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 5000.0
+        },
+        {
+          "samples": 400,
+          "rmse_3d_m": 0.5812042787243786,
+          "mean_3d_m": 0.5313035288613467,
+          "median_3d_m": 0.4744844172553724,
+          "p95_3d_m": 1.009416512936548,
+          "p99_3d_m": 1.2444807250300791,
+          "max_3d_m": 1.2822564438360105,
+          "final_3d_m": 1.2727231702372561,
+          "horizontal_rmse_m": 0.5811356877914345,
+          "vertical_rmse_m": 0.008928940737932692,
+          "final_horizontal_m": 1.272701255938223,
+          "final_vertical_m": 0.007468680743045297,
+          "start_distance_m": 5000.0,
+          "stop_distance_m": 5399.981544377776
+        }
+      ]
+    },
+    "rmse_reduction_vs_dead_reckoning_percent": {
+      "local_acoustic_esikf": 12.28552642035143,
+      "final_optimized_global_slam": 99.58404464962004
+    },
+    "final_drift_percent_of_distance": {
+      "dead_reckoning_imu_dvl_depth": 1.6380605240675814,
+      "local_acoustic_esikf": 5.469081935737827,
+      "online_global_slam": 0.06561293186516956,
+      "final_optimized_global_slam": 0.02356902814903802
+    }
+  },
+  "position_error_csv": "demo/large_scale_slam/full_map_route_5km_terrain_prior_metrics_position_errors.csv"
+}

@@ -277,6 +277,61 @@ def publish_camera_tf(camera: Camera):
     return
 
 
+def publish_sensor_tf(sensor, graph_path: str = "/AcousticSensorTFActionGraph"):
+    """Publish a USD sensor prim pose to ``/tf`` without camera-axis rotation."""
+
+    sensor_prim = sensor.prim_path
+    if not is_prim_path_valid(sensor_prim):
+        raise ValueError(f"Sensor path '{sensor_prim}' is invalid.")
+    frame_id = sensor_prim.rsplit("/", 1)[-1]
+    node_name = "PublishTF_" + frame_id
+
+    try:
+        if not is_prim_path_valid(graph_path):
+            og.Controller.edit(
+                {
+                    "graph_path": graph_path,
+                    "evaluator_name": "execution",
+                    "pipeline_stage": og.GraphPipelineStage.GRAPH_PIPELINE_STAGE_SIMULATION,
+                },
+                {
+                    og.Controller.Keys.CREATE_NODES: [
+                        ("OnTick", "omni.graph.action.OnTick"),
+                        ("IsaacClock", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+                    ],
+                },
+            )
+
+        og.Controller.edit(
+            graph_path,
+            {
+                og.Controller.Keys.CREATE_NODES: [
+                    (node_name, "isaacsim.ros2.bridge.ROS2PublishTransformTree"),
+                ],
+                og.Controller.Keys.SET_VALUES: [
+                    (f"{node_name}.inputs:topicName", "/tf"),
+                ],
+                og.Controller.Keys.CONNECT: [
+                    (
+                        f"{graph_path}/OnTick.outputs:tick",
+                        f"{node_name}.inputs:execIn",
+                    ),
+                    (
+                        f"{graph_path}/IsaacClock.outputs:simulationTime",
+                        f"{node_name}.inputs:timeStamp",
+                    ),
+                ],
+            },
+        )
+        set_target_prims(
+            primPath=f"{graph_path}/{node_name}",
+            inputName="inputs:targetPrims",
+            targetPrimPaths=[sensor_prim],
+        )
+    except Exception as exc:
+        carb.log_error(f"Failed to setup acoustic sensor TF publisher: {exc}")
+
+
 ###################################################################
 
 
@@ -293,6 +348,8 @@ class OmniHandler:
         use_imu: bool = False,
         use_dvl: bool = False,
         use_baro: bool = False,
+        use_multibeam: bool = False,
+        use_sidescan: bool = False,
     ):
         self._og_graph = None
         self._rgb_node = None
@@ -302,6 +359,8 @@ class OmniHandler:
         self._imu_node = None
         self._dvl_node = None
         self._baro_node = None
+        self._mbes_node = None
+        self._sidescan_node = None
         self._name = name
         self._dvl_message_package = dvl_message_package
         self._dvl_message_subfolder = dvl_message_subfolder
@@ -311,6 +370,8 @@ class OmniHandler:
         self._use_imu = use_imu
         self._use_dvl = use_dvl
         self._use_baro = use_baro
+        self._use_multibeam = use_multibeam
+        self._use_sidescan = use_sidescan
         self._setup_ros_graph()
 
     @staticmethod
@@ -407,6 +468,35 @@ class OmniHandler:
                     },
                 )
 
+            if self._use_multibeam:
+                self._add_sensor_publisher(
+                    node_definitions=publisher_node_definitions,
+                    execution_connections=publisher_execution_connections,
+                    attribute_values=publisher_attribute_values,
+                    publisher_node_name="mbes_pointcloud_publisher",
+                    publisher_node_type=(
+                        "isaacsim.ros2.bridge.ROS2PublishPointCloud"
+                    ),
+                    publisher_input_values={
+                        "topicName": f"{self._name}/mbes/points",
+                        "frameId": f"{self._name}_mbes",
+                    },
+                )
+
+            if self._use_sidescan:
+                self._add_sensor_publisher(
+                    node_definitions=publisher_node_definitions,
+                    execution_connections=publisher_execution_connections,
+                    attribute_values=publisher_attribute_values,
+                    publisher_node_name="sidescan_image_publisher",
+                    publisher_node_type="isaacsim.ros2.bridge.ROS2PublishImage",
+                    publisher_input_values={
+                        "topicName": f"{self._name}/sidescan/waterfall",
+                        "frameId": f"{self._name}_sidescan",
+                        "encoding": "mono8",
+                    },
+                )
+
             if self._use_imu:
                 self._add_sensor_publisher(
                     node_definitions=publisher_node_definitions,
@@ -492,6 +582,14 @@ class OmniHandler:
             if self._use_baro:
                 self._baro_node = og.Controller.node(
                     f"{graph_path}/baro_publisher"
+                )
+            if self._use_multibeam:
+                self._mbes_node = og.Controller.node(
+                    f"{graph_path}/mbes_pointcloud_publisher"
+                )
+            if self._use_sidescan:
+                self._sidescan_node = og.Controller.node(
+                    f"{graph_path}/sidescan_image_publisher"
                 )
             carb.log_info(
                 f"[{self._name}] Internal ROS 2 Bridge Graph initialized at {graph_path}"

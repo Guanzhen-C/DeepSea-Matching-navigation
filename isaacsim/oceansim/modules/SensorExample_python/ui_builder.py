@@ -170,6 +170,25 @@ class UIBuilder:
                 )
                 self._use_sonar = False
                 self.wrapped_ui_elements.append(sonar_check_box)
+
+                mbes_check_box = CheckBox(
+                    "Multibeam Echosounder (live view)",
+                    default_value=True,
+                    tooltip="Bathymetric swath, hit points, and visible beam fan",
+                    on_click_fn=self._on_mbes_checkbox_click_fn,
+                )
+                self._use_mbes = True
+                self.wrapped_ui_elements.append(mbes_check_box)
+
+                sidescan_check_box = CheckBox(
+                    "Side-scan Sonar (live view)",
+                    default_value=True,
+                    tooltip="Port/starboard returns and a live waterfall image",
+                    on_click_fn=self._on_sidescan_checkbox_click_fn,
+                )
+                self._use_sidescan = True
+                self.wrapped_ui_elements.append(sidescan_check_box)
+
                 camera_check_box = CheckBox(
                     "Underwater Camera",
                     default_value=False,
@@ -290,6 +309,10 @@ class UIBuilder:
         self._imu = None
         self._sonar = None
         self._sonar_trans = np.array([0.3, 0.0, 0.3])
+        self._mbes = None
+        self._mbes_trans = np.array([0.0, 0.0, -0.35])
+        self._sidescan = None
+        self._sidescan_trans = np.array([0.0, 0.0, -0.32])
         self._cam = None
         self._cam_trans = np.array([0.3, 0.0, 0.1])
         self._cam_focal_length = 21
@@ -431,6 +454,67 @@ class UIBuilder:
                 hori_res=4000,
             )
 
+        if self._use_mbes:
+            if self._use_ros:
+                from isaacsim.oceansim.sensors.MultibeamEchosounderSensor_ROS import (
+                    MultibeamEchosounderSensor_ROS,
+                )
+
+                mbes_cls = MultibeamEchosounderSensor_ROS
+            else:
+                from isaacsim.oceansim.sensors.MultibeamEchosounderSensor import (
+                    MultibeamEchosounderSensor,
+                )
+
+                mbes_cls = MultibeamEchosounderSensor
+
+            self._mbes = mbes_cls(
+                prim_path=robot_prim_path + "/mbes",
+                translation=self._mbes_trans,
+                num_beams=128,
+                swath_width_deg=120.0,
+                min_range=0.4,
+                max_range=30.0,
+                range_noise_std=0.015,
+                attenuation=0.008,
+                random_seed=7,
+                viewport=True,
+                draw_in_scene=True,
+            )
+
+        if self._use_sidescan:
+            if self._use_ros:
+                from isaacsim.oceansim.sensors.SideScanSonarSensor_ROS import (
+                    SideScanSonarSensor_ROS,
+                )
+
+                sidescan_cls = SideScanSonarSensor_ROS
+            else:
+                from isaacsim.oceansim.sensors.SideScanSonarSensor import (
+                    SideScanSonarSensor,
+                )
+
+                sidescan_cls = SideScanSonarSensor
+
+            self._sidescan = sidescan_cls(
+                prim_path=robot_prim_path + "/sidescan",
+                translation=self._sidescan_trans,
+                range_bins=384,
+                waterfall_lines=260,
+                rays_per_side=160,
+                tilt_deg=45.0,
+                vertical_beam_width_deg=50.0,
+                min_range=0.4,
+                max_range=30.0,
+                range_noise_std=0.02,
+                multiplicative_noise_std=0.035,
+                additive_noise_std=0.012,
+                attenuation=0.008,
+                random_seed=11,
+                viewport=True,
+                draw_in_scene=True,
+            )
+
         if self._use_camera:
             # TODO: make stereo seperate
             if self._use_ros:
@@ -505,6 +589,8 @@ class UIBuilder:
             self._imu,
             self._rob,
             self._sonar,
+            self._mbes,
+            self._sidescan,
             self._cam,
             self._DVL,
             self._baro,
@@ -586,6 +672,14 @@ class UIBuilder:
 
     def _on_sonar_checkbox_click_fn(self, model):
         self._use_sonar = model
+        print("Reload the scene for changes to take effect.")
+
+    def _on_mbes_checkbox_click_fn(self, model):
+        self._use_mbes = model
+        print("Reload the scene for changes to take effect.")
+
+    def _on_sidescan_checkbox_click_fn(self, model):
+        self._use_sidescan = model
         print("Reload the scene for changes to take effect.")
 
     def _on_camera_checkbox_click_fn(self, model):

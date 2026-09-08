@@ -1,0 +1,121 @@
+{
+  "algorithm": "OceanSim acoustic FAST-LIVO2 adaptation",
+  "sensors": [
+    "IMU",
+    "DVL",
+    "pressure_depth",
+    "MBES",
+    "side_scan"
+  ],
+  "scene_m": [
+    800.0,
+    600.0
+  ],
+  "terrain_source": "BathymetryB [5m]--Monterey Canyon and Vicinity",
+  "terrain_resolution_m": 5.0,
+  "vehicle": "LSTS/OceanScan LAUV",
+  "sonar_backend": "Warp CUDA (cuda:0)",
+  "sonar_backend_gpu": true,
+  "sonar_mesh_triangles": 38400,
+  "sonar_bvh_build_ms": 10.829386010300368,
+  "sonar_mean_cast_ms": 0.9652275499589898,
+  "sonar_backend_verification": {},
+  "slam_association_backend": "Warp CUDA (cuda:0)",
+  "slam_max_points": 384,
+  "mbes_group_pings": 3,
+  "slam_association_gpu": true,
+  "slam_association_warmup_ms": 3.855176968500018,
+  "slam_association_mean_ms": 4.199739107032329,
+  "slam_association_calls": 1518,
+  "slam_gpu_call_mean_ms": 4.151161712659053,
+  "slam_association_gpu_calls": 1518,
+  "slam_association_cpu_fallbacks": 0,
+  "sim_time_s": 359.9999999999898,
+  "wall_time_s": 106.16931460099295,
+  "frames": 2700,
+  "pings": 1801,
+  "mbes_map_points": 172800,
+  "sidescan_lines": 1801,
+  "accepted_geometry_updates": 286,
+  "rejected_geometry_updates": 310,
+  "accepted_intensity_updates": 1,
+  "rejected_intensity_updates": 1725,
+  "committed_geometry_groups": 600,
+  "quarantined_geometry_groups": 0,
+  "committed_intensity_batches": 1801,
+  "quarantined_intensity_batches": 0,
+  "sonar_rejection_reasons": {
+    "insufficient_correspondences": 270,
+    "residual_not_improved": 32,
+    "excessive_translation_correction": 8
+  },
+  "sonar_observable_rank_counts": {
+    "r0_t0": 263,
+    "r2_t0": 99,
+    "r2_t1": 140,
+    "r3_t1": 76,
+    "r1_t0": 15,
+    "r1_t1": 2,
+    "r3_t0": 1
+  },
+  "keyframes": 150,
+  "loop_edges": 0,
+  "local_error_m": 2.7648040976905963,
+  "global_error_m": 2.7648040976905963,
+  "position_error_statistics": {
+    "definition": "unaligned Euclidean position error at synchronized 5 Hz acoustic ping times",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 1802,
+      "rmse_3d_m": 3.9321140602038382,
+      "mean_3d_m": 3.0714677281752754,
+      "p95_3d_m": 7.433593060293284,
+      "max_3d_m": 8.59398462557207,
+      "final_3d_m": 1.877386569164246,
+      "horizontal_rmse_m": 3.9320986223884993,
+      "vertical_rmse_m": 0.011018451033438176,
+      "final_horizontal_m": 1.8773854004246422,
+      "final_vertical_m": 0.002094839064085363
+    },
+    "local_acoustic_esikf": {
+      "samples": 1802,
+      "rmse_3d_m": 3.125487387493929,
+      "mean_3d_m": 2.4248700020049725,
+      "p95_3d_m": 6.385419068567594,
+      "max_3d_m": 6.678483960217761,
+      "final_3d_m": 2.7648040976905963,
+      "horizontal_rmse_m": 3.125467894039733,
+      "vertical_rmse_m": 0.01103869151963564,
+      "final_horizontal_m": 2.7648029463934454,
+      "final_vertical_m": 0.002523137102237172
+    },
+    "online_global_slam": {
+      "samples": 1802,
+      "rmse_3d_m": 3.125487387493929,
+      "mean_3d_m": 2.4248700020049725,
+      "p95_3d_m": 6.385419068567594,
+      "max_3d_m": 6.678483960217761,
+      "final_3d_m": 2.7648040976905963,
+      "horizontal_rmse_m": 3.125467894039733,
+      "vertical_rmse_m": 0.01103869151963564,
+      "final_horizontal_m": 2.7648029463934454,
+      "final_vertical_m": 0.002523137102237172
+    },
+    "final_optimized_global_slam": {
+      "samples": 1802,
+      "rmse_3d_m": 3.125487387493929,
+      "mean_3d_m": 2.4248700020049725,
+      "p95_3d_m": 6.385419068567594,
+      "max_3d_m": 6.678483960217761,
+      "final_3d_m": 2.7648040976905963,
+      "horizontal_rmse_m": 3.125467894039733,
+      "vertical_rmse_m": 0.01103869151963564,
+      "final_horizontal_m": 2.7648029463934454,
+      "final_vertical_m": 0.002523137102237172
+    },
+    "rmse_reduction_vs_dead_reckoning_percent": {
+      "local_acoustic_esikf": 20.513816749967173,
+      "final_optimized_global_slam": 20.513816749967173
+    }
+  },
+  "position_error_csv": "demo/large_scale_slam/measured_group3_fastlivo2_position_errors.csv"
+}

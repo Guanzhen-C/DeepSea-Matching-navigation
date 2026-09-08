@@ -12,6 +12,8 @@ class MHL_Sensor_Example_Scenario():
         self._rob = None
         self._imu = None
         self._sonar = None
+        self._mbes = None
+        self._sidescan = None
         self._cam = None
         self._DVL = None
         self._baro = None
@@ -23,12 +25,28 @@ class MHL_Sensor_Example_Scenario():
 
         self._running_scenario = False
         self._time = 0.0
+        self._acoustic_elapsed = 0.0
+        self._acoustic_ping_period = 0.1
 
-    def setup_scenario(self, imu, rob, sonar, cam, DVL, baro, ctrl_mode, use_ros=True):
+    def setup_scenario(
+        self,
+        imu,
+        rob,
+        sonar,
+        mbes,
+        sidescan,
+        cam,
+        DVL,
+        baro,
+        ctrl_mode,
+        use_ros=True,
+    ):
         self._use_ros = use_ros
         self._imu = imu
         self._rob = rob
         self._sonar = sonar
+        self._mbes = mbes
+        self._sidescan = sidescan
         self._cam = cam
         self._DVL = DVL
         self._baro = baro
@@ -44,6 +62,8 @@ class MHL_Sensor_Example_Scenario():
                 use_imu=self._imu is not None,
                 use_dvl=self._DVL is not None,
                 use_baro=self._baro is not None,
+                use_multibeam=self._mbes is not None,
+                use_sidescan=self._sidescan is not None,
             )
 
             if self._imu is not None:
@@ -58,6 +78,14 @@ class MHL_Sensor_Example_Scenario():
                 ros2_helpers.publish_depth(self._sonar, approx_freq)
                 ros2_helpers.publish_pointcloud_from_depth(self._sonar, approx_freq)
                 ros2_helpers.publish_camera_tf(self._sonar)
+
+            if self._mbes is not None:
+                self._mbes.initialize(og_node=self.omni_ros._mbes_node)
+                ros2_helpers.publish_sensor_tf(self._mbes)
+
+            if self._sidescan is not None:
+                self._sidescan.initialize(og_node=self.omni_ros._sidescan_node)
+                ros2_helpers.publish_sensor_tf(self._sidescan)
 
             if self._cam is not None:
                 self._cam.initialize(
@@ -85,6 +113,12 @@ class MHL_Sensor_Example_Scenario():
 
             if self._sonar is not None:
                 self._sonar.sonar_initialize(include_unlabelled=True)
+
+            if self._mbes is not None:
+                self._mbes.initialize()
+
+            if self._sidescan is not None:
+                self._sidescan.initialize()
 
             if self._cam is not None:
                 self._cam.initialize()
@@ -139,6 +173,7 @@ class MHL_Sensor_Example_Scenario():
                                       })
             
         self._running_scenario = True
+        self._acoustic_elapsed = self._acoustic_ping_period
     # This function will only be called if ctrl_mode==waypoints and waypoints files are changed
     def setup_waypoints(self, waypoint_path, default_waypoint_path):
         def read_data_from_file(file_path):
@@ -176,6 +211,10 @@ class MHL_Sensor_Example_Scenario():
             self._imu = None
         if self._sonar is not None:
             self._sonar.close()
+        if self._mbes is not None:
+            self._mbes.close()
+        if self._sidescan is not None:
+            self._sidescan.close()
         if self._cam is not None:
             self._cam.close()
 
@@ -191,12 +230,15 @@ class MHL_Sensor_Example_Scenario():
 
         self._rob = None
         self._sonar = None
+        self._mbes = None
+        self._sidescan = None
         self._cam = None
         self._DVL = None
         self._baro = None
         self.omni_ros = None
         self._running_scenario = False
         self._time = 0.0
+        self._acoustic_elapsed = 0.0
 
 
     def update_scenario(self, step: float):
@@ -213,6 +255,13 @@ class MHL_Sensor_Example_Scenario():
                 self._imu.get_current_frame()
         if self._sonar is not None:
             self._sonar.make_sonar_data()
+        self._acoustic_elapsed += step
+        if self._acoustic_elapsed >= self._acoustic_ping_period:
+            self._acoustic_elapsed %= self._acoustic_ping_period
+            if self._mbes is not None:
+                self._mbes.scan(timestamp=self._time)
+            if self._sidescan is not None:
+                self._sidescan.scan(timestamp=self._time)
         if self._cam is not None:
             self._cam.render()
         if self._DVL is not None:

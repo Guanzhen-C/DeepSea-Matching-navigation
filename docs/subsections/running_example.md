@@ -8,6 +8,12 @@ Navigate to `OceanSim - Examples - Sensor Example` to open the module. Select th
 
 The module provides self-explanatory UI in which you can choose which sensor to use and corresponding data visualization will be automatically available. User may test this module in their own USD scenes otherwise a default one is used.
 
+The multibeam echosounder and side-scan sonar live-view options are enabled by
+default. Running the scenario opens an MBES swath window and a side-scan
+waterfall window, and also displays acoustic beams and returns in the main 3D
+viewport. Disable the two checkboxes before `LOAD` when acoustic output is not
+needed.
+
 `Enable ROS` publishes selected sensors and enables control of the robot over ROS. 
 When using ROS, ensure you have build and sourced [Oceansim_msgs](https://github.com/umfieldrobotics/oceansim_ros_msgs) prior to starting the simulator. [Refer to the ROS instructions](ros2.md) for more information.
 
@@ -49,6 +55,22 @@ For more instructions when using this example, refer to the following, which you
 
 ### Running the example
 To run the example after selecting the sensors and their configurations, first `Load`, and then click `Run`.
+
+If Isaac Sim is unavailable on a presentation computer, run
+`python3 standalone/acoustic_slam_demo.py` from the repository root and open
+the generated PNG or GIF under `demo/acoustic_slam_preview/`.
+
+For the complete 300 x 220 m acoustic-inertial SLAM validation, run
+`standalone/run_large_scale_underwater_slam.sh --assert-quality`. To see the
+same large environment with live GPU bathymetry/co-registered-side-scan windows
+and SLAM tracks in Isaac Sim, run
+`standalone/run_large_scale_slam_isaac.sh`. Its default `auto`
+backend selects Warp CUDA for the static measured seabed and reports the
+ray and point-to-surfel providers independently in the status window. The
+default 384-point ESIKF group uses GPU association, while small configured
+groups automatically retain CPU association. See the
+[FastSonar-LIVO2 guide](underwater_fast_sonar_slam.md) for metrics, outputs,
+sensor interfaces, and limitations.
 
 ## Color Picker
 OceanSim provides a handy UI tool to accelerate the process of recreating underwater column effects similar to the robot's actual working environment by selecting the appropriate image formation parameters ([Akkaynak, Derya, and Tali Treibitz. "A revised underwater image formation model"](https://ieeexplore.ieee.org/document/8578801).)

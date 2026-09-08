@@ -1,0 +1,109 @@
+{
+  "algorithm": "OceanSim FastSonar-LIVO2",
+  "sonar_acquisition_model": "single_ping_coregistered_bathymetry_backscatter",
+  "seed": 31,
+  "duration_s": 360.0,
+  "intensity_updates_enabled": true,
+  "runtime_s": 23.673571098945104,
+  "environment_m": {
+    "width": 300.0,
+    "length": 220.0
+  },
+  "trajectory": {
+    "path_length_m": 1699.9841496146387,
+    "x_span_m": 244.0,
+    "y_span_m": 156.0,
+    "samples": 18001
+  },
+  "dead_reckoning": {
+    "rmse_m": 1.3629719718499829,
+    "mean_m": 0.9442026211254134,
+    "p95_m": 3.557756426337136,
+    "max_m": 4.595735136948711,
+    "final_m": 0.74298480090758
+  },
+  "local_sonar_odometry": {
+    "rmse_m": 0.38652053844666234,
+    "mean_m": 0.35625233008464713,
+    "p95_m": 0.592239272222071,
+    "max_m": 0.6245142528805656,
+    "final_m": 0.5165651566740243
+  },
+  "global_slam": {
+    "rmse_m": 0.271736193167923,
+    "mean_m": 0.251435449689911,
+    "p95_m": 0.4036156019566657,
+    "max_m": 0.436944562872104,
+    "final_m": 0.13348985485956077
+  },
+  "mapping": {
+    "input_points": 172800,
+    "total_committed_points": 172800,
+    "voxels": 23069,
+    "association_map_voxels": 11788,
+    "mature_surfels": 13954,
+    "optimized_keyframe_points": 50400,
+    "intensity_map_points": 165043,
+    "intensity_map_cells": 12294
+  },
+  "updates": {
+    "integrated_sonar_pings": 1800,
+    "bathymetric_pings": 1800,
+    "sidescan_lines": 1800,
+    "coregistered_intensity_samples": 172723,
+    "legacy_range_attached_intensity_samples": 0,
+    "accepted_sonar_updates": 293,
+    "rejected_sonar_updates": 65,
+    "accepted_intensity_updates": 97,
+    "rejected_intensity_updates": 118,
+    "committed_geometry_groups": 360,
+    "quarantined_geometry_groups": 0,
+    "committed_intensity_batches": 215,
+    "quarantined_intensity_batches": 0,
+    "sonar_rejection_reasons": {
+      "insufficient_correspondences": 49,
+      "residual_not_improved": 16
+    },
+    "sonar_observable_rank_counts": {
+      "r0_t0": 49,
+      "r2_t0": 38,
+      "r2_t1": 131,
+      "r3_t1": 129,
+      "r3_t0": 8,
+      "r1_t0": 3
+    },
+    "intensity_rejection_reasons": {
+      "insufficient_correspondences": 105,
+      "insufficient_overlap": 13
+    },
+    "intensity_planar_rank_counts": {
+      "r0": 118,
+      "r3": 97
+    },
+    "mean_accepted_intensity_correlation": 0.9771219699307049,
+    "minimum_accepted_intensity_correlation": 0.8821025097234145,
+    "mean_accepted_intensity_overlap": 0.8155068728522339,
+    "cumulative_intensity_translation_correction_m": 1.2887988958620726,
+    "cumulative_intensity_rotation_correction_deg": 0.8599066343989249,
+    "pending_intensity_batches": 10,
+    "pending_intensity_points": 7680,
+    "formed_intensity_strips": 225,
+    "skipped_intensity_strips": 0,
+    "last_intensity_strip_span_m": 9.67535097201491,
+    "keyframes": 180,
+    "loop_edges": 90,
+    "relocalization_edges": 0
+  },
+  "quality_checks": {
+    "large_environment": true,
+    "large_trajectory": true,
+    "finite_solution": true,
+    "map_populated": true,
+    "loop_closures": true,
+    "local_rmse": true,
+    "local_p95": true,
+    "global_rmse": true,
+    "global_p95": true
+  },
+  "passed": true
+}

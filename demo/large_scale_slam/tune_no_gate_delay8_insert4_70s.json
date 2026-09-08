@@ -1,0 +1,1485 @@
+{
+  "run_status": "completed",
+  "termination_reason": "requested_wall_duration_reached",
+  "completed_requested_route": false,
+  "full_map_completed": false,
+  "algorithm": "OceanSim acoustic FAST-LIVO2 adaptation with absolute bathymetric terrain-map factors",
+  "algorithm_tracks": {
+    "dead_reckoning_imu_dvl_depth": "IMU propagation with DVL velocity and pressure depth",
+    "local_acoustic_esikf": "self-built surfel/intensity-map relative acoustic ESIKF; no prior-map correction",
+    "online_global_slam": "online pose graph including accepted loop, intensity, and absolute bathymetric terrain factors",
+    "final_optimized_global_slam": "the same global factor graph after consuming every accepted factor in a final optimization"
+  },
+  "navigation_initialization": {
+    "roll_pitch_velocity_and_depth": "simulator t=0 truth (evaluation only)",
+    "horizontal_origin_and_yaw_gauge": "simulator t=0 truth (evaluation only)",
+    "uses_simulator_truth": true,
+    "horizontal_seed_offset_m": [
+      0.0,
+      0.0
+    ],
+    "yaw_seed_offset_deg": 0.0,
+    "interpretation": "controlled front-end odometry evaluation with an exact initial state; not an operational initialization claim"
+  },
+  "sensors": [
+    "IMU",
+    "DVL",
+    "pressure_depth",
+    "integrated_bathymetric_side_scan"
+  ],
+  "sonar_acquisition_model": "single_raw_return_grid_derived_bathymetry_and_backscatter",
+  "simulation_clock_model": "exact application-clock sensor events; kinematic AUV pose; zero-order-held IMU propagation to asynchronous sonar timestamps; Isaac physics timeline is not the navigation time base",
+  "pose_graph_odometry_noise_model": {
+    "model": "continuous-time random walk",
+    "reference_interval_s": 30.0,
+    "horizontal_std_m_per_reference_interval": 1.0,
+    "yaw_std_deg_per_reference_interval": 0.8,
+    "keyframe_max_interval_s": 30.0,
+    "edge_scaling": "standard deviation times sqrt(elapsed/reference)"
+  },
+  "reproducibility": {
+    "random_seed": 31,
+    "python_random_seed": 31,
+    "numpy_legacy_random_seed": 31,
+    "navigation_sensor_seed": 31,
+    "sonar_sensor_seed": 32,
+    "deterministic_event_clock": true,
+    "deterministic_sampling_and_decimation": true,
+    "python_hash_seed": null,
+    "strict_bitwise_determinism": false,
+    "determinism_scope": "sensor noise, event scheduling, sampling, and decimation are seeded/deterministic; bitwise identity is not claimed across Isaac, Warp, driver, device, or thread configurations"
+  },
+  "scene_m": [
+    29205.0,
+    17665.0
+  ],
+  "terrain_source": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+  "terrain_resolution_m": 5.0,
+  "terrain_matching_reference": {
+    "enabled": true,
+    "map_role": "georeferenced prior bathymetry",
+    "surface_model": "same_survey_low_pass_sigma_2p2_cells",
+    "source_product": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+    "resolution_m": 5.0,
+    "vertical_model_std_m": 1.5,
+    "low_pass_sigma_cells": 2.2,
+    "uses_simulator_truth_pose": false,
+    "simulation_and_matcher_share_source_survey": true,
+    "simulation_and_matcher_use_identical_surface": false,
+    "independent_survey_prior": false
+  },
+  "backscatter_map_matching": {
+    "enabled": true,
+    "map_role": "georeferenced side-scan texture refinement of accepted bathymetric fixes",
+    "source_product": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+    "resolution_m": 5.0,
+    "radiometry": "unitless normalized survey mosaic; port/starboard and smooth cross-track trends removed before zero-mean normalized correlation; not calibrated target strength",
+    "fusion": "weighted covariance intersection in local SE(2) coordinates; bathymetry/backscatter independence is not assumed",
+    "covariance_intersection_bathymetry_weight": 0.0,
+    "maximum_points": 2048,
+    "maximum_yaw_deg": 2.5,
+    "boundary_yaw_retry_window_deg": 5.0,
+    "large_correction_compatibility_threshold_m": 5.0,
+    "horizontal_std_floor_m": 2.5,
+    "yaw_std_floor_deg": 1.5,
+    "simulation_and_matcher_share_source_backscatter": true,
+    "independent_survey_prior": false,
+    "inverse_crime_risk": "optimistic same-survey texture upper bound; noise, attenuation and incidence effects are simulated, but the reference mosaic is not from an independent survey",
+    "uses_simulator_truth_pose": false,
+    "invocations": 4,
+    "matcher_calls": 4,
+    "accepts": 3,
+    "rejections": 1,
+    "rejection_reasons": {
+      "ambiguous_backscatter_match": 1
+    },
+    "primary_rejection_reasons": {
+      "ambiguous_backscatter_match": 1
+    },
+    "boundary_yaw_retries": 0,
+    "boundary_yaw_retry_accepts": 0,
+    "fused_fixes": 3,
+    "compatibility_vetoes": 0,
+    "compatibility_veto_reasons": {},
+    "wall_time_s": 1.0886715651722625,
+    "mean_time_ms": 272.1678912930656,
+    "last_patch_raw_points": 140843,
+    "last_patch_reduced_points": 715,
+    "last_patch_voxel_size_m": 5.0,
+    "truth_evaluation": {
+      "evaluation_only": true,
+      "used_by_matcher_or_estimator": false,
+      "accepted_match_count": 3,
+      "bathymetric_seed_horizontal_rmse_m": 0.9544779652594138,
+      "backscatter_horizontal_rmse_m": 1.1871130811383215,
+      "fused_horizontal_rmse_m": 1.1871130811383215,
+      "bathymetric_seed_yaw_rmse_deg": 1.0102392979679637,
+      "backscatter_yaw_rmse_deg": 0.43726012237133627,
+      "fused_yaw_rmse_deg": 0.43726012237133627,
+      "records": [
+        {
+          "timestamp_s": 30.0,
+          "primary_accepted": true,
+          "primary_rejection_reason": null,
+          "primary_yaw_boundary": false,
+          "primary_translation_boundary": false,
+          "boundary_yaw_retry_attempted": false,
+          "accepted": true,
+          "rejection_reason": null,
+          "correlation_before": 0.4990375741226901,
+          "correlation_after": 0.5316360501757581,
+          "second_basin_correlation": 0.5001292402055201,
+          "basin_correlation_gap": 0.031506809970238026,
+          "correspondences": 593,
+          "valid_fraction": 1.0,
+          "observation_texture_std": 0.37877612315571535,
+          "map_texture_std": 0.6012202083872852,
+          "correction_from_bathymetry": [
+            2.0,
+            1.0,
+            -0.012217304763960306
+          ],
+          "bathymetric_translation_correction_m": 0.3787359152201509,
+          "cross_modal_compatible": true,
+          "compatibility_veto_reason": null,
+          "bathymetric_horizontal_error_m": 0.5974834440593272,
+          "bathymetric_yaw_error_deg": 0.030063614021467934,
+          "backscatter_horizontal_error_m": 1.7490426158224617,
+          "backscatter_yaw_error_deg": -0.6699363859785394,
+          "fused_horizontal_error_m": 1.7490426158224617,
+          "fused_yaw_error_deg": -0.6699363859785394,
+          "truth_evaluation_only": true,
+          "truth_used_by_matcher_or_fusion": false,
+          "wall_time_s": 0.2802287370432168
+        },
+        {
+          "timestamp_s": 60.0,
+          "primary_accepted": true,
+          "primary_rejection_reason": null,
+          "primary_yaw_boundary": false,
+          "primary_translation_boundary": false,
+          "boundary_yaw_retry_attempted": false,
+          "accepted": true,
+          "rejection_reason": null,
+          "correlation_before": 0.2412116371831846,
+          "correlation_after": 0.26861178280100106,
+          "second_basin_correlation": 0.2507365143523466,
+          "basin_correlation_gap": 0.017875268448654447,
+          "correspondences": 644,
+          "valid_fraction": 1.0,
+          "observation_texture_std": 0.3808302064024019,
+          "map_texture_std": 0.7180136766050769,
+          "correction_from_bathymetry": [
+            0.5,
+            -0.5,
+            0.026179938779914945
+          ],
+          "bathymetric_translation_correction_m": 1.1488791089799395,
+          "cross_modal_compatible": true,
+          "compatibility_veto_reason": null,
+          "bathymetric_horizontal_error_m": 1.230803150908402,
+          "bathymetric_yaw_error_deg": -1.719419009720755,
+          "backscatter_horizontal_error_m": 0.5543831111964646,
+          "backscatter_yaw_error_deg": -0.2194190097207465,
+          "fused_horizontal_error_m": 0.5543831111964646,
+          "fused_yaw_error_deg": -0.2194190097207465,
+          "truth_evaluation_only": true,
+          "truth_used_by_matcher_or_fusion": false,
+          "wall_time_s": 0.29123705194797367
+        },
+        {
+          "timestamp_s": 90.0,
+          "primary_accepted": false,
+          "primary_rejection_reason": "ambiguous_backscatter_match",
+          "primary_yaw_boundary": false,
+          "primary_translation_boundary": false,
+          "boundary_yaw_retry_attempted": false,
+          "accepted": false,
+          "rejection_reason": "ambiguous_backscatter_match",
+          "correlation_before": 0.3054028166182049,
+          "correlation_after": 0.340320846995678,
+          "second_basin_correlation": 0.3303459979165977,
+          "basin_correlation_gap": 0.009974849079080306,
+          "correspondences": 707,
+          "valid_fraction": 1.0,
+          "observation_texture_std": 0.3951023444291523,
+          "map_texture_std": 0.7081859698863572,
+          "correction_from_bathymetry": [
+            0.5,
+            0.0,
+            -0.03490658503988659
+          ],
+          "bathymetric_translation_correction_m": 0.5380418308075964,
+          "cross_modal_compatible": true,
+          "compatibility_veto_reason": null,
+          "bathymetric_horizontal_error_m": 1.2385570156846015,
+          "bathymetric_yaw_error_deg": 1.7066626557245683,
+          "backscatter_horizontal_error_m": 0.820693774602402,
+          "backscatter_yaw_error_deg": -0.29333734427539737,
+          "fused_horizontal_error_m": 1.2385570156846015,
+          "fused_yaw_error_deg": 1.7066626557245683,
+          "truth_evaluation_only": true,
+          "truth_used_by_matcher_or_fusion": false,
+          "wall_time_s": 0.21520783309824765
+        },
+        {
+          "timestamp_s": 120.0,
+          "primary_accepted": true,
+          "primary_rejection_reason": null,
+          "primary_yaw_boundary": false,
+          "primary_translation_boundary": false,
+          "boundary_yaw_retry_attempted": false,
+          "accepted": true,
+          "rejection_reason": null,
+          "correlation_before": 0.5505036461953049,
+          "correlation_after": 0.5730399100279006,
+          "second_basin_correlation": 0.5514114592505241,
+          "basin_correlation_gap": 0.021628450777376407,
+          "correspondences": 715,
+          "valid_fraction": 1.0,
+          "observation_texture_std": 0.5014820354480438,
+          "map_texture_std": 0.8101069428160214,
+          "correction_from_bathymetry": [
+            0.0,
+            0.0,
+            0.010471975511965978
+          ],
+          "bathymetric_translation_correction_m": 2.3737387136046615,
+          "cross_modal_compatible": true,
+          "compatibility_veto_reason": null,
+          "bathymetric_horizontal_error_m": 0.9280203102767771,
+          "bathymetric_yaw_error_deg": -0.3231791540295872,
+          "backscatter_horizontal_error_m": 0.9280203102767771,
+          "backscatter_yaw_error_deg": 0.2768208459704009,
+          "fused_horizontal_error_m": 0.9280203102767771,
+          "fused_yaw_error_deg": 0.2768208459704009,
+          "truth_evaluation_only": true,
+          "truth_used_by_matcher_or_fusion": false,
+          "wall_time_s": 0.30199794308282435
+        }
+      ]
+    }
+  },
+  "terrain_source_shape_pixels": [
+    3534,
+    5842
+  ],
+  "terrain_geographically_cropped": false,
+  "terrain_valid_measured_cells": 11296546,
+  "terrain_display_stride": 8,
+  "sonar_terrain_stride": 1,
+  "measured_backscatter_coverage_fraction": 0.9866050206850837,
+  "bounds_utm_m": {
+    "west": 583530.0,
+    "east": 612740.0,
+    "south": 4060670.0,
+    "north": 4078340.0
+  },
+  "vehicle": "LSTS/OceanScan LAUV",
+  "sonar_profile": {
+    "mode": "standard",
+    "rows_per_side_per_ping": 8,
+    "along_track_sample_spacing_m": 0.15,
+    "along_track_coverage_per_ping_m": 1.2,
+    "constant_resolution_breakpoint_m": 60.0,
+    "near_range_along_track_resolution_m": 0.15,
+    "horizontal_beam_opening_deg": 0.14,
+    "range_sample_spacing_m": 0.02,
+    "range_resolution_m": 0.025,
+    "maximum_range_m": 250.0,
+    "range_bins_per_side": 12500,
+    "manufacturer": null,
+    "model": null,
+    "acoustic_frequency_hz": null,
+    "ping_rate_hz": null,
+    "vertical_beam_opening_deg": null,
+    "pulse_duration_s": null,
+    "receiver_bandwidth_hz": null,
+    "source_level_db_re_1upa_at_1m": null,
+    "bathymetry_accuracy_m": null,
+    "intensity_unit": null,
+    "vehicle_speed_m_s": null,
+    "operating_altitude_m": null,
+    "line_spacing_m": null,
+    "full_swath_width_m": null,
+    "schema": "oceansim.bathymetric_sidescan.v2.profile/1",
+    "source_document": "\u591a\u6ce2\u675f\u6d4b\u6df1\u4fa7\u626b\u4f5c\u4e1a\u53ca\u6210\u50cfV2.docx",
+    "source_document_sha256": "d078dbfae5776192a3f84d186c9a22b29859e53ee1502a187ab6ba4170be4866",
+    "source_device_identified": false,
+    "far_range_resolution_equation": "sin(radians(horizontal_beam_opening_deg)) * range_m",
+    "source_ambiguities": [
+      "R is not consistently distinguished as slant or ground range",
+      "250 m is not explicitly identified as per-side or full-swath width",
+      "eight along-track beams are represented here as image rows",
+      "2 cm sampling is not explicitly identified before or after slant correction"
+    ],
+    "unprovided_fields": [
+      "acoustic_frequency_hz",
+      "bathymetry_accuracy_m",
+      "full_swath_width_m",
+      "intensity_unit",
+      "line_spacing_m",
+      "manufacturer",
+      "model",
+      "operating_altitude_m",
+      "ping_rate_hz",
+      "pulse_duration_s",
+      "receiver_bandwidth_hz",
+      "source_level_db_re_1upa_at_1m",
+      "vehicle_speed_m_s",
+      "vertical_beam_opening_deg"
+    ]
+  },
+  "sonar_profile_interpretation": {
+    "maximum_range": "treated as per-side slant range",
+    "along_track_rows": "modelled as eight parallel virtual footprint centres per side, spaced by the documented along-track sample interval",
+    "along_track_row_center_offsets_m": [
+      -0.525,
+      -0.375,
+      -0.22499999999999998,
+      -0.075,
+      0.075,
+      0.22499999999999998,
+      0.375,
+      0.525
+    ],
+    "along_track_coverage_boundaries_m": [
+      -0.6,
+      0.6
+    ],
+    "terrain_resolution_limit_m": 5.0,
+    "warning": "2 cm output sampling and 2.5 cm documented sensor resolution do not create independent centimetre-scale seabed information from the 5 m source raster"
+  },
+  "sonar_simulation_assumptions": {
+    "sound_speed_mps": 1500.0,
+    "ping_rate_hz": 10.0,
+    "two_way_travel_time_at_maximum_range_s": 0.3333333333333333,
+    "distinguishable_pings_in_water": 4,
+    "required_distinguishable_pings_in_water": 4,
+    "maximum_scheduled_ping_rate_hz": 12.0,
+    "multiping_waveform_separation_modelled": false,
+    "vertical_fan_width_deg": 170.0,
+    "horizontal_beam_opening_deg": 0.14,
+    "along_track_footprint_model": "parallel virtual row centres; finite 0.14 deg aperture is recorded but not coherently integrated",
+    "center_frequency_hz": null,
+    "range_noise_std_m": 0.028,
+    "attenuation_coefficient_per_m": 0.003,
+    "installation_translation_body_m": [
+      0.1,
+      0.0,
+      -0.15
+    ],
+    "installation_orientation_body_rpy_deg": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "survey_speed_mps": 1.5,
+  "survey_pattern": "full-map-route",
+  "survey_period_s": 48231.13237190622,
+  "requested_survey_laps": 1.01,
+  "survey_laps_completed": 0.0026469763488495292,
+  "survey_travelled_distance_m": 191.39992207817664,
+  "survey_route_completion_fraction": 0.0026455930387079708,
+  "survey_route_file": "/home/cgz/OceanSim/standalone/../data/monterey_canyon_full_5m/full_map_traversal_route.json",
+  "survey_route_definition": {
+    "purpose": "whole_map_traversal",
+    "coverage_claim": "largest_joint_measured_connected_region_extent",
+    "joint_valid_mask": "bathymetry_valid_mask AND backscatter_valid_mask",
+    "planning_clearance_m": 500.0,
+    "required_validation_clearance_m": 250.0,
+    "coarse_planning_grid_m": 50.0,
+    "planner": "four-neighbour A* through cardinal extrema of the largest eroded connected component",
+    "polyline_simplification": "Ramer-Douglas-Peucker, 100 m tolerance, followed by finite-width U-turn replacement at four boundary extrema",
+    "smoothing": "periodic Chaikin corner cutting followed by periodic Catmull-Rom interpolation",
+    "smoothing_iterations": 4,
+    "closed": true,
+    "validated_horizontal_path_length_m": 71678.545,
+    "validated_constant_altitude_3d_path_length_m": 72813.473,
+    "validated_envelope_m": [
+      22750.195,
+      16384.466
+    ],
+    "validated_minimum_joint_clearance_m": 301.654,
+    "validated_maximum_horizontal_curvature_per_m": 0.0142394083,
+    "validated_minimum_horizontal_turn_radius_m": 70.228,
+    "safe_component_extent_fraction": {
+      "x": 0.970779,
+      "y": 0.95425
+    },
+    "recommended_flight_profile": {
+      "speed_mps": 1.5,
+      "minimum_navigation_surface_altitude_m": 40.0,
+      "maximum_pitch_deg": 12.0,
+      "validated_3d_path_length_m": 72346.699,
+      "validated_period_s": 48231.132,
+      "raw_seabed_altitude_range_m": [
+        32.391,
+        178.964
+      ],
+      "pitch_range_deg": [
+        -11.909,
+        11.909
+      ],
+      "note": "A periodic slope-limited vertical look-ahead envelope starts climbs before steep terrain; altitude therefore varies while remaining inside the 250 m sonar range."
+    },
+    "note": "The raster rectangle contains NoData. Disconnected islands cannot be reached without crossing NoData, so they are excluded from a physically valid continuous mission."
+  },
+  "survey_center_m": null,
+  "survey_amplitude_m": null,
+  "survey_pattern_yaw_deg": null,
+  "survey_altitude_m": 40.0,
+  "survey_maximum_pitch_deg": 12.0,
+  "survey_route_validation": {
+    "sample_count": 8192,
+    "period_s": 48231.13237190622,
+    "path_length_m": 72346.69855785933,
+    "x_range_m": [
+      -14025.09765625,
+      8725.140380859375
+    ],
+    "y_range_m": [
+      -8139.370918273926,
+      8245.121765136719
+    ],
+    "auv_depth_range_m": [
+      15.677743688009244,
+      1004.6624649983969
+    ],
+    "seabed_depth_range_m": [
+      56.24207979190309,
+      1111.2253540680904
+    ],
+    "altitude_range_m": [
+      32.39079793303432,
+      178.96399362221268
+    ],
+    "pitch_range_deg": [
+      -11.90882490206504,
+      11.90877398670704
+    ],
+    "bathymetry_fully_valid": true,
+    "backscatter_fully_valid": true,
+    "bathymetry_min_clearance_m": 351.84105860126584,
+    "backscatter_min_clearance_m": 301.65404478276446,
+    "maximum_horizontal_curvature_per_m": 0.014239408292493105,
+    "validation_sample_count": 62812,
+    "validation_max_spacing_m": 1.25,
+    "waypoint_count": 57
+  },
+  "ping_rate_hz": 10.0,
+  "sonar_pings_in_water": 4,
+  "sonar_beams": 96,
+  "published_bathymetry_samples_per_ping": 96,
+  "bathymetry_is_raw_return_subset": true,
+  "slam_uses_unified_xyz_intensity_returns": true,
+  "documented_sidescan_rows_per_side_per_ping": 8,
+  "sidescan_imaging_rays_per_side": 2048,
+  "sidescan_imaging_rays_per_side_per_row": 256,
+  "sidescan_imaging_rays_per_ping": 4096,
+  "unified_raw_returns_per_ping": 4096,
+  "sidescan_slam_sample_stride": 8,
+  "shared_rays_per_ping": 4096,
+  "sonar_swath_width_deg": 170.0,
+  "sidescan_range_bins_per_side": 12500,
+  "sidescan_range_sample_spacing_m": 0.02,
+  "sidescan_documented_range_resolution_m": 0.025,
+  "sidescan_maximum_range_m": 250.0,
+  "intensity_reference_delay_pings": 8,
+  "intensity_group_pings": 1,
+  "intensity_map_insert_stride": 4,
+  "intensity_update_rate_hz": 10.0,
+  "intensity_min_group_span_m": 1.0,
+  "intensity_submap_anchor_interval_s": 120.0,
+  "intensity_effective_independent_samples": 32,
+  "local_sonar_noise_floor_m": 0.3,
+  "local_intensity_noise_std": 0.09,
+  "intensity_min_singular_ratio": 0.002,
+  "intensity_factor_min_interval_s": 300.0,
+  "intensity_factor_optimize_interval": 20,
+  "intensity_updates_enabled": true,
+  "terrain_map_matching_enabled": true,
+  "terrain_prior_surface": "low-pass",
+  "terrain_match_window_pings": 300,
+  "terrain_patch_motion_compensation": "causal_acoustic_inertial_prediction_before_current_ping",
+  "terrain_match_maximum_points": 3072,
+  "terrain_patch_minimum_voxel_size_m": 0.0,
+  "terrain_position_only_priors": false,
+  "terrain_prior_horizontal_std_floor_m": 0.0,
+  "terrain_prior_yaw_std_floor_deg": 3.0,
+  "terrain_gauge_confirmation_patches": 2,
+  "terrain_confirm_every_prior": true,
+  "terrain_gauge_minimum_baseline_m": 40.0,
+  "terrain_gauge_maximum_position_residual_m": 5.0,
+  "terrain_gauge_maximum_yaw_residual_deg": 3.0,
+  "terrain_gauge_initialization": {
+    "pending_patches": 1,
+    "confirmed_pairs": 3,
+    "confirmed_initializations": 1,
+    "inconsistent_pairs": 0,
+    "inconsistent_position_pairs": 0,
+    "inconsistent_yaw_pairs": 0,
+    "full_pose_confirmations": 3,
+    "position_only_confirmations": 0,
+    "unobservable_yaw_patches_held": 0,
+    "overlapping_pairs": 0,
+    "short_baseline_pairs": 0,
+    "last_status": "two_disjoint_patches_prior_ready",
+    "last_seed_baseline_m": 44.81183088385698,
+    "last_odometry_baseline_m": 44.81183088385698,
+    "last_matched_baseline_m": 42.95741370376141,
+    "last_position_fit_residual_m": 2.039779804631459,
+    "last_yaw_correction_deg": 1.045480064887184,
+    "pending_at_end": true,
+    "uses_simulator_truth": false
+  },
+  "terrain_fix_consistency_records": [
+    {
+      "timestamp_s": 60.0,
+      "initializing": true,
+      "reference_timestamp_s": 30.0,
+      "odometry_baseline_m": 45.03620190069397,
+      "position_innovation_m": 2.0957414458625037,
+      "yaw_innovation_deg": 0.06349252562506953,
+      "position_consistent": true,
+      "yaw_consistent": true,
+      "measurement_yaw_observable": true,
+      "propagated_reference_pose2": [
+        5208.888921441694,
+        2518.6901689928204,
+        3.126046007336455
+      ],
+      "current_matched_pose2": [
+        5207.1084689364025,
+        2517.584673138325,
+        3.1271541609590194
+      ],
+      "decision": "full"
+    },
+    {
+      "timestamp_s": 90.0,
+      "initializing": false,
+      "reference_timestamp_s": 60.0,
+      "odometry_baseline_m": 45.61717763487305,
+      "position_innovation_m": 0.479393074582947,
+      "yaw_innovation_deg": 2.5329810044678043,
+      "position_consistent": true,
+      "yaw_consistent": true,
+      "measurement_yaw_observable": true,
+      "propagated_reference_pose2": [
+        5161.494657808929,
+        2518.1388660638963,
+        3.1116615376683576
+      ],
+      "current_matched_pose2": [
+        5161.840970091821,
+        2518.4703559169484,
+        -3.1273149110927925
+      ],
+      "decision": "full"
+    },
+    {
+      "timestamp_s": 120.0,
+      "initializing": false,
+      "reference_timestamp_s": 90.0,
+      "odometry_baseline_m": 44.81183088385698,
+      "position_innovation_m": 2.039779804631459,
+      "yaw_innovation_deg": 1.3259859367388573,
+      "position_consistent": true,
+      "yaw_consistent": true,
+      "measurement_yaw_observable": true,
+      "propagated_reference_pose2": [
+        5117.0306542573235,
+        2518.8388419763164,
+        -3.1379591114782333
+      ],
+      "current_matched_pose2": [
+        5118.899902492165,
+        2519.655305501481,
+        3.1220833752701194
+      ],
+      "decision": "full"
+    }
+  ],
+  "last_terrain_retained_full_swath_pings": 300,
+  "terrain_patch_reduction": "all_ping_horizontal_voxel_centroid_averaging",
+  "last_terrain_patch_raw_points": 26400,
+  "last_terrain_patch_reduced_points": 331,
+  "last_terrain_patch_voxel_size_m": 1.9694660394608554,
+  "terrain_match_translation_window_m": 30.0,
+  "terrain_recovery_translation_window_m": 100.0,
+  "terrain_recovery_after_rejections": 3,
+  "terrain_recovery_policy": {
+    "enabled": true,
+    "strict_rank3": true,
+    "same_patch_pings": 300,
+    "coarse_translation_step_m": 10.0,
+    "coarse_top_k": 16,
+    "coarse_seed_translation_separation_m": 20.0,
+    "coarse_seed_yaw_separation_deg": 2.0,
+    "minimum_basin_translation_separation_m": 5.0,
+    "minimum_basin_yaw_separation_deg": 1.0,
+    "boundary_translation_margin_m": 5.0,
+    "minimum_basin_log_likelihood_ratio": 4.605170185988092,
+    "uses_truth": false,
+    "accepted_factor_optimize_interval": 1
+  },
+  "terrain_emergency_recovery_translation_window_m": 150.0,
+  "terrain_emergency_recovery_policy": {
+    "enabled": true,
+    "requires_preceding_recovery_layer": true,
+    "strict_rank3": true,
+    "same_patch_pings": 300,
+    "failed_prior_threshold": 7,
+    "minimum_estimated_raw_arc_m": 600.0,
+    "minimum_time_since_prior_s": 400.0,
+    "ordinary_attempt_interval_observations": 3,
+    "allowed_preceding_rejection_reasons": [
+      "search_boundary_reached",
+      "insufficient_inliers",
+      "yaw_unobservable",
+      "unobservable_terrain"
+    ],
+    "ambiguity_expansion_allowed": false,
+    "coarse_translation_step_m": 10.0,
+    "coarse_top_k": 16,
+    "coarse_seed_translation_separation_m": 20.0,
+    "minimum_basin_translation_separation_m": 5.0,
+    "minimum_basin_log_likelihood_ratio": 4.605170185988092,
+    "first_match_fused": false,
+    "confirmed_factor_optimize_interval": 1,
+    "confirmed_factor_relocalization_seed": true,
+    "confirmed_factor_robust_kernel": false,
+    "confirmation_requires_actual_nonoverlapping_patch_ids": true,
+    "confirmation_requires_actual_nonoverlapping_patch_times": true,
+    "confirmation_minimum_estimated_raw_arc_m": 60.0,
+    "confirmation_minimum_time_separation_s": 30.0,
+    "confirmation_max_future_observations": 5,
+    "confirmation_position_tolerance_m": 20.0,
+    "confirmation_yaw_tolerance_deg": 5.0,
+    "cooldown_observations": 3,
+    "maximum_automatic_translation_window_m": 150.0,
+    "uses_truth": false
+  },
+  "terrain_match_yaw_window_deg": 8.0,
+  "terrain_require_yaw_observable": true,
+  "terrain_position_only_fallback": {
+    "enabled": true,
+    "policy": "only after a strict primary result is rejected solely as yaw_unobservable; the identical solve is rerun with rank-two output permitted so boundary, residual, ambiguity and innovation checks still execute",
+    "invocations": 0,
+    "accepts": 0,
+    "rejections": 0,
+    "rejection_reasons": {},
+    "wall_time_s": 0.0,
+    "uses_simulator_truth": false
+  },
+  "terrain_initialize_global_gauge": true,
+  "terrain_prior_optimize_interval": 1,
+  "terrain_prior_robust_kernel": "huber",
+  "terrain_match_attempts": 4,
+  "terrain_match_observations": 4,
+  "accepted_terrain_matches": 4,
+  "rejected_terrain_matches": 0,
+  "accepted_terrain_match_observations": 4,
+  "rejected_terrain_match_observations": 0,
+  "terrain_match_invocations": 4,
+  "accepted_terrain_match_invocations": 4,
+  "rejected_terrain_match_invocations": 0,
+  "accepted_terrain_prior_factors": 3,
+  "accepted_terrain_prior_observations": 3,
+  "rejected_terrain_prior_observations": 1,
+  "terrain_prior_factor_attempts": 3,
+  "rejected_terrain_prior_factor_attempts": 0,
+  "terrain_prior_factor_rejection_reasons": {},
+  "normal_terrain_match_invocations": 4,
+  "normal_terrain_match_accepts": 4,
+  "normal_terrain_match_rejections": 0,
+  "normal_terrain_match_rejection_reasons": {},
+  "normal_terrain_match_observable_rank_counts": {
+    "r3_t2_yaw1": 4
+  },
+  "normal_terrain_prior_factor_attempts": 3,
+  "normal_terrain_prior_factor_accepts": 3,
+  "normal_terrain_prior_factor_rejections": 0,
+  "normal_terrain_matching_wall_time_s": 0.5852661470416933,
+  "recovery_terrain_match_invocations": 0,
+  "recovery_terrain_match_accepts": 0,
+  "recovery_terrain_match_rejections": 0,
+  "recovery_terrain_match_rejection_reasons": {},
+  "recovery_terrain_match_observable_rank_counts": {},
+  "recovery_terrain_prior_factor_attempts": 0,
+  "recovery_terrain_prior_factor_accepts": 0,
+  "recovery_terrain_prior_factor_rejections": 0,
+  "recovery_terrain_matching_wall_time_s": 0.0,
+  "emergency_terrain_match_invocations": 0,
+  "emergency_terrain_match_accepts": 0,
+  "emergency_terrain_match_rejections": 0,
+  "emergency_terrain_match_rejection_reasons": {},
+  "emergency_terrain_match_observable_rank_counts": {},
+  "emergency_terrain_prior_factor_attempts": 0,
+  "emergency_terrain_prior_factor_accepts": 0,
+  "emergency_terrain_prior_factor_rejections": 0,
+  "emergency_terrain_matching_wall_time_s": 0.0,
+  "emergency_recovery_attempts": 0,
+  "emergency_pending_hypotheses_created": 0,
+  "emergency_confirmed_recoveries": 0,
+  "emergency_inconsistent_hypotheses": 0,
+  "emergency_expired_hypotheses": 0,
+  "emergency_preceding_factor_rejections": 0,
+  "emergency_pending_at_end": false,
+  "terrain_consecutive_failed_prior_observations": 0,
+  "terrain_maximum_consecutive_failed_prior_observations": 1,
+  "terrain_recovery_events": 0,
+  "terrain_recovery_invocation_records": [],
+  "terrain_match_truth_evaluation": {
+    "evaluation_only": true,
+    "used_by_matcher_or_estimator": false,
+    "definition": "unaligned matcher seed and output error against the synchronized simulated pose at each matcher invocation; truth is recorded only after matching for diagnosis",
+    "accepted_invocation_count": 4,
+    "seed_horizontal_rmse_m": 1.5669868352190475,
+    "matched_horizontal_rmse_m": 1.03284897729518,
+    "seed_yaw_rmse_deg": 0.6220254332907015,
+    "matched_yaw_rmse_deg": 1.2221341720450798,
+    "records": [
+      {
+        "timestamp_s": 30.0,
+        "mode": "normal",
+        "matcher_accepted": true,
+        "rejection_reason": null,
+        "truth_pose2": [
+          5252.5165218553275,
+          2517.007841557329,
+          3.1387301398765546
+        ],
+        "seed_pose2": [
+          5252.28506596804,
+          2517.1537261168505,
+          -3.141442147074251
+        ],
+        "matched_pose2": [
+          5251.920584593581,
+          2517.0507978838405,
+          3.139254848926278
+        ],
+        "seed_horizontal_error_m": 0.27359483267587037,
+        "matched_horizontal_error_m": 0.5974834440593272,
+        "seed_yaw_error_deg": 0.17263334269668318,
+        "matched_yaw_error_deg": 0.030063614021467934,
+        "local_acoustic_odometry_pose2": [
+          5252.28506596804,
+          2517.1537261168505,
+          -3.141442147074251
+        ],
+        "dead_reckoning_pose2": [
+          5252.134227459408,
+          2517.253685569685,
+          -3.1404775203789654
+        ],
+        "reported_pose_std": [
+          3.147813962670162,
+          1.241251467502353,
+          0.03255304159182659
+        ]
+      },
+      {
+        "timestamp_s": 60.0,
+        "mode": "normal",
+        "matcher_accepted": true,
+        "rejection_reason": null,
+        "truth_pose2": [
+          5207.631111336813,
+          2517.399779776429,
+          3.130983745120112
+        ],
+        "seed_pose2": [
+          5207.248869885627,
+          2517.130833617607,
+          3.140751623279473
+        ],
+        "matched_pose2": [
+          5206.6084689364025,
+          2518.084673138325,
+          3.1009742221791043
+        ],
+        "seed_horizontal_error_m": 0.4673762545850098,
+        "matched_horizontal_error_m": 1.230803150908402,
+        "seed_yaw_error_deg": 0.559658193329418,
+        "matched_yaw_error_deg": -1.719419009720755,
+        "local_acoustic_odometry_pose2": [
+          5207.248869885627,
+          2517.130833617607,
+          3.140751623279473
+        ],
+        "dead_reckoning_pose2": [
+          5206.737493762361,
+          2517.7485930543503,
+          3.1356314205034783
+        ],
+        "reported_pose_std": [
+          3.435658230747274,
+          0.9715784039367729,
+          0.028939071657046754
+        ]
+      },
+      {
+        "timestamp_s": 90.0,
+        "mode": "normal",
+        "matcher_accepted": true,
+        "rejection_reason": null,
+        "truth_pose2": [
+          5162.951455301251,
+          2517.921861540735,
+          3.1260835135235694
+        ],
+        "seed_pose2": [
+          5161.409253358811,
+          2518.1492489657035,
+          3.1124095967547545
+        ],
+        "matched_pose2": [
+          5161.840970091821,
+          2518.4703559169484,
+          -3.1273149110927925
+        ],
+        "seed_horizontal_error_m": 1.5588751945877248,
+        "matched_horizontal_error_m": 1.2385570156846015,
+        "seed_yaw_error_deg": -0.783457720266258,
+        "matched_yaw_error_deg": 1.7066626557245683,
+        "local_acoustic_odometry_pose2": [
+          5161.631740099125,
+          2517.064762345609,
+          3.1252589999888114
+        ],
+        "dead_reckoning_pose2": [
+          5161.779121486022,
+          2518.22674917335,
+          3.129886460233689
+        ],
+        "reported_pose_std": [
+          2.117205779248211,
+          1.4260668037562252,
+          0.03518765002016272
+        ]
+      },
+      {
+        "timestamp_s": 120.0,
+        "mode": "normal",
+        "matcher_accepted": true,
+        "rejection_reason": null,
+        "truth_pose2": [
+          5118.527260984506,
+          2518.8053878566143,
+          3.11725194006978
+        ],
+        "seed_pose2": [
+          5116.876723948728,
+          2520.896830395248,
+          3.103836305873874
+        ],
+        "matched_pose2": [
+          5118.899902492165,
+          2519.655305501481,
+          3.1116113997581536
+        ],
+        "seed_horizontal_error_m": 2.6642830928565866,
+        "matched_horizontal_error_m": 0.9280203102767771,
+        "seed_yaw_error_deg": -0.768659218916783,
+        "matched_yaw_error_deg": -0.3231791540295872,
+        "local_acoustic_odometry_pose2": [
+          5116.853695659235,
+          2518.8045678814883,
+          3.1146147996033706
+        ],
+        "dead_reckoning_pose2": [
+          5116.9815855204315,
+          2519.0432419410204,
+          3.1237202833421085
+        ],
+        "reported_pose_std": [
+          2.062982486162946,
+          1.5956899143953907,
+          0.022926372386131814
+        ]
+      }
+    ]
+  },
+  "terrain_recovery_active_at_end": false,
+  "terrain_prior_prefit_chi2": {
+    "accepted": {
+      "count": 3,
+      "finite_count": 3,
+      "nonfinite_count": 0,
+      "max": 1.3873321506870695,
+      "p95": 1.3656354134228297,
+      "mean": 0.9545222464174712
+    },
+    "rejected": {
+      "count": 0,
+      "finite_count": 0,
+      "nonfinite_count": 0,
+      "max": null,
+      "p95": null,
+      "mean": null
+    },
+    "rank2_threshold": 100000.0,
+    "rank3_threshold": 150000.0
+  },
+  "terrain_match_rejection_reasons": {},
+  "terrain_match_invocation_rejection_reasons": {},
+  "terrain_match_observable_rank_counts": {
+    "r3_t2_yaw1": 4
+  },
+  "mean_accepted_terrain_rmse_before_m": 0.49057798050963125,
+  "mean_accepted_terrain_rmse_after_m": 0.42399330702077015,
+  "mean_accepted_terrain_translation_correction_m": 1.109848892153087,
+  "mean_accepted_terrain_yaw_correction_deg": 0.12848837728817025,
+  "maximum_accepted_terrain_translation_correction_m": 2.3737387136046615,
+  "maximum_accepted_terrain_abs_yaw_correction_deg": 2.4901203759908452,
+  "terrain_matching_wall_time_s": 0.5852661470416933,
+  "terrain_matching_mean_time_ms": 146.31653676042333,
+  "last_terrain_match_mode": "normal",
+  "last_terrain_match": {
+    "accepted": true,
+    "rejection_reason": null,
+    "correspondences": 331,
+    "inliers": 331,
+    "observable_rank": 3,
+    "translation_observable_rank": 2,
+    "yaw_observable": true,
+    "rmse_before_m": 0.4997018330940631,
+    "rmse_after_m": 0.46655174894425433,
+    "reduced_chi_square": 0.09986318426056144,
+    "innovation_nis_diagnostic_only": 0.991735087439597,
+    "translation_correction_m": 2.3737387136046615,
+    "yaw_correction_deg": 0.4454800648872121,
+    "distinct_basin_count": 1,
+    "best_basin_cost": 0.10883526722147127,
+    "second_best_basin_cost": null,
+    "basin_cost_gap": null,
+    "basin_log_likelihood_ratio": null,
+    "minimum_basin_log_likelihood_ratio": 4.605170185988092
+  },
+  "sonar_backend": "Warp CUDA (cuda:0)",
+  "sonar_backend_gpu": true,
+  "sonar_mesh_triangles": 22566165,
+  "sonar_bvh_build_ms": 136.9050130015239,
+  "sonar_mean_cast_ms": 0.6496089413257419,
+  "sonar_cast_calls": 1277,
+  "sonar_backend_verification": {},
+  "slam_association_backend": "Warp CUDA (cuda:0)",
+  "slam_max_points": 384,
+  "slam_voxel_size_m": 5.0,
+  "intensity_voxel_size_m": 3.0,
+  "map_insert_stride": 2,
+  "trajectory_sample_interval_s": 0.2,
+  "ui_display_trajectory_samples_cached": 0,
+  "ui_display_trajectory_sample_spacing_m": null,
+  "mbes_group_pings": 1,
+  "association_map_half_extent_m": 275.0,
+  "slam_association_gpu": true,
+  "slam_association_warmup_ms": 4.2078229598701,
+  "slam_association_mean_ms": 1.3221227981803174,
+  "slam_association_calls": 3811,
+  "slam_gpu_call_mean_ms": 1.2737299721664614,
+  "slam_association_gpu_calls": 3811,
+  "slam_association_cpu_fallbacks": 0,
+  "sim_time_s": 127.66666666666667,
+  "wall_time_s": 70.05483268504031,
+  "requested_time_scale": 20.0,
+  "achieved_time_scale_including_startup": 1.8223819817369245,
+  "ui_sonar_refresh_limit_hz": 2.0,
+  "sonar_visualization_updates": 0,
+  "effective_sonar_visualization_rate_sim_hz": 0.0,
+  "performance_wall_time_breakdown_s": {
+    "acoustic_stage_pose": 0.48553956230171025,
+    "display_stage_updates": 0.11980119871441275,
+    "kit_render_step": 0.24671249720267951,
+    "local_slam_update": 52.20337270363234,
+    "sensor_and_slam_event_loop": 69.22711832250934,
+    "sonar_scan": 9.780189732089639
+  },
+  "frames": 383,
+  "imu_rate_hz": 50.0,
+  "imu_samples": 6383,
+  "dvl_rate_hz": 5.0,
+  "dvl_samples": 638,
+  "depth_rate_hz": 10.0,
+  "depth_samples": 1276,
+  "pings": 1277,
+  "mbes_map_points": 303828,
+  "mbes_total_committed_points": 303828,
+  "mbes_association_map_voxels": 2300,
+  "mbes_map_voxels": 2465,
+  "mbes_mature_surfels": 2300,
+  "sidescan_lines": 1277,
+  "integrated_sonar_pings": 1277,
+  "coregistered_intensity_samples": 582030,
+  "legacy_range_attached_intensity_samples": 0,
+  "accepted_geometry_updates": 1230,
+  "rejected_geometry_updates": 33,
+  "accepted_intensity_updates": 218,
+  "accepted_local_intensity_updates": 218,
+  "accepted_local_intensity_updates_with_graph_factor": 1,
+  "accepted_local_intensity_updates_without_graph_factor": 217,
+  "accepted_graph_seeded_intensity_updates": 0,
+  "rejected_intensity_updates": 1041,
+  "committed_geometry_groups": 1277,
+  "quarantined_geometry_groups": 0,
+  "committed_intensity_batches": 317,
+  "quarantined_intensity_batches": 0,
+  "sonar_rejection_reasons": {
+    "residual_not_improved": 33
+  },
+  "sonar_observable_rank_counts": {
+    "r3_t1": 529,
+    "r2_t1": 706,
+    "r1_t1": 28
+  },
+  "intensity_rejection_reasons": {
+    "insufficient_correspondences": 20,
+    "insufficient_overlap": 1021
+  },
+  "intensity_planar_rank_counts": {
+    "r0": 1039,
+    "r3": 220
+  },
+  "mean_accepted_intensity_correlation": 0.9788023468395991,
+  "minimum_accepted_intensity_correlation": 0.9198846911583582,
+  "mean_accepted_intensity_overlap": 0.4945885894495411,
+  "cumulative_intensity_translation_correction_m": 0.6013320071583995,
+  "cumulative_intensity_rotation_correction_deg": 0.5148471301975073,
+  "pending_intensity_batches": 2,
+  "pending_intensity_points": 789,
+  "intensity_map_points": 144626,
+  "intensity_map_cells": 5848,
+  "formed_intensity_strips": 1277,
+  "skipped_intensity_strips": 0,
+  "last_intensity_strip_span_m": 1.2,
+  "keyframes": 6,
+  "loop_edges": 0,
+  "relocalization_edges": 0,
+  "terrain_prior_edges": 3,
+  "pose_graph_accepted_terrain_priors": 3,
+  "pose_graph_rejected_terrain_priors": 0,
+  "last_terrain_prior_factor_rejection_reason": null,
+  "last_terrain_prefit_performed": true,
+  "last_terrain_prefit_chi2": 1.3873321506870695,
+  "last_terrain_prefit_dof": 3,
+  "terrain_relocalization_seeds": 1,
+  "last_terrain_relocalization_translation_m": 0.47506077201602787,
+  "last_terrain_relocalization_yaw_deg": -0.7790772030501645,
+  "last_terrain_relocalization_anchor_index": null,
+  "intensity_factor_edges": 1,
+  "rejected_intensity_factors": 0,
+  "throttled_intensity_factors": 18,
+  "intensity_factor_rejection_reasons": {},
+  "last_intensity_factor_rejection_reason": null,
+  "last_intensity_prefit_performed": false,
+  "last_intensity_prefit_chi2": 0.0,
+  "last_intensity_prefit_dof": 0,
+  "pose_graph_optimization_runs": 4,
+  "local_error_m": 1.54937266251939,
+  "global_error_m": 1.867482637311365,
+  "position_error_statistics": {
+    "definition": "unaligned Euclidean position error at synchronized 10 Hz acoustic ping times, including the t=0 ping/initialization sample exactly once",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 1277,
+      "rmse_3d_m": 1.0188159505556325,
+      "mean_3d_m": 0.8996144339218471,
+      "median_3d_m": 0.993547441557215,
+      "p95_3d_m": 1.580768478140704,
+      "p99_3d_m": 1.6463553273784006,
+      "max_3d_m": 1.6757272610681442,
+      "final_3d_m": 1.6618146889490089,
+      "horizontal_rmse_m": 1.0187725651816164,
+      "vertical_rmse_m": 0.009402209306657845,
+      "final_horizontal_m": 1.661814667858698,
+      "final_vertical_m": 0.00026475720312646445
+    },
+    "local_acoustic_esikf": {
+      "samples": 1277,
+      "rmse_3d_m": 1.091954344322529,
+      "mean_3d_m": 0.890900748488899,
+      "median_3d_m": 0.5591511623588267,
+      "p95_3d_m": 1.788380379063474,
+      "p99_3d_m": 1.8328406124002061,
+      "max_3d_m": 1.8406553596361108,
+      "final_3d_m": 1.558886147273385,
+      "horizontal_rmse_m": 1.0918825206372034,
+      "vertical_rmse_m": 0.01252402538288378,
+      "final_horizontal_m": 1.5588762692181177,
+      "final_vertical_m": 0.0055495431758458835
+    },
+    "online_global_slam": {
+      "samples": 1277,
+      "rmse_3d_m": 1.2821913553188287,
+      "mean_3d_m": 0.9992514141127268,
+      "median_3d_m": 0.6761186118973429,
+      "p95_3d_m": 2.481761243698469,
+      "p99_3d_m": 2.6356933681626575,
+      "max_3d_m": 2.6589673551116126,
+      "final_3d_m": 1.8707462884114718,
+      "horizontal_rmse_m": 1.2821301885699998,
+      "vertical_rmse_m": 0.01252402538288378,
+      "final_horizontal_m": 1.87073805707155,
+      "final_vertical_m": 0.0055495431758458835
+    },
+    "final_optimized_global_slam": {
+      "samples": 1277,
+      "rmse_3d_m": 0.9627296854260502,
+      "mean_3d_m": 0.8291260718382754,
+      "median_3d_m": 0.5729335718159958,
+      "p95_3d_m": 1.7410295645172866,
+      "p99_3d_m": 1.8263255933376226,
+      "max_3d_m": 1.8707462455457007,
+      "final_3d_m": 1.8707462455457007,
+      "horizontal_rmse_m": 0.9626493487571229,
+      "vertical_rmse_m": 0.012436982673820412,
+      "final_horizontal_m": 1.87073801420559,
+      "final_vertical_m": 0.0055495431758458835
+    },
+    "translation_rpe_by_truth_distance": {
+      "dead_reckoning_imu_dvl_depth": {
+        "100m": {
+          "available": true,
+          "samples": 610,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.04992336813186,
+          "rmse_translation_m": 0.8939981183541803,
+          "mean_translation_m": 0.8916024822621745,
+          "p95_translation_m": 1.019454308048441,
+          "max_translation_m": 1.0491072662701544
+        },
+        "1000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        },
+        "10000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        }
+      },
+      "local_acoustic_esikf": {
+        "100m": {
+          "available": true,
+          "samples": 610,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.04992336813186,
+          "rmse_translation_m": 1.4152063562228099,
+          "mean_translation_m": 1.402793720730898,
+          "p95_translation_m": 1.5885653009580667,
+          "max_translation_m": 1.6123643973729427
+        },
+        "1000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        },
+        "10000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        }
+      },
+      "online_global_slam": {
+        "100m": {
+          "available": true,
+          "samples": 610,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.04992336813186,
+          "rmse_translation_m": 1.6194289328700135,
+          "mean_translation_m": 1.531150004880288,
+          "p95_translation_m": 2.3805019340713427,
+          "max_translation_m": 2.564690703301902
+        },
+        "1000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        },
+        "10000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        }
+      },
+      "final_optimized_global_slam": {
+        "100m": {
+          "available": true,
+          "samples": 610,
+          "requested_interval_m": 100.0,
+          "mean_actual_interval_m": 100.04992336813186,
+          "rmse_translation_m": 0.9533661553618377,
+          "mean_translation_m": 0.8974399815739258,
+          "p95_translation_m": 1.2889734274013716,
+          "max_translation_m": 1.3563216971829704
+        },
+        "1000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 1000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        },
+        "10000m": {
+          "available": false,
+          "samples": 0,
+          "requested_interval_m": 10000.0,
+          "mean_actual_interval_m": null,
+          "rmse_translation_m": null,
+          "mean_translation_m": null,
+          "p95_translation_m": null,
+          "max_translation_m": null
+        }
+      }
+    },
+    "five_kilometre_segments": {
+      "dead_reckoning_imu_dvl_depth": [
+        {
+          "samples": 1277,
+          "rmse_3d_m": 1.0188159505556325,
+          "mean_3d_m": 0.8996144339218471,
+          "median_3d_m": 0.993547441557215,
+          "p95_3d_m": 1.580768478140704,
+          "p99_3d_m": 1.6463553273784006,
+          "max_3d_m": 1.6757272610681442,
+          "final_3d_m": 1.6618146889490089,
+          "horizontal_rmse_m": 1.0187725651816164,
+          "vertical_rmse_m": 0.009402209306657845,
+          "final_horizontal_m": 1.661814667858698,
+          "final_vertical_m": 0.00026475720312646445,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 191.39992207817664
+        }
+      ],
+      "local_acoustic_esikf": [
+        {
+          "samples": 1277,
+          "rmse_3d_m": 1.091954344322529,
+          "mean_3d_m": 0.890900748488899,
+          "median_3d_m": 0.5591511623588267,
+          "p95_3d_m": 1.788380379063474,
+          "p99_3d_m": 1.8328406124002061,
+          "max_3d_m": 1.8406553596361108,
+          "final_3d_m": 1.558886147273385,
+          "horizontal_rmse_m": 1.0918825206372034,
+          "vertical_rmse_m": 0.01252402538288378,
+          "final_horizontal_m": 1.5588762692181177,
+          "final_vertical_m": 0.0055495431758458835,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 191.39992207817664
+        }
+      ],
+      "online_global_slam": [
+        {
+          "samples": 1277,
+          "rmse_3d_m": 1.2821913553188287,
+          "mean_3d_m": 0.9992514141127268,
+          "median_3d_m": 0.6761186118973429,
+          "p95_3d_m": 2.481761243698469,
+          "p99_3d_m": 2.6356933681626575,
+          "max_3d_m": 2.6589673551116126,
+          "final_3d_m": 1.8707462884114718,
+          "horizontal_rmse_m": 1.2821301885699998,
+          "vertical_rmse_m": 0.01252402538288378,
+          "final_horizontal_m": 1.87073805707155,
+          "final_vertical_m": 0.0055495431758458835,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 191.39992207817664
+        }
+      ],
+      "final_optimized_global_slam": [
+        {
+          "samples": 1277,
+          "rmse_3d_m": 0.9627296854260502,
+          "mean_3d_m": 0.8291260718382754,
+          "median_3d_m": 0.5729335718159958,
+          "p95_3d_m": 1.7410295645172866,
+          "p99_3d_m": 1.8263255933376226,
+          "max_3d_m": 1.8707462455457007,
+          "final_3d_m": 1.8707462455457007,
+          "horizontal_rmse_m": 0.9626493487571229,
+          "vertical_rmse_m": 0.012436982673820412,
+          "final_horizontal_m": 1.87073801420559,
+          "final_vertical_m": 0.0055495431758458835,
+          "start_distance_m": 0.0,
+          "stop_distance_m": 191.39992207817664
+        }
+      ]
+    },
+    "rmse_reduction_vs_dead_reckoning_percent": {
+      "local_acoustic_esikf": -7.178764106216538,
+      "final_optimized_global_slam": 5.505043879514691
+    },
+    "final_drift_percent_of_distance": {
+      "dead_reckoning_imu_dvl_depth": 0.8682420927372407,
+      "local_acoustic_esikf": 0.814465403301817,
+      "online_global_slam": 0.9774018025186928,
+      "final_optimized_global_slam": 0.977401780122774
+    }
+  },
+  "orientation_error_statistics": {
+    "definition": "truth-to-estimate relative SO(3) rotation at synchronized 10 Hz acoustic ping times, decomposed into intrinsic roll/pitch/yaw error; yaw is wrapped and no component-wise quaternion subtraction is used",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 1277,
+      "roll": {
+        "rmse_deg": 0.057853467782824186,
+        "p95_abs_deg": 0.11287776721448221,
+        "max_abs_deg": 0.14062400290446145,
+        "final_abs_deg": 0.021864342670172482,
+        "final_signed_deg": 0.021864342670172482
+      },
+      "pitch": {
+        "rmse_deg": 0.06544246230572563,
+        "p95_abs_deg": 0.10976344151569678,
+        "max_abs_deg": 0.18761701113929155,
+        "final_abs_deg": 0.013215398696806765,
+        "final_signed_deg": 0.013215398696806765
+      },
+      "yaw": {
+        "rmse_deg": 0.2856758519880927,
+        "p95_abs_deg": 0.42017106214901784,
+        "max_abs_deg": 0.48669464957031056,
+        "final_abs_deg": 0.4601069761091136,
+        "final_signed_deg": 0.4601069761091136
+      },
+      "total_rotation": {
+        "rmse_deg": 0.29874132932941777,
+        "p95_abs_deg": 0.42871718116110263,
+        "max_abs_deg": 0.48831326172768613,
+        "final_abs_deg": 0.46081319626358697,
+        "final_signed_deg": 0.46081319626358697
+      }
+    },
+    "local_acoustic_esikf": {
+      "samples": 1277,
+      "roll": {
+        "rmse_deg": 0.08217203856768886,
+        "p95_abs_deg": 0.15166815469434702,
+        "max_abs_deg": 0.23587623972754027,
+        "final_abs_deg": 0.021764734244593312,
+        "final_signed_deg": 0.021764734244593312
+      },
+      "pitch": {
+        "rmse_deg": 0.09290912824355638,
+        "p95_abs_deg": 0.15425316529762176,
+        "max_abs_deg": 0.20643567538344756,
+        "final_abs_deg": 0.08332066331365491,
+        "final_signed_deg": 0.08332066331365491
+      },
+      "yaw": {
+        "rmse_deg": 0.3013750517434163,
+        "p95_abs_deg": 0.5641860711851627,
+        "max_abs_deg": 0.6231084940676077,
+        "final_abs_deg": 0.1833187402845456,
+        "final_signed_deg": 0.1833187402845456
+      },
+      "total_rotation": {
+        "rmse_deg": 0.325874862099094,
+        "p95_abs_deg": 0.5675102770451771,
+        "max_abs_deg": 0.6376196034796232,
+        "final_abs_deg": 0.20252404438167718,
+        "final_signed_deg": 0.20252404438167718
+      }
+    },
+    "online_global_slam": {
+      "samples": 1277,
+      "roll": {
+        "rmse_deg": 0.11904926633966073,
+        "p95_abs_deg": 0.21299256602339828,
+        "max_abs_deg": 0.302117331942586,
+        "final_abs_deg": 0.010815668110975375,
+        "final_signed_deg": 0.010815668110975375
+      },
+      "pitch": {
+        "rmse_deg": 0.09266945064443852,
+        "p95_abs_deg": 0.15397228868181428,
+        "max_abs_deg": 0.20645035922802182,
+        "final_abs_deg": 0.08334855431762289,
+        "final_signed_deg": 0.08334855431762289
+      },
+      "yaw": {
+        "rmse_deg": 0.4950390765395735,
+        "p95_abs_deg": 0.9672100475423906,
+        "max_abs_deg": 1.010386730088122,
+        "final_abs_deg": 0.10858470119574674,
+        "final_signed_deg": 0.10858470119574674
+      },
+      "total_rotation": {
+        "rmse_deg": 0.5174374122063986,
+        "p95_abs_deg": 0.9930103013901088,
+        "max_abs_deg": 1.0323685847716013,
+        "final_abs_deg": 0.1373058154259532,
+        "final_signed_deg": 0.1373058154259532
+      }
+    },
+    "final_optimized_global_slam": {
+      "samples": 1277,
+      "roll": {
+        "rmse_deg": 0.08004828649099822,
+        "p95_abs_deg": 0.1514437276580673,
+        "max_abs_deg": 0.2554969483633254,
+        "final_abs_deg": 0.01081567175408085,
+        "final_signed_deg": 0.01081567175408085
+      },
+      "pitch": {
+        "rmse_deg": 0.09287034624037412,
+        "p95_abs_deg": 0.15413070137237508,
+        "max_abs_deg": 0.20645035922590355,
+        "final_abs_deg": 0.0833485543107195,
+        "final_signed_deg": 0.0833485543107195
+      },
+      "yaw": {
+        "rmse_deg": 0.45951906571294243,
+        "p95_abs_deg": 0.8145682499520561,
+        "max_abs_deg": 0.8931642796888016,
+        "final_abs_deg": 0.10858472606212174,
+        "final_signed_deg": 0.10858472606212174
+      },
+      "total_rotation": {
+        "rmse_deg": 0.4755797173275927,
+        "p95_abs_deg": 0.8263508206135339,
+        "max_abs_deg": 0.9099412247888673,
+        "final_abs_deg": 0.13730583537645016,
+        "final_signed_deg": 0.13730583537645016
+      }
+    }
+  },
+  "position_error_csv": "demo/large_scale_slam/tune_no_gate_delay8_insert4_70s_position_errors.csv"
+}

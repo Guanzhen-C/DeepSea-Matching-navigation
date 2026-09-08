@@ -1,0 +1,128 @@
+{
+  "algorithm": "OceanSim acoustic FAST-LIVO2 adaptation",
+  "sensors": [
+    "IMU",
+    "DVL",
+    "pressure_depth",
+    "MBES",
+    "side_scan"
+  ],
+  "scene_m": [
+    800.0,
+    600.0
+  ],
+  "terrain_source": "BathymetryB [5m]--Monterey Canyon and Vicinity",
+  "terrain_resolution_m": 5.0,
+  "vehicle": "LSTS/OceanScan LAUV",
+  "survey_speed_mps": 1.5,
+  "survey_period_s": 1566.2134294995901,
+  "survey_laps_completed": 1.0001191220154597,
+  "sidescan_along_track_samples": 3,
+  "sidescan_along_track_beam_deg": 2.0,
+  "intensity_reference_delay_pings": 2,
+  "sonar_backend": "Warp CUDA (cuda:0)",
+  "sonar_backend_gpu": true,
+  "sonar_mesh_triangles": 38400,
+  "sonar_bvh_build_ms": 4.878256993833929,
+  "sonar_mean_cast_ms": 0.6645940767851307,
+  "sonar_backend_verification": {},
+  "slam_association_backend": "Warp CUDA (cuda:0)",
+  "slam_max_points": 384,
+  "mbes_group_pings": 5,
+  "slam_association_gpu": true,
+  "slam_association_warmup_ms": 3.916194022167474,
+  "slam_association_mean_ms": 14.211973236868465,
+  "slam_association_calls": 5330,
+  "slam_gpu_call_mean_ms": 14.148274641433794,
+  "slam_association_gpu_calls": 5330,
+  "slam_association_cpu_fallbacks": 0,
+  "sim_time_s": 1566.3999999999521,
+  "wall_time_s": 664.7571128960117,
+  "frames": 2937,
+  "pings": 7833,
+  "mbes_map_points": 751680,
+  "sidescan_lines": 7833,
+  "accepted_geometry_updates": 1508,
+  "rejected_geometry_updates": 56,
+  "accepted_intensity_updates": 7156,
+  "rejected_intensity_updates": 659,
+  "committed_geometry_groups": 1566,
+  "quarantined_geometry_groups": 0,
+  "committed_intensity_batches": 7831,
+  "quarantined_intensity_batches": 0,
+  "sonar_rejection_reasons": {
+    "residual_not_improved": 56
+  },
+  "sonar_observable_rank_counts": {
+    "r2_t1": 683,
+    "r3_t1": 861,
+    "r1_t1": 20
+  },
+  "intensity_rejection_reasons": {
+    "residual_not_improved": 106,
+    "insufficient_correspondences": 550,
+    "insufficient_yaw_information": 3
+  },
+  "pending_intensity_batches": 2,
+  "pending_intensity_points": 492,
+  "keyframes": 587,
+  "loop_edges": 0,
+  "local_error_m": 7.8636699172633175,
+  "global_error_m": 7.8636699172633175,
+  "position_error_statistics": {
+    "definition": "unaligned Euclidean position error at synchronized 5 Hz acoustic ping times",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 7834,
+      "rmse_3d_m": 8.373449863413397,
+      "mean_3d_m": 6.79012198600646,
+      "p95_3d_m": 18.183301119928746,
+      "max_3d_m": 25.504640590224756,
+      "final_3d_m": 6.724610165069998,
+      "horizontal_rmse_m": 8.373444565879458,
+      "vertical_rmse_m": 0.009418983044406935,
+      "final_horizontal_m": 6.7246035983836805,
+      "final_vertical_m": 0.009397700144631926
+    },
+    "local_acoustic_esikf": {
+      "samples": 7834,
+      "rmse_3d_m": 11.378721399497959,
+      "mean_3d_m": 10.184365431943414,
+      "p95_3d_m": 17.010297333241763,
+      "max_3d_m": 17.412910770790702,
+      "final_3d_m": 7.8636699172633175,
+      "horizontal_rmse_m": 11.378717324179942,
+      "vertical_rmse_m": 0.009630358252743776,
+      "final_horizontal_m": 7.863667727182663,
+      "final_vertical_m": 0.005868912839900986
+    },
+    "online_global_slam": {
+      "samples": 7834,
+      "rmse_3d_m": 11.378721399497959,
+      "mean_3d_m": 10.184365431943414,
+      "p95_3d_m": 17.010297333241763,
+      "max_3d_m": 17.412910770790702,
+      "final_3d_m": 7.8636699172633175,
+      "horizontal_rmse_m": 11.378717324179942,
+      "vertical_rmse_m": 0.009630358252743776,
+      "final_horizontal_m": 7.863667727182663,
+      "final_vertical_m": 0.005868912839900986
+    },
+    "final_optimized_global_slam": {
+      "samples": 7834,
+      "rmse_3d_m": 11.378721399497959,
+      "mean_3d_m": 10.184365431943414,
+      "p95_3d_m": 17.010297333241763,
+      "max_3d_m": 17.412910770790702,
+      "final_3d_m": 7.8636699172633175,
+      "horizontal_rmse_m": 11.378717324179942,
+      "vertical_rmse_m": 0.009630358252743776,
+      "final_horizontal_m": 7.863667727182663,
+      "final_vertical_m": 0.005868912839900986
+    },
+    "rmse_reduction_vs_dead_reckoning_percent": {
+      "local_acoustic_esikf": -35.89048223977157,
+      "final_optimized_global_slam": -35.89048223977157
+    }
+  },
+  "position_error_csv": "demo/large_scale_slam/measured_constant_speed_fastlivo2_round1_position_errors.csv"
+}

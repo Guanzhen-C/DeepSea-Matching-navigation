@@ -15,6 +15,10 @@
 
 OceanSim is a high-fidelity underwater simulation framework designed to accelerate the development of robust underwater perception solutions. Leveraging GPU-accelerated rendering and advanced physics-based techniques, OceanSim accurately models both visual and acoustic sensors, significantly reducing the simulation-to-real gap.
 
+![OceanSim acoustic SLAM dashboard](../demo/acoustic_slam_preview/acoustic_slam_dashboard.png)
+
+![OceanSim large-area FastSonar-LIVO2 validation](../demo/large_scale_slam/overview.png)
+
 <a href="https://umfieldrobotics.github.io/OceanSim/">
   <img src="../media/terrain-gen.gif" alt="OceanSim Demo" style="width:75%;">
 </a>
@@ -25,7 +29,7 @@ Towards scaling marine perception with synthetic data, we are now bringing Ocean
 ![OceanSim pitch](../media/pitch.png)
 <!-- GPU-accelerated, physics-based underwater sensor rendering, highly effetcive 3D workflows, open-source -->
 <!-- use emoji -->
-🚀 **GPU-accelerated**: OceanSim fully leverages the power of GPU-based parallel computing. OceanSim is built on top of [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) and is part of [NVIDIA Omniverse](https://www.nvidia.com/en-us/omniverse/) ecosystem, which provide high performance and real-time rendering. \
+🚀 **GPU-accelerated**: OceanSim uses GPU parallelism for rendering, underwater camera and imaging-sonar processing, water/terrain kernels, integrated bathymetry/backscatter ray casting, and sufficiently large point-to-surfel SLAM association batches. CPU fallbacks remain available and the small ESIKF/pose-graph solves stay on the CPU; acceleration is reported per subsystem rather than implying every module runs on the GPU. OceanSim is built on [NVIDIA Isaac Sim](https://developer.nvidia.com/isaac/sim) and the [NVIDIA Omniverse](https://www.nvidia.com/en-us/omniverse/) ecosystem. \
 🌊 **Physics-based underwater sensor rendering**: Experience realistic simulations with advanced physics models that accurately replicate underwater sensor data under varied conditions. \
 📡 **ROS 2 integration**: Easily integrate into you existing projects with support for publishing of sensors and control over ROS 2.
 🎨 **Efficient 3D workflows**: Users of OceanSim can enjoy efficient 3D workflows empowered by [OpenUSD](https://openusd.org/release/index.html). \
@@ -52,10 +56,13 @@ Towards scaling marine perception with synthetic data, we are now bringing Ocean
 
 ## Documentation
 <!-- installation, running examples, building your own digital twins-->
-We divide the documentation into four parts:
+The documentation is divided into the following sections:
 - [Installation](subsections/installation.md)
 - [Running OceanSim](subsections/running_example.md)
 - [ROS 2](subsections/ros2.md) [❗NEW❗]
+- [Multibeam Echosounder and Side-scan Sonar](subsections/multibeam_sidescan.md) [❗NEW❗]
+- [FastSonar-LIVO2 Underwater SLAM](subsections/underwater_fast_sonar_slam.md) [❗NEW❗]
+- [2026年9—10月重点工作计划](subsections/2026_sep_oct_work_plan.md)
 - [Building Your Own Digital Twins with OceanSim](subsections/building_own_digital_twin.md)
 - [Underwater SDG using standalone scripts](subsections/running_sdg_example.md) [❗NEW❗]
 
@@ -106,4 +113,3 @@ If you use the sonar model in OceanSim, please also cite the HoloOcean paper as 
 ---
 
 *OceanSim - A GPU-Accelerated Underwater Robot Perception Simulation Framework*
-

@@ -1,0 +1,102 @@
+{
+  "algorithm": "OceanSim acoustic FAST-LIVO2 adaptation",
+  "sensors": [
+    "IMU",
+    "DVL",
+    "pressure_depth",
+    "MBES",
+    "side_scan"
+  ],
+  "scene_m": [
+    800.0,
+    600.0
+  ],
+  "terrain_source": "BathymetryB [5m]--Monterey Canyon and Vicinity",
+  "terrain_resolution_m": 5.0,
+  "vehicle": "LSTS/OceanScan LAUV",
+  "sonar_backend": "Warp CUDA (cuda:0)",
+  "sonar_backend_gpu": true,
+  "sonar_mesh_triangles": 38400,
+  "sonar_bvh_build_ms": 7.978362031280994,
+  "sonar_mean_cast_ms": 0.9692048824672523,
+  "sonar_backend_verification": {},
+  "slam_association_backend": "Warp CUDA (cuda:0)",
+  "slam_max_points": 384,
+  "slam_association_gpu": true,
+  "slam_association_warmup_ms": 3.8224559975787997,
+  "slam_association_mean_ms": 4.180434156148132,
+  "slam_association_calls": 907,
+  "slam_gpu_call_mean_ms": 4.1319711464729325,
+  "slam_association_gpu_calls": 907,
+  "slam_association_cpu_fallbacks": 0,
+  "sim_time_s": 359.9999999999898,
+  "wall_time_s": 100.07559446699452,
+  "frames": 2700,
+  "pings": 1801,
+  "mbes_map_points": 172800,
+  "sidescan_lines": 1801,
+  "accepted_geometry_updates": 151,
+  "rejected_geometry_updates": 207,
+  "accepted_intensity_updates": 0,
+  "rejected_intensity_updates": 1726,
+  "keyframes": 133,
+  "loop_edges": 0,
+  "local_error_m": 3.342269110199172,
+  "global_error_m": 3.342269110199172,
+  "position_error_statistics": {
+    "definition": "unaligned Euclidean position error at synchronized 5 Hz acoustic ping times",
+    "dead_reckoning_imu_dvl_depth": {
+      "samples": 1802,
+      "rmse_3d_m": 3.9321140602038382,
+      "mean_3d_m": 3.0714677281752754,
+      "p95_3d_m": 7.433593060293284,
+      "max_3d_m": 8.59398462557207,
+      "final_3d_m": 1.877386569164246,
+      "horizontal_rmse_m": 3.9320986223884993,
+      "vertical_rmse_m": 0.011018451033438176,
+      "final_horizontal_m": 1.8773854004246422,
+      "final_vertical_m": 0.002094839064085363
+    },
+    "local_acoustic_esikf": {
+      "samples": 1802,
+      "rmse_3d_m": 2.679342123317254,
+      "mean_3d_m": 1.884977882360434,
+      "p95_3d_m": 5.893425483674295,
+      "max_3d_m": 6.086073766778387,
+      "final_3d_m": 3.342269110199172,
+      "horizontal_rmse_m": 2.679319455531664,
+      "vertical_rmse_m": 0.01102129718843066,
+      "final_horizontal_m": 3.3422683680182836,
+      "final_vertical_m": 0.0022273607619531788
+    },
+    "online_global_slam": {
+      "samples": 1802,
+      "rmse_3d_m": 2.679342123317254,
+      "mean_3d_m": 1.884977882360434,
+      "p95_3d_m": 5.893425483674295,
+      "max_3d_m": 6.086073766778387,
+      "final_3d_m": 3.342269110199172,
+      "horizontal_rmse_m": 2.679319455531664,
+      "vertical_rmse_m": 0.01102129718843066,
+      "final_horizontal_m": 3.3422683680182836,
+      "final_vertical_m": 0.0022273607619531788
+    },
+    "final_optimized_global_slam": {
+      "samples": 1802,
+      "rmse_3d_m": 2.679342123317254,
+      "mean_3d_m": 1.884977882360434,
+      "p95_3d_m": 5.893425483674295,
+      "max_3d_m": 6.086073766778387,
+      "final_3d_m": 3.342269110199172,
+      "horizontal_rmse_m": 2.679319455531664,
+      "vertical_rmse_m": 0.01102129718843066,
+      "final_horizontal_m": 3.3422683680182836,
+      "final_vertical_m": 0.0022273607619531788
+    },
+    "rmse_reduction_vs_dead_reckoning_percent": {
+      "local_acoustic_esikf": 31.86001010412301,
+      "final_optimized_global_slam": 31.86001010412301
+    }
+  },
+  "position_error_csv": "demo/large_scale_slam/measured_terrain_error_comparison_position_errors.csv"
+}
