@@ -198,6 +198,27 @@ def _finite_tree(value: Any) -> bool:
     return True
 
 
+def _upper_bound_check(
+    name: str,
+    baseline: float,
+    candidate: float,
+    *,
+    relative_allowance: float,
+    absolute_allowance: float,
+) -> dict[str, Any]:
+    limit = float(baseline) * (1.0 + relative_allowance) + absolute_allowance
+    return {
+        "name": name,
+        "lower_is_better": True,
+        "baseline": float(baseline),
+        "candidate": float(candidate),
+        "relative_allowance": relative_allowance,
+        "absolute_allowance": absolute_allowance,
+        "failure_limit": limit,
+        "passed": bool(math.isfinite(float(candidate)) and candidate <= limit),
+    }
+
+
 def _markdown(report: dict[str, Any]) -> str:
     lines = [
         "# Pose-graph backend A/B comparison",
@@ -207,6 +228,7 @@ def _markdown(report: dict[str, Any]) -> str:
         f"- Candidate: `{report['candidate_path']}`",
         f"- Timestamp streams identical: `{report['sampling']['timestamps_identical']}`",
         f"- Fixed-input mismatches: {len(report['invariant_mismatches'])}",
+        f"- Accuracy verdict: `{report['accuracy_verdict']}`",
         "",
         "## Position error",
         "",
@@ -324,6 +346,59 @@ def main() -> int:
             for axis in ("roll", "pitch", "yaw", "total_rotation")
         }
 
+    accuracy_checks: list[dict[str, Any]] = []
+    baseline_online = baseline_position["online_global_slam"]
+    candidate_online = candidate_position["online_global_slam"]
+    for field, relative, absolute in (
+        ("rmse_3d_m", 0.25, 1.0),
+        ("p95_3d_m", 0.25, 2.0),
+        ("max_3d_m", 0.25, 10.0),
+        ("final_3d_m", 0.50, 3.0),
+    ):
+        accuracy_checks.append(
+            _upper_bound_check(
+                f"online_global_slam.{field}",
+                baseline_online[field],
+                candidate_online[field],
+                relative_allowance=relative,
+                absolute_allowance=absolute,
+            )
+        )
+    diagnostic = candidate_position.get(
+        "gtsam_full_history_isam2_diagnostic"
+    )
+    if diagnostic is not None:
+        baseline_final = baseline_position["final_optimized_global_slam"]
+        for field, relative, absolute in (
+            ("rmse_3d_m", 0.25, 1.0),
+            ("p95_3d_m", 0.25, 2.0),
+            ("max_3d_m", 0.25, 10.0),
+            ("final_3d_m", 0.50, 3.0),
+        ):
+            accuracy_checks.append(
+                _upper_bound_check(
+                    f"gtsam_full_history_vs_numpy_final.{field}",
+                    baseline_final[field],
+                    diagnostic[field],
+                    relative_allowance=relative,
+                    absolute_allowance=absolute,
+                )
+            )
+        for interval, absolute in (("100m", 1.0), ("1000m", 2.0), ("10000m", 5.0)):
+            accuracy_checks.append(
+                _upper_bound_check(
+                    f"gtsam_full_history_vs_numpy_final.rpe.{interval}",
+                    baseline_rpe["final_optimized_global_slam"][interval][
+                        "rmse_translation_m"
+                    ],
+                    candidate_rpe[
+                        "gtsam_full_history_isam2_diagnostic"
+                    ][interval]["rmse_translation_m"],
+                    relative_allowance=0.30,
+                    absolute_allowance=absolute,
+                )
+            )
+
     segments = {}
     baseline_segments = baseline_position.get("five_kilometre_segments", {})
     candidate_segments = candidate_position.get("five_kilometre_segments", {})
@@ -389,7 +464,28 @@ def main() -> int:
         {
             "position": candidate_position,
             "orientation": candidate.get("orientation_error_statistics", {}),
+            "map_to_odom": candidate.get(
+                "online_map_to_odom_change_audit", {}
+            ),
         }
+    )
+    map_to_odom_audit = candidate.get(
+        "online_map_to_odom_change_audit", {}
+    )
+    backend_contract = bool(
+        candidate.get("pose_graph_optimizer_backend")
+        == "gtsam_isam2_incremental_fixed_lag"
+        and int(candidate.get("pose_graph_isam_updates", 0)) > 0
+        and int(candidate.get("pose_graph_fixed_lag_updates", 0)) > 0
+        and int(candidate.get("pose_graph_fixed_lag_active_variables", 0)) > 0
+        and int(
+            candidate.get("pose_graph_fixed_lag_marginalized_variables", 0)
+        )
+        > 0
+        and diagnostic is not None
+    )
+    no_nonfinite_online_states = bool(
+        int(map_to_odom_audit.get("nonfinite_samples", -1)) == 0
     )
     structural_verdict = (
         "pass"
@@ -397,11 +493,25 @@ def main() -> int:
         and not invariant_mismatches
         and timestamps_identical
         and finite_candidate
+        and backend_contract
+        and no_nonfinite_online_states
+        else "fail"
+    )
+    accuracy_verdict = (
+        "pass"
+        if accuracy_checks and all(check["passed"] for check in accuracy_checks)
+        else "fail"
+    )
+    overall_verdict = (
+        "pass"
+        if structural_verdict == "pass" and accuracy_verdict == "pass"
         else "fail"
     )
     report = {
         "schema": "oceansim.pose_graph_backend_ab.v1",
+        "overall_verdict": overall_verdict,
         "structural_verdict": structural_verdict,
+        "accuracy_verdict": accuracy_verdict,
         "baseline_path": str(args.baseline.resolve()),
         "candidate_path": str(args.candidate.resolve()),
         "completion": {
@@ -421,6 +531,9 @@ def main() -> int:
             ),
         },
         "candidate_metrics_finite": finite_candidate,
+        "gtsam_backend_contract_satisfied": backend_contract,
+        "candidate_online_map_to_odom_change_audit": map_to_odom_audit,
+        "accuracy_acceptance_checks": accuracy_checks,
         "position_error": position_error,
         "translation_rpe_rmse_m": rpe,
         "orientation_error": orientation,
@@ -436,7 +549,7 @@ def main() -> int:
     )
     args.markdown_output.write_text(_markdown(report), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2))
-    return 0 if structural_verdict == "pass" else 2
+    return 0 if overall_verdict == "pass" else 2
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from .esikf import (
     IntensityUpdateResult,
     SonarUpdateResult,
 )
+from .evaluation import map_to_odom_change_metrics
 from .fast_sonar_slam import FastSonarSLAM, FastSonarSLAMConfig
 from .intensity_map import AcousticIntensityMap, IntensityMapSample
 from .initialization import (
@@ -105,6 +106,7 @@ __all__ = [
     "fixed_lag_fused_deskew_states",
     "gauge_anchored_initial_covariance",
     "initialize_from_imu_dvl_depth",
+    "map_to_odom_change_metrics",
     "make_terrain_recovery_config",
     "match_bathymetric_terrain",
     "motion_compensate_to_body",

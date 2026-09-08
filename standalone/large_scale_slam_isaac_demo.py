@@ -1003,6 +1003,7 @@ from isaacsim.oceansim.slam import (
     fixed_lag_fused_deskew_states,
     gauge_anchored_initial_covariance,
     initialize_from_imu_dvl_depth,
+    map_to_odom_change_metrics,
     make_terrain_recovery_config,
     motion_compensate_to_body,
     voxel_average_backscatter_patch,
@@ -5030,6 +5031,13 @@ def main() -> int:
                 for name, estimates in estimate_rotation_tracks.items()
             },
         }
+        map_to_odom_audit = map_to_odom_change_metrics(
+            sample_times,
+            local_samples,
+            local_rotation_samples,
+            online_global_samples,
+            online_global_rotation_samples,
+        )
         dead_rmse = position_errors[
             "dead_reckoning_imu_dvl_depth"
         ]["rmse_3d_m"]
@@ -6474,6 +6482,7 @@ def main() -> int:
             "pose_graph_global_isam_final_cost": (
                 diagnostics.pose_graph.global_isam_final_cost
             ),
+            "online_map_to_odom_change_audit": map_to_odom_audit,
             "local_error_m": float(np.linalg.norm(slam.state.position - truth.position)),
             "global_error_m": float(np.linalg.norm(global_position - truth.position)),
             "position_error_statistics": position_errors,
