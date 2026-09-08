@@ -362,6 +362,44 @@ def test_old_to_live_loop_anchors_window_without_reviving_old_key() -> None:
     assert graph.global_anchor_bridge_updates == 1
     assert not np.allclose(graph.global_isam_poses, global_before)
 
+    # The public live-window poses now carry the rigid map anchor while the
+    # smoother retains its own marginal frame internally.  Subsequent nodes
+    # must still enter continuously and preserve the odometry increment; this
+    # catches a frame mismatch on the first update after relocalization.
+    previous = graph.poses[-1].copy()
+    information = np.diag([100.0, 100.0, 400.0])
+    for index in range(8, 13):
+        seed = np.array(
+            [
+                previous[0] + np.cos(previous[2]),
+                previous[1] + np.sin(previous[2]),
+                previous[2],
+            ]
+        )
+        graph.add_pose(seed, timestamp=float(index))
+        graph.add_edge(
+            index - 1,
+            index,
+            np.array([1.0, 0.0, 0.0]),
+            information,
+            kind="odometry",
+        )
+        graph.optimize()
+        np.testing.assert_allclose(
+            _relative_pose2(previous, graph.poses[-1]),
+            np.array([1.0, 0.0, 0.0]),
+            atol=2.0e-4,
+        )
+        np.testing.assert_allclose(
+            graph.poses[-1], graph.global_isam_poses[-1], atol=2.0e-4
+        )
+        previous = graph.poses[-1].copy()
+
+    assert graph.fixed_lag_active_variables == 3
+    assert graph.fixed_lag_marginalized_variables == 10
+    assert graph.global_anchor_bridge_updates == 6
+    assert np.isfinite(graph.poses).all()
+
 
 def test_rank_deficient_acoustic_information_is_not_given_fake_rank() -> None:
     graph = GTSAMPlanarPoseGraph(_gtsam_config())
