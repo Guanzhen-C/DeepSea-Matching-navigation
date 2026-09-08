@@ -683,6 +683,31 @@ def parse_args() -> argparse.Namespace:
             "configured physical reference interval"
         ),
     )
+    parser.add_argument(
+        "--pose-graph-backend",
+        choices=("numpy-batch", "gtsam-fixed-lag-isam2"),
+        default="numpy-batch",
+        help=(
+            "planar pose-graph solver; selecting GTSAM changes only the "
+            "optimizer and preserves front-end states, factors, and matchers"
+        ),
+    )
+    parser.add_argument(
+        "--pose-graph-fixed-lag-s",
+        type=float,
+        default=180.0,
+        help="GTSAM IncrementalFixedLagSmoother window duration",
+    )
+    parser.add_argument(
+        "--pose-graph-isam-relinearize-threshold",
+        type=float,
+        default=0.01,
+    )
+    parser.add_argument(
+        "--pose-graph-isam-relinearize-skip",
+        type=int,
+        default=1,
+    )
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument(
         "--progress-distance-m",
@@ -803,6 +828,13 @@ def parse_args() -> argparse.Namespace:
         or args.pose_graph_odometry_xy_std_m <= 0.0
         or not math.isfinite(args.pose_graph_odometry_yaw_std_deg)
         or args.pose_graph_odometry_yaw_std_deg <= 0.0
+        or not math.isfinite(args.pose_graph_fixed_lag_s)
+        or args.pose_graph_fixed_lag_s <= 0.0
+        or not math.isfinite(
+            args.pose_graph_isam_relinearize_threshold
+        )
+        or args.pose_graph_isam_relinearize_threshold <= 0.0
+        or args.pose_graph_isam_relinearize_skip < 1
         or args.terrain_display_stride < 1
         or args.sonar_terrain_stride < 1
         or args.progress_distance_m <= 0.0
@@ -1376,6 +1408,8 @@ def _pose_graph_corrected_rotations(
     pose_graph,
     timestamps: np.ndarray,
     raw_rotations: np.ndarray,
+    *,
+    optimized_poses: np.ndarray | None = None,
 ) -> np.ndarray:
     """Apply the pose graph's interpolated yaw correction to attitude history."""
 
@@ -1385,7 +1419,7 @@ def _pose_graph_corrected_rotations(
         raise ValueError("rotation timestamps and samples must have equal length")
     if not pose_graph.keyframes or times.size == 0:
         return rotations.copy()
-    key_times, key_yaw_delta, _ = pose_graph._corrections()
+    key_times, key_yaw_delta, _ = pose_graph._corrections(optimized_poses)
     yaw_delta = np.interp(times, key_times, np.unwrap(key_yaw_delta))
     cosine = np.cos(yaw_delta)
     sine = np.sin(yaw_delta)
@@ -2014,6 +2048,14 @@ def main() -> int:
             intensity_updates_enabled=not ARGS.disable_intensity_updates,
             trajectory_sample_interval_s=ARGS.trajectory_sample_interval_s,
             pose_graph=PoseGraphConfig(
+                optimizer_backend=ARGS.pose_graph_backend.replace("-", "_"),
+                fixed_lag_seconds=ARGS.pose_graph_fixed_lag_s,
+                isam_relinearize_threshold=(
+                    ARGS.pose_graph_isam_relinearize_threshold
+                ),
+                isam_relinearize_skip=(
+                    ARGS.pose_graph_isam_relinearize_skip
+                ),
                 keyframe_distance_m=ARGS.keyframe_distance_m,
                 keyframe_max_interval_s=ARGS.keyframe_max_interval_s,
                 odometry_reference_interval_s=(
@@ -4615,6 +4657,22 @@ def main() -> int:
                             "online_global_error_m": global_error,
                             "keyframes": diagnostics.pose_graph.keyframes,
                             "loop_edges": diagnostics.pose_graph.loop_edges,
+                            "pose_graph_optimizer_backend": (
+                                diagnostics.pose_graph.optimizer_backend
+                            ),
+                            "pose_graph_isam_updates": (
+                                diagnostics.pose_graph.isam_updates
+                            ),
+                            "pose_graph_fixed_lag_updates": (
+                                diagnostics.pose_graph.fixed_lag_updates
+                            ),
+                            "pose_graph_fixed_lag_active_variables": (
+                                diagnostics.pose_graph.fixed_lag_active_variables
+                            ),
+                            "pose_graph_fixed_lag_marginalized_variables": (
+                                diagnostics.pose_graph
+                                .fixed_lag_marginalized_variables
+                            ),
                             "terrain_matches_accepted": terrain_match_accepts,
                             "terrain_priors_accepted": terrain_prior_accepts,
                             "backscatter_matches_accepted": int(
@@ -4886,6 +4944,34 @@ def main() -> int:
                 optimized_global_rotation_samples
             ),
         }
+        full_history_poses = np.asarray(
+            getattr(
+                slam.pose_graph.graph,
+                "global_isam_poses",
+                np.empty((0, 3), dtype=np.float64),
+            ),
+            dtype=np.float64,
+        ).reshape(-1, 3)
+        if (
+            full_history_poses.shape[0] > 0
+            and full_history_poses.shape[0] == len(slam.pose_graph.keyframes)
+        ):
+            full_history_name = "gtsam_full_history_isam2_diagnostic"
+            estimate_tracks[full_history_name] = (
+                slam.pose_graph.correct_trajectory(
+                    sample_times,
+                    local_samples,
+                    optimized_poses=full_history_poses,
+                )
+            )
+            estimate_rotation_tracks[full_history_name] = (
+                _pose_graph_corrected_rotations(
+                    slam.pose_graph,
+                    sample_times,
+                    local_rotation_samples,
+                    optimized_poses=full_history_poses,
+                )
+            )
         position_errors = {
             "definition": (
                 "unaligned Euclidean position error at synchronized "
@@ -4905,6 +4991,13 @@ def main() -> int:
                 optimized_global_samples, truth_samples
             ),
         }
+        if "gtsam_full_history_isam2_diagnostic" in estimate_tracks:
+            position_errors["gtsam_full_history_isam2_diagnostic"] = (
+                _position_error_metrics(
+                    estimate_tracks["gtsam_full_history_isam2_diagnostic"],
+                    truth_samples,
+                )
+            )
         position_errors["translation_rpe_by_truth_distance"] = {
             name: {
                 f"{int(interval_m)}m": _relative_position_error_metrics(
@@ -4952,19 +5045,32 @@ def main() -> int:
                 100.0 * (dead_rmse - global_rmse) / max(dead_rmse, 1.0e-12)
             ),
         }
-        error_traces = np.column_stack(
-            (
-                sample_times,
-                np.linalg.norm(dead_samples - truth_samples, axis=1),
-                np.linalg.norm(local_samples - truth_samples, axis=1),
+        error_columns = [
+            sample_times,
+            np.linalg.norm(dead_samples - truth_samples, axis=1),
+            np.linalg.norm(local_samples - truth_samples, axis=1),
+            np.linalg.norm(online_global_samples - truth_samples, axis=1),
+            np.linalg.norm(optimized_global_samples - truth_samples, axis=1),
+        ]
+        error_column_names = [
+            "timestamp_s",
+            "dead_reckoning_3d_m",
+            "local_acoustic_esikf_3d_m",
+            "online_global_slam_3d_m",
+            "final_optimized_global_slam_3d_m",
+        ]
+        if "gtsam_full_history_isam2_diagnostic" in estimate_tracks:
+            error_columns.append(
                 np.linalg.norm(
-                    online_global_samples - truth_samples, axis=1
-                ),
-                np.linalg.norm(
-                    optimized_global_samples - truth_samples, axis=1
-                ),
+                    estimate_tracks["gtsam_full_history_isam2_diagnostic"]
+                    - truth_samples,
+                    axis=1,
+                )
             )
-        )
+            error_column_names.append(
+                "gtsam_full_history_isam2_diagnostic_3d_m"
+            )
+        error_traces = np.column_stack(error_columns)
         error_csv = ARGS.metrics.with_name(
             f"{ARGS.metrics.stem}_position_errors.csv"
         )
@@ -4973,12 +5079,20 @@ def main() -> int:
             error_csv,
             error_traces,
             delimiter=",",
-            header=(
-                "timestamp_s,dead_reckoning_3d_m,local_acoustic_esikf_3d_m,"
-                "online_global_slam_3d_m,final_optimized_global_slam_3d_m"
-            ),
+            header=",".join(error_column_names),
             comments="",
         )
+        factor_log = ARGS.metrics.with_name(
+            f"{ARGS.metrics.stem}_pose_graph_factors.json"
+        )
+        factor_payload = slam.pose_graph.graph.factor_stream_payload()
+        temporary_factor_log = factor_log.with_suffix(
+            f"{factor_log.suffix}.tmp"
+        )
+        with temporary_factor_log.open("w", encoding="utf-8") as stream:
+            json.dump(factor_payload, stream, indent=2)
+            stream.write("\n")
+        temporary_factor_log.replace(factor_log)
         travelled_distance_m = float(cumulative_distance_m[-1])
         survey_laps_completed = float(sim_time / survey.period)
         completion_tolerance_laps = 1.0e-9
@@ -5080,12 +5194,38 @@ def main() -> int:
                     "no prior-map correction"
                 ),
                 "online_global_slam": (
-                    "online pose graph including accepted loop, intensity, "
-                    "and absolute bathymetric terrain factors"
+                    (
+                        "GTSAM IncrementalFixedLagSmoother active-window "
+                        "estimate; marginalized poses retain their last "
+                        "online value"
+                    )
+                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
+                    else (
+                        "online NumPy batch pose graph including accepted "
+                        "loop, intensity, and absolute terrain factors"
+                    )
                 ),
                 "final_optimized_global_slam": (
-                    "the same global factor graph after consuming every "
-                    "accepted factor in a final optimization"
+                    (
+                        "the fixed-lag online trajectory after consuming all "
+                        "factors that remain representable in its live window"
+                    )
+                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
+                    else (
+                        "the same global factor graph after consuming every "
+                        "accepted factor in a final optimization"
+                    )
+                ),
+                **(
+                    {
+                        "gtsam_full_history_isam2_diagnostic": (
+                            "separate full-history iSAM2 diagnostic; retained "
+                            "for old-node constraints and not used as the "
+                            "online map-to-odom output"
+                        )
+                    }
+                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
+                    else {}
                 ),
             },
             "navigation_initialization": {
@@ -5148,6 +5288,22 @@ def main() -> int:
                     ARGS.keyframe_max_interval_s
                 ),
                 "edge_scaling": "standard deviation times sqrt(elapsed/reference)",
+            },
+            "pose_graph_backend_configuration": {
+                "selected": ARGS.pose_graph_backend,
+                "implementation": diagnostics.pose_graph.optimizer_backend,
+                "fixed_lag_seconds": float(ARGS.pose_graph_fixed_lag_s),
+                "isam_relinearize_threshold": float(
+                    ARGS.pose_graph_isam_relinearize_threshold
+                ),
+                "isam_relinearize_skip": int(
+                    ARGS.pose_graph_isam_relinearize_skip
+                ),
+                "online_output_source": (
+                    "incremental_fixed_lag_active_window"
+                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
+                    else "numpy_batch_full_graph"
+                ),
             },
             "reproducibility": {
                 "random_seed": int(ARGS.seed),
@@ -6293,11 +6449,37 @@ def main() -> int:
             "pose_graph_optimization_runs": (
                 diagnostics.pose_graph.optimization_runs
             ),
+            "pose_graph_optimizer_backend": (
+                diagnostics.pose_graph.optimizer_backend
+            ),
+            "pose_graph_isam_updates": diagnostics.pose_graph.isam_updates,
+            "pose_graph_fixed_lag_updates": (
+                diagnostics.pose_graph.fixed_lag_updates
+            ),
+            "pose_graph_fixed_lag_active_variables": (
+                diagnostics.pose_graph.fixed_lag_active_variables
+            ),
+            "pose_graph_fixed_lag_marginalized_variables": (
+                diagnostics.pose_graph.fixed_lag_marginalized_variables
+            ),
+            "pose_graph_fixed_lag_global_only_factors": (
+                diagnostics.pose_graph.fixed_lag_global_only_factors
+            ),
+            "pose_graph_optimizer_rebuilds": (
+                diagnostics.pose_graph.optimizer_rebuilds
+            ),
+            "pose_graph_global_isam_initial_cost": (
+                diagnostics.pose_graph.global_isam_initial_cost
+            ),
+            "pose_graph_global_isam_final_cost": (
+                diagnostics.pose_graph.global_isam_final_cost
+            ),
             "local_error_m": float(np.linalg.norm(slam.state.position - truth.position)),
             "global_error_m": float(np.linalg.norm(global_position - truth.position)),
             "position_error_statistics": position_errors,
             "orientation_error_statistics": orientation_errors,
             "position_error_csv": str(error_csv),
+            "pose_graph_factor_log": str(factor_log),
         }
         with ARGS.metrics.open("w", encoding="utf-8") as stream:
             json.dump(metrics, stream, indent=2)

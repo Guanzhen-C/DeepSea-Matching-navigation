@@ -22,6 +22,7 @@ from .initialization import (
 from .pose_graph import (
     AcousticKeyframe,
     AcousticPoseGraph,
+    GTSAMPlanarPoseGraph,
     PlanarPoseGraph,
     PoseGraphConfig,
     PoseGraphDiagnostics,
@@ -75,6 +76,7 @@ __all__ = [
     "ESIKFConfig",
     "FastSonarSLAM",
     "FastSonarSLAMConfig",
+    "GTSAMPlanarPoseGraph",
     "InertialState",
     "IntensityMapSample",
     "IntensityUpdateResult",

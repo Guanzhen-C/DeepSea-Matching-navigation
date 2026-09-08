@@ -1,14 +1,15 @@
-"""Lightweight keyframe and loop-closure back end for acoustic SLAM.
+"""Keyframe and loop-closure back end for acoustic SLAM.
 
 The high-rate estimator in :mod:`esikf` deliberately remains a local
 odometry front end, just like FAST-LIO/FAST-LIVO.  This module adds the part
 needed to make a long underwater survey a SLAM system: repeat-place
 recognition, geometric MBES verification, and a robust planar pose graph.
 
-Only NumPy is required.  Survey AUVs are normally roll/pitch stabilised and
-have pressure depth, so the graph optimises the weakly drifting ``x, y, yaw``
-states while the filter continues to own roll, pitch, depth, velocity, and
-IMU biases.
+Survey AUVs are normally roll/pitch stabilised and have pressure depth, so the
+graph optimises the weakly drifting ``x, y, yaw`` states while the filter
+continues to own roll, pitch, depth, velocity, and IMU biases.  The historical
+NumPy batch solver remains the default reference, while a selectable GTSAM
+iSAM2 incremental fixed-lag backend supports controlled A/B experiments.
 """
 
 from __future__ import annotations
@@ -120,6 +121,13 @@ class PoseGraphConfig:
     intensity_seed_max_candidates: int = 6
     optimizer_iterations: int = 12
     sidescan_descriptor_bins: int = 32
+    # The solver is explicit so a run can change only the back end while
+    # preserving the acoustic front end and every generated factor.  NumPy is
+    # kept as the historical default; the GTSAM candidate must be requested.
+    optimizer_backend: str = "numpy_batch"
+    fixed_lag_seconds: float = 180.0
+    isam_relinearize_threshold: float = 0.01
+    isam_relinearize_skip: int = 1
 
 
 @dataclass(frozen=True)
@@ -216,6 +224,15 @@ class PoseGraphDiagnostics:
     last_terrain_relocalization_translation_m: float = 0.0
     last_terrain_relocalization_yaw_deg: float = 0.0
     last_terrain_relocalization_anchor_index: int | None = None
+    optimizer_backend: str = "numpy_batch"
+    isam_updates: int = 0
+    fixed_lag_updates: int = 0
+    fixed_lag_active_variables: int = 0
+    fixed_lag_marginalized_variables: int = 0
+    fixed_lag_global_only_factors: int = 0
+    optimizer_rebuilds: int = 0
+    global_isam_initial_cost: float = 0.0
+    global_isam_final_cost: float = 0.0
 
 
 def _relative_pose2(pose_a: np.ndarray, pose_b: np.ndarray) -> np.ndarray:
@@ -340,11 +357,118 @@ class PlanarPoseGraph:
         self.optimization_runs = 0
         self.initial_cost = 0.0
         self.final_cost = 0.0
+        self.isam_updates = 0
+        self.fixed_lag_updates = 0
+        self.fixed_lag_active_variables = 0
+        self.fixed_lag_marginalized_variables = 0
+        self._timestamps: list[float] = []
+        self._pose_initializations: list[np.ndarray] = []
+        self.optimization_boundaries: list[tuple[int, int, int]] = []
 
-    def add_pose(self, pose: np.ndarray) -> int:
-        value = np.asarray(pose, dtype=np.float64).reshape(1, 3)
+    @property
+    def backend_name(self) -> str:
+        return "numpy_batch"
+
+    def add_pose(
+        self, pose: np.ndarray, *, timestamp: float | None = None
+    ) -> int:
+        value = np.asarray(pose, dtype=np.float64).reshape(3).copy()
+        if not np.isfinite(value).all():
+            raise ValueError("pose must be finite")
+        time_value = (
+            self._timestamps[-1] + 1.0
+            if timestamp is None and self._timestamps
+            else float(len(self._timestamps))
+            if timestamp is None
+            else float(timestamp)
+        )
+        if not np.isfinite(time_value):
+            raise ValueError("pose timestamp must be finite")
+        if self._timestamps and time_value < self._timestamps[-1] - 1.0e-9:
+            raise ValueError("pose timestamps must be monotonic")
+        value[2] = wrap_angle(value[2])
+        self._timestamps.append(time_value)
+        self._pose_initializations.append(value.copy())
+        value = value.reshape(1, 3)
         self.poses = np.concatenate((self.poses, value), axis=0)
         return self.poses.shape[0] - 1
+
+    def truncate_poses(self, count: int) -> None:
+        retained = int(count)
+        if retained < 0 or retained > self.poses.shape[0]:
+            raise ValueError("retained pose count is invalid")
+        self.poses = self.poses[:retained].copy()
+        del self._timestamps[retained:]
+        del self._pose_initializations[retained:]
+
+    def factor_stream_payload(self) -> dict[str, object]:
+        """Return a JSON-compatible solver-independent factor stream."""
+
+        return {
+            "schema": "oceansim.planar_pose_graph_factor_stream.v1",
+            "source_backend": self.backend_name,
+            "pose_initializations": [
+                pose.tolist() for pose in self._pose_initializations
+            ],
+            "pose_timestamps_s": [float(value) for value in self._timestamps],
+            "edges": [
+                {
+                    "source": edge.source,
+                    "target": edge.target,
+                    "measurement": edge.measurement.tolist(),
+                    "information": edge.information.tolist(),
+                    "kind": edge.kind,
+                    "score": edge.score,
+                }
+                for edge in self.edges
+            ],
+            "priors": [
+                {
+                    "target": prior.target,
+                    "measurement": prior.measurement.tolist(),
+                    "information": prior.information.tolist(),
+                    "kind": prior.kind,
+                    "score": prior.score,
+                    "robust": prior.robust,
+                }
+                for prior in self.priors
+            ],
+            "optimization_boundaries": [
+                {
+                    "poses": poses,
+                    "edges": edges,
+                    "priors": priors,
+                }
+                for poses, edges, priors in self.optimization_boundaries
+            ],
+            "final_online_poses": self.poses.tolist(),
+            "gauge_pose": (
+                self.poses[0].tolist() if self.poses.shape[0] else None
+            ),
+            "full_history_diagnostic_poses": getattr(
+                self, "global_isam_poses", np.empty((0, 3), dtype=np.float64)
+            ).tolist(),
+            "objective_configuration": {
+                "terrain_prior_robust_kernel": (
+                    self.config.terrain_prior_robust_kernel
+                ),
+                "robust_terrain_prior_delta": float(
+                    self.config.robust_terrain_prior_delta
+                ),
+                "robust_loop_delta": float(self.config.robust_loop_delta),
+                "robust_intensity_delta": float(
+                    self.config.robust_intensity_delta
+                ),
+                "optimizer_iterations": int(self.config.optimizer_iterations),
+                "fixed_lag_seconds": float(self.config.fixed_lag_seconds),
+                "isam_relinearize_threshold": float(
+                    self.config.isam_relinearize_threshold
+                ),
+                "isam_relinearize_skip": int(
+                    self.config.isam_relinearize_skip
+                ),
+            },
+        }
 
     def add_edge(
         self,
@@ -537,7 +661,577 @@ class PlanarPoseGraph:
         self.poses = poses
         self.final_cost = self._cost(poses)
         self.optimization_runs += 1
+        self.optimization_boundaries.append(
+            (self.poses.shape[0], len(self.edges), len(self.priors))
+        )
         return poses.copy()
+
+
+class GTSAMPlanarPoseGraph(PlanarPoseGraph):
+    """Incremental GTSAM backend with a fixed-lag and a global iSAM2 graph.
+
+    The fixed-lag smoother is the bounded real-time estimator and supplies the
+    public ``poses`` used by online ``map->odom`` correction.  Once a pose is
+    marginalized, its last fixed-lag estimate remains in that array.  A second
+    iSAM2 instance retains the complete graph for old-node constraints and a
+    separately reported full-history diagnostic solution; it is deliberately
+    not substituted for the fixed-lag online estimate.
+
+    No silent NumPy fallback is provided.  If GTSAM is unavailable, creating
+    the production acoustic graph fails with an actionable dependency error.
+    """
+
+    BACKEND_NAME = "gtsam_isam2_incremental_fixed_lag"
+
+    def __init__(self, config: PoseGraphConfig | None = None) -> None:
+        super().__init__(config)
+        if (
+            not np.isfinite(self.config.fixed_lag_seconds)
+            or self.config.fixed_lag_seconds <= 0.0
+        ):
+            raise ValueError("fixed_lag_seconds must be finite and positive")
+        if (
+            not np.isfinite(self.config.isam_relinearize_threshold)
+            or self.config.isam_relinearize_threshold <= 0.0
+        ):
+            raise ValueError(
+                "isam_relinearize_threshold must be finite and positive"
+            )
+        if int(self.config.isam_relinearize_skip) < 1:
+            raise ValueError("isam_relinearize_skip must be at least one")
+
+        try:
+            import gtsam  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise ImportError(
+                "The production acoustic pose graph requires GTSAM. Install "
+                "requirements-slam.txt before running the SLAM demo."
+            ) from exc
+        self._gtsam = gtsam
+        if hasattr(gtsam, "IncrementalFixedLagSmoother"):
+            # GTSAM 4.3 promotes the fixed-lag API into the main module.
+            self._fixed_lag_api = gtsam
+        else:
+            try:
+                import gtsam_unstable  # type: ignore[import-not-found]
+            except ImportError as exc:
+                raise ImportError(
+                    "This GTSAM build does not expose an incremental "
+                    "fixed-lag smoother"
+                ) from exc
+            if not hasattr(gtsam_unstable, "IncrementalFixedLagSmoother"):
+                raise ImportError(
+                    "This GTSAM build does not expose an incremental "
+                    "fixed-lag smoother"
+                )
+            self._fixed_lag_api = gtsam_unstable
+        self._synced_pose_count = 0
+        self._synced_edge_count = 0
+        self._synced_prior_count = 0
+        self._synced_pose_snapshot = np.empty((0, 3), dtype=np.float64)
+        self._synced_edge_ids: tuple[int, ...] = ()
+        self._synced_prior_ids: tuple[int, ...] = ()
+        self.isam_updates = 0
+        self.fixed_lag_updates = 0
+        self.fixed_lag_active_variables = 0
+        self.fixed_lag_marginalized_variables = 0
+        self.global_isam_poses = np.empty((0, 3), dtype=np.float64)
+        self.global_initial_cost = 0.0
+        self.global_final_cost = 0.0
+        self.rebuilds = 0
+        self.global_only_factor_count = 0
+        self._new_solvers()
+
+    @property
+    def backend_name(self) -> str:
+        return self.BACKEND_NAME
+
+    def _new_isam_params(self):
+        params = self._gtsam.ISAM2Params()
+        params.setRelinearizeThreshold(
+            float(self.config.isam_relinearize_threshold)
+        )
+        params.relinearizeSkip = int(self.config.isam_relinearize_skip)
+        params.enableDetailedResults = True
+        params.evaluateNonlinearError = True
+        return params
+
+    def _new_solvers(self) -> None:
+        self._global_isam = self._gtsam.ISAM2(self._new_isam_params())
+        self._fixed_lag = self._fixed_lag_api.IncrementalFixedLagSmoother(
+            float(self.config.fixed_lag_seconds), self._new_isam_params()
+        )
+        self._fixed_lag_active_keys: set[int] = set()
+
+    def add_pose(
+        self, pose: np.ndarray, *, timestamp: float | None = None
+    ) -> int:
+        return super().add_pose(pose, timestamp=timestamp)
+
+    def _key(self, index: int) -> int:
+        return int(self._gtsam.symbol("x", int(index)))
+
+    def _pose2(self, pose: np.ndarray):
+        x, y, yaw = np.asarray(pose, dtype=np.float64).reshape(3)
+        return self._gtsam.Pose2(float(x), float(y), float(yaw))
+
+    @staticmethod
+    def _pose_array(pose) -> np.ndarray:
+        return np.array(
+            [float(pose.x()), float(pose.y()), float(pose.theta())],
+            dtype=np.float64,
+        )
+
+    @staticmethod
+    def _local_delta_to_world(pose: np.ndarray) -> np.ndarray:
+        """Map a GTSAM Pose2 tangent perturbation to additive world axes."""
+
+        yaw = float(np.asarray(pose, dtype=np.float64).reshape(3)[2])
+        c, s = np.cos(yaw), np.sin(yaw)
+        return np.array(
+            [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]],
+            dtype=np.float64,
+        )
+
+    def _noise_model(
+        self,
+        information: np.ndarray,
+        *,
+        robust_kernel: str | None = None,
+        robust_delta: float | None = None,
+    ):
+        validated = _validated_psd_information(information)
+        eigenvalues, eigenvectors = np.linalg.eigh(validated)
+        # Supplying the symmetric square root directly preserves rank-deficient
+        # acoustic factors.  Adding an arbitrary diagonal floor here would turn
+        # an unobservable direction into invented information.
+        square_root = (
+            eigenvectors * np.sqrt(np.maximum(eigenvalues, 0.0))
+        ) @ eigenvectors.T
+        base = self._gtsam.noiseModel.Gaussian.SqrtInformation(
+            np.ascontiguousarray(square_root, dtype=np.float64), False
+        )
+        if robust_kernel is None:
+            return base
+        delta = float(robust_delta)
+        if not np.isfinite(delta) or delta <= 0.0:
+            raise ValueError("robust loss delta must be finite and positive")
+        if robust_kernel == "huber":
+            loss = self._gtsam.noiseModel.mEstimator.Huber.Create(delta)
+        elif robust_kernel == "cauchy":
+            loss = self._gtsam.noiseModel.mEstimator.Cauchy.Create(delta)
+        else:
+            raise ValueError(f"unsupported GTSAM robust kernel: {robust_kernel}")
+        return self._gtsam.noiseModel.Robust.Create(loss, base)
+
+    def _edge_factor(self, edge: PoseGraphEdge):
+        robust_kernel = None
+        robust_delta = None
+        if edge.kind == "loop":
+            robust_kernel = "huber"
+            robust_delta = self.config.robust_loop_delta
+        elif edge.kind == "intensity":
+            robust_kernel = "huber"
+            robust_delta = self.config.robust_intensity_delta
+        source_key = self._key(edge.source)
+        target_key = self._key(edge.target)
+
+        def error_function(_factor, values, jacobians):
+            source = self._pose_array(values.atPose2(source_key))
+            target = self._pose_array(values.atPose2(target_key))
+            error, jacobian_source, jacobian_target = (
+                _edge_error_and_jacobians(source, target, edge.measurement)
+            )
+            if jacobians is not None:
+                jacobians[0] = np.asfortranarray(
+                    jacobian_source @ self._local_delta_to_world(source)
+                )
+                jacobians[1] = np.asfortranarray(
+                    jacobian_target @ self._local_delta_to_world(target)
+                )
+            return error
+
+        return self._gtsam.CustomFactor(
+            self._noise_model(
+                edge.information,
+                robust_kernel=robust_kernel,
+                robust_delta=robust_delta,
+            ),
+            [source_key, target_key],
+            error_function,
+        )
+
+    def _prior_factor(self, prior: PoseGraphPrior):
+        robust_kernel = (
+            self.config.terrain_prior_robust_kernel if prior.robust else None
+        )
+        target_key = self._key(prior.target)
+
+        def error_function(_factor, values, jacobians):
+            target = self._pose_array(values.atPose2(target_key))
+            error = _prior_error(target, prior.measurement)
+            if jacobians is not None:
+                jacobians[0] = np.asfortranarray(
+                    self._local_delta_to_world(target)
+                )
+            return error
+
+        return self._gtsam.CustomFactor(
+            self._noise_model(
+                prior.information,
+                robust_kernel=robust_kernel,
+                robust_delta=self.config.robust_terrain_prior_delta,
+            ),
+            [target_key],
+            error_function,
+        )
+
+    def _gauge_factor(self, pose: np.ndarray):
+        return self._gtsam.PriorFactorPose2(
+            self._key(0),
+            self._pose2(pose),
+            self._gtsam.noiseModel.Constrained.All(3),
+        )
+
+    def _normalise_timestamp_storage(self) -> None:
+        pose_count = int(self.poses.shape[0])
+        if len(self._timestamps) > pose_count:
+            del self._timestamps[pose_count:]
+        if len(self._pose_initializations) > pose_count:
+            del self._pose_initializations[pose_count:]
+        while len(self._timestamps) < pose_count:
+            next_value = (
+                self._timestamps[-1] + 1.0
+                if self._timestamps
+                else float(len(self._timestamps))
+            )
+            self._timestamps.append(next_value)
+        while len(self._pose_initializations) < pose_count:
+            self._pose_initializations.append(
+                self.poses[len(self._pose_initializations)].copy()
+            )
+
+    def _existing_state_was_edited(self) -> bool:
+        if self.poses.shape[0] < self._synced_pose_count:
+            return True
+        if len(self.edges) < self._synced_edge_count:
+            return True
+        if len(self.priors) < self._synced_prior_count:
+            return True
+        if self._synced_pose_count and not np.array_equal(
+            self.poses[: self._synced_pose_count],
+            self._synced_pose_snapshot[: self._synced_pose_count],
+        ):
+            return True
+        if tuple(id(edge) for edge in self.edges[: self._synced_edge_count]) != (
+            self._synced_edge_ids
+        ):
+            return True
+        if tuple(
+            id(prior) for prior in self.priors[: self._synced_prior_count]
+        ) != self._synced_prior_ids:
+            return True
+        return False
+
+    def _mark_synchronised(self) -> None:
+        self._synced_pose_count = int(self.poses.shape[0])
+        self._synced_edge_count = len(self.edges)
+        self._synced_prior_count = len(self.priors)
+        self._synced_pose_snapshot = self.poses.copy()
+        self._synced_edge_ids = tuple(id(edge) for edge in self.edges)
+        self._synced_prior_ids = tuple(id(prior) for prior in self.priors)
+
+    def _pose_array_from_values(
+        self, values, initial: np.ndarray
+    ) -> np.ndarray:
+        result = np.asarray(initial, dtype=np.float64).reshape(-1, 3).copy()
+        for index in range(result.shape[0]):
+            key = self._key(index)
+            if values.exists(key):
+                result[index] = self._pose_array(values.atPose2(key))
+        result[:, 2] = wrap_angle(result[:, 2])
+        return result
+
+    def _store_fixed_lag_values(self, values) -> None:
+        # Values contains only the live smoother window.  Updating it after
+        # every chronological backlog step preserves a pose's last estimate
+        # immediately before marginalization instead of leaving its raw seed.
+        self.poses = self._pose_array_from_values(values, self.poses)
+
+    def _incremental_global_update(self):
+        graph = self._gtsam.NonlinearFactorGraph()
+        values = self._gtsam.Values()
+        touched_keys: set[int] = set()
+        if self._synced_pose_count == 0 and self.poses.shape[0]:
+            graph.add(self._gauge_factor(self.poses[0]))
+            touched_keys.add(self._key(0))
+        for edge in self.edges[self._synced_edge_count :]:
+            graph.add(self._edge_factor(edge))
+            touched_keys.update((self._key(edge.source), self._key(edge.target)))
+        for prior in self.priors[self._synced_prior_count :]:
+            graph.add(self._prior_factor(prior))
+            touched_keys.add(self._key(prior.target))
+        for index in range(self._synced_pose_count, self.poses.shape[0]):
+            key = self._key(index)
+            if key not in touched_keys:
+                raise RuntimeError(
+                    f"new GTSAM pose x{index} has no connecting factor"
+                )
+            values.insert(key, self._pose2(self.poses[index]))
+        result = self._global_isam.update(graph, values)
+        # A second standard iSAM2 update lets variables selected by the
+        # relinearization policy settle after a newly inserted nonlinear loop
+        # or terrain factor.  It is not a hand-written batch iteration.
+        self._global_isam.update()
+        self.isam_updates += 1
+        return result
+
+    def _incremental_fixed_lag_update(self) -> None:
+        # Insert a backlog chronologically, one timestamp at a time.  GTSAM's
+        # IncrementalFixedLagSmoother cannot safely receive a single batch whose
+        # timestamp span exceeds the lag: it may try to marginalize the first
+        # new key while later factors in that same update still reference it,
+        # which the Python binding reports as ``IndexError: map::at``.  This
+        # situation is normal here because terrain factors are intentionally
+        # confirmed sparsely and graph optimization can be idle for several
+        # keyframes.  Replaying the pending chain in timestamp order is exactly
+        # the online sequence the smoother is defined to consume.
+        pending_edges = list(
+            enumerate(
+                self.edges[self._synced_edge_count :],
+                start=self._synced_edge_count,
+            )
+        )
+        pending_priors = list(
+            enumerate(
+                self.priors[self._synced_prior_count :],
+                start=self._synced_prior_count,
+            )
+        )
+        emitted_edges: set[int] = set()
+        emitted_priors: set[int] = set()
+
+        def update_once(graph, values, timestamps) -> None:
+            has_new_data = bool(values.size() or graph.size())
+            self._fixed_lag.update(graph, values, timestamps)
+            self.fixed_lag_updates += 1
+            if has_new_data:
+                # Match the two-step iSAM2 policy used by the retained global
+                # diagnostic graph: the first call inserts nonlinear factors,
+                # while the second gives the selected variables one immediate
+                # relinearization/solve pass without adding information.
+                self._fixed_lag.update(
+                    self._gtsam.NonlinearFactorGraph(),
+                    self._gtsam.Values(),
+                    self._fixed_lag_api.FixedLagSmootherKeyTimestampMap(),
+                )
+                self.fixed_lag_updates += 1
+            fixed_values = self._fixed_lag.calculateEstimate()
+            self._store_fixed_lag_values(fixed_values)
+            self._fixed_lag_active_keys = {
+                int(active_key) for active_key in fixed_values.keys()
+            }
+
+        for index in range(self._synced_pose_count, self.poses.shape[0]):
+            key = self._key(index)
+            available = set(self._fixed_lag_active_keys)
+            available.add(key)
+            graph = self._gtsam.NonlinearFactorGraph()
+            values = self._gtsam.Values()
+            timestamps = self._fixed_lag_api.FixedLagSmootherKeyTimestampMap()
+            touched_keys: set[int] = set()
+            if index == 0 and self._synced_pose_count == 0:
+                graph.add(self._gauge_factor(self.poses[0]))
+                touched_keys.add(key)
+            for edge_index, edge in pending_edges:
+                if edge_index in emitted_edges:
+                    continue
+                keys = {self._key(edge.source), self._key(edge.target)}
+                if keys.issubset(available):
+                    graph.add(self._edge_factor(edge))
+                    touched_keys.update(keys)
+                    emitted_edges.add(edge_index)
+            for prior_index, prior in pending_priors:
+                if prior_index in emitted_priors:
+                    continue
+                prior_key = self._key(prior.target)
+                if prior_key in available:
+                    graph.add(self._prior_factor(prior))
+                    touched_keys.add(prior_key)
+                    emitted_priors.add(prior_index)
+            if key not in touched_keys:
+                # A long-baseline loop can reference a key already marginalized
+                # from this window.  Anchor the new window state to the global
+                # iSAM2 marginal instead of reviving a deleted variable.
+                estimate = self._global_isam.calculateEstimatePose2(key)
+                covariance = np.asarray(
+                    self._global_isam.marginalCovariance(key),
+                    dtype=np.float64,
+                )
+                information = np.linalg.pinv(
+                    0.5 * (covariance + covariance.T), rcond=1.0e-12
+                )
+                graph.add(
+                    self._gtsam.PriorFactorPose2(
+                        key,
+                        estimate,
+                        self._noise_model(information),
+                    )
+                )
+            values.insert(key, self._pose2(self.poses[index]))
+            timestamps.insert((key, float(self._timestamps[index])))
+            update_once(graph, values, timestamps)
+
+        # Factors added without a new pose (for example a late absolute prior)
+        # are still useful when all their variables remain inside the window.
+        # Factors touching a marginalized variable stay in global iSAM2 only.
+        graph = self._gtsam.NonlinearFactorGraph()
+        values = self._gtsam.Values()
+        timestamps = self._fixed_lag_api.FixedLagSmootherKeyTimestampMap()
+        available = set(self._fixed_lag_active_keys)
+        for edge_index, edge in pending_edges:
+            if edge_index in emitted_edges:
+                continue
+            keys = {self._key(edge.source), self._key(edge.target)}
+            if keys.issubset(available):
+                graph.add(self._edge_factor(edge))
+                emitted_edges.add(edge_index)
+            else:
+                self.global_only_factor_count += 1
+        for prior_index, prior in pending_priors:
+            if prior_index in emitted_priors:
+                continue
+            prior_key = self._key(prior.target)
+            if prior_key in available:
+                graph.add(self._prior_factor(prior))
+                emitted_priors.add(prior_index)
+            else:
+                self.global_only_factor_count += 1
+        update_once(graph, values, timestamps)
+        self.fixed_lag_active_variables = len(self._fixed_lag_active_keys)
+        self.fixed_lag_marginalized_variables = max(
+            0, int(self.poses.shape[0]) - self.fixed_lag_active_variables
+        )
+
+    def _rebuild(self) -> None:
+        self.rebuilds += 1
+        self._new_solvers()
+        all_graph = self._gtsam.NonlinearFactorGraph()
+        all_values = self._gtsam.Values()
+        if self.poses.shape[0]:
+            all_graph.add(self._gauge_factor(self.poses[0]))
+        for edge in self.edges:
+            all_graph.add(self._edge_factor(edge))
+        for prior in self.priors:
+            all_graph.add(self._prior_factor(prior))
+        for index, pose in enumerate(self.poses):
+            all_values.insert(self._key(index), self._pose2(pose))
+        if self.poses.shape[0]:
+            self._global_isam.update(all_graph, all_values)
+            self._global_isam.update()
+            self.isam_updates += 1
+
+        # Replay chronologically so IncrementalFixedLagSmoother performs real
+        # marginalization and creates its boundary marginal factors itself.
+        self._fixed_lag_active_keys.clear()
+        edges_by_target: dict[int, list[PoseGraphEdge]] = {}
+        priors_by_target: dict[int, list[PoseGraphPrior]] = {}
+        for edge in self.edges:
+            edges_by_target.setdefault(edge.target, []).append(edge)
+        for prior in self.priors:
+            priors_by_target.setdefault(prior.target, []).append(prior)
+        for index, pose in enumerate(self.poses):
+            key = self._key(index)
+            graph = self._gtsam.NonlinearFactorGraph()
+            values = self._gtsam.Values()
+            timestamps = self._fixed_lag_api.FixedLagSmootherKeyTimestampMap()
+            values.insert(key, self._pose2(pose))
+            timestamps.insert((key, float(self._timestamps[index])))
+            if index == 0:
+                graph.add(self._gauge_factor(pose))
+            available = set(self._fixed_lag_active_keys)
+            available.add(key)
+            for edge in edges_by_target.get(index, ()):
+                keys = {self._key(edge.source), self._key(edge.target)}
+                if keys.issubset(available):
+                    graph.add(self._edge_factor(edge))
+            for prior in priors_by_target.get(index, ()):
+                graph.add(self._prior_factor(prior))
+            if graph.size() == 0:
+                estimate = self._global_isam.calculateEstimatePose2(key)
+                covariance = np.asarray(
+                    self._global_isam.marginalCovariance(key),
+                    dtype=np.float64,
+                )
+                graph.add(
+                    self._gtsam.PriorFactorPose2(
+                        key,
+                        estimate,
+                        self._noise_model(
+                            np.linalg.pinv(
+                                0.5 * (covariance + covariance.T),
+                                rcond=1.0e-12,
+                            )
+                        ),
+                    )
+                )
+            self._fixed_lag.update(graph, values, timestamps)
+            self.fixed_lag_updates += 1
+            self._fixed_lag.update(
+                self._gtsam.NonlinearFactorGraph(),
+                self._gtsam.Values(),
+                self._fixed_lag_api.FixedLagSmootherKeyTimestampMap(),
+            )
+            self.fixed_lag_updates += 1
+            estimate_values = self._fixed_lag.calculateEstimate()
+            self._store_fixed_lag_values(estimate_values)
+            self._fixed_lag_active_keys = set(
+                int(active_key) for active_key in estimate_values.keys()
+            )
+        self.fixed_lag_active_variables = len(self._fixed_lag_active_keys)
+        self.fixed_lag_marginalized_variables = max(
+            0, int(self.poses.shape[0]) - self.fixed_lag_active_variables
+        )
+
+    def optimize(self) -> np.ndarray:
+        count = int(self.poses.shape[0])
+        if count < 2 or (not self.edges and not self.priors):
+            return self.poses.copy()
+        self._normalise_timestamp_storage()
+        self.initial_cost = self._cost(self.poses)
+        self.global_initial_cost = self.initial_cost
+        if self._existing_state_was_edited():
+            self._rebuild()
+        else:
+            self._incremental_global_update()
+            self._incremental_fixed_lag_update()
+        global_values = self._global_isam.calculateEstimate()
+        self.global_isam_poses = self._pose_array_from_values(
+            global_values, self.poses
+        )
+        self.global_final_cost = self._cost(self.global_isam_poses)
+        # ``_incremental_fixed_lag_update`` and ``_rebuild`` already copied
+        # each live-window estimate into public poses.  Do not overwrite those
+        # with the complete-graph diagnostic estimate here.
+        self.final_cost = self._cost(self.poses)
+        self.optimization_runs += 1
+        self.optimization_boundaries.append(
+            (self.poses.shape[0], len(self.edges), len(self.priors))
+        )
+        self._mark_synchronised()
+        return self.poses.copy()
+
+
+def _make_planar_pose_graph(config: PoseGraphConfig) -> PlanarPoseGraph:
+    backend = str(config.optimizer_backend).strip().lower()
+    if backend == "numpy_batch":
+        return PlanarPoseGraph(config)
+    if backend == "gtsam_fixed_lag_isam2":
+        return GTSAMPlanarPoseGraph(config)
+    raise ValueError(
+        "optimizer_backend must be 'numpy_batch' or "
+        "'gtsam_fixed_lag_isam2'"
+    )
 
 
 def acoustic_descriptor(
@@ -802,7 +1496,7 @@ class AcousticPoseGraph:
 
     def __init__(self, config: PoseGraphConfig | None = None) -> None:
         self.config = config or PoseGraphConfig()
-        self.graph = PlanarPoseGraph(self.config)
+        self.graph = _make_planar_pose_graph(self.config)
         self.keyframes: list[AcousticKeyframe] = []
         self.loop_edges: list[PoseGraphEdge] = []
         self._pending_loops: list[PoseGraphEdge] = []
@@ -831,7 +1525,7 @@ class AcousticPoseGraph:
         self._geometry_keyframe_count = 0
 
     def reset(self) -> None:
-        self.graph = PlanarPoseGraph(self.config)
+        self.graph = _make_planar_pose_graph(self.config)
         self.keyframes.clear()
         self.loop_edges.clear()
         self._pending_loops.clear()
@@ -989,7 +1683,7 @@ class AcousticPoseGraph:
                     graph_prior,
                     _relative_pose2(odometry_pose, raw_pose),
                 )
-        node = self.graph.add_pose(graph_pose)
+        node = self.graph.add_pose(graph_pose, timestamp=float(timestamp))
         if node != frame.index:
             raise RuntimeError("keyframe and graph indices diverged")
         if self.keyframes:
@@ -1376,12 +2070,12 @@ class AcousticPoseGraph:
                     detect_loops=False,
                 )
             except (TypeError, ValueError, RuntimeError, np.linalg.LinAlgError):
-                self.graph.poses = self.graph.poses[:pose_count].copy()
+                self.graph.truncate_poses(pose_count)
                 del self.graph.edges[edge_count:]
                 del self.keyframes[frame_count:]
                 return self._reject_terrain_prior("node_creation_failed")
             if not created:
-                self.graph.poses = self.graph.poses[:pose_count].copy()
+                self.graph.truncate_poses(pose_count)
                 del self.graph.edges[edge_count:]
                 del self.keyframes[frame_count:]
                 return self._reject_terrain_prior("node_creation_failed")
@@ -2129,6 +2823,25 @@ class AcousticPoseGraph:
             optimization_runs=self.graph.optimization_runs,
             initial_cost=float(self.graph.initial_cost),
             final_cost=float(self.graph.final_cost),
+            optimizer_backend=self.graph.backend_name,
+            isam_updates=self.graph.isam_updates,
+            fixed_lag_updates=self.graph.fixed_lag_updates,
+            fixed_lag_active_variables=(
+                self.graph.fixed_lag_active_variables
+            ),
+            fixed_lag_marginalized_variables=(
+                self.graph.fixed_lag_marginalized_variables
+            ),
+            fixed_lag_global_only_factors=getattr(
+                self.graph, "global_only_factor_count", 0
+            ),
+            optimizer_rebuilds=getattr(self.graph, "rebuilds", 0),
+            global_isam_initial_cost=float(
+                getattr(self.graph, "global_initial_cost", 0.0)
+            ),
+            global_isam_final_cost=float(
+                getattr(self.graph, "global_final_cost", 0.0)
+            ),
         )
 
     def optimized_keyframe_positions(self) -> tuple[np.ndarray, np.ndarray]:
@@ -2139,13 +2852,24 @@ class AcousticPoseGraph:
         positions[:, :2] = self.graph.poses[:, :2]
         return timestamps, positions
 
-    def _corrections(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _corrections(
+        self, optimized_poses: np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         timestamps = np.array([frame.timestamp for frame in self.keyframes])
+        optimized_values = (
+            self.graph.poses
+            if optimized_poses is None
+            else np.asarray(optimized_poses, dtype=np.float64).reshape(-1, 3)
+        )
+        if optimized_values.shape[0] != len(self.keyframes):
+            raise ValueError(
+                "optimized pose count must match acoustic keyframe count"
+            )
         yaw_delta = np.empty(len(self.keyframes), dtype=np.float64)
         translation = np.empty((len(self.keyframes), 2), dtype=np.float64)
         for index, frame in enumerate(self.keyframes):
             raw = frame.raw_pose2
-            optimized = self.graph.poses[index]
+            optimized = optimized_values[index]
             yaw_delta[index] = float(wrap_angle(optimized[2] - raw[2]))
             c, s = np.cos(yaw_delta[index]), np.sin(yaw_delta[index])
             rotated_raw = np.array(
@@ -2164,13 +2888,19 @@ class AcousticPoseGraph:
         return timestamps, yaw_delta, translation
 
     def correct_trajectory(
-        self, timestamps: np.ndarray, raw_positions: np.ndarray
+        self,
+        timestamps: np.ndarray,
+        raw_positions: np.ndarray,
+        *,
+        optimized_poses: np.ndarray | None = None,
     ) -> np.ndarray:
         times = np.asarray(timestamps, dtype=np.float64).reshape(-1)
         positions = np.asarray(raw_positions, dtype=np.float64).reshape(-1, 3)
         if not self.keyframes or times.size == 0:
             return positions.copy()
-        key_times, key_yaw_delta, key_translation = self._corrections()
+        key_times, key_yaw_delta, key_translation = self._corrections(
+            optimized_poses
+        )
         # Unwrap before interpolation so corrections cross +/-pi smoothly.
         yaw_delta = np.interp(times, key_times, np.unwrap(key_yaw_delta))
         tx = np.interp(times, key_times, key_translation[:, 0])

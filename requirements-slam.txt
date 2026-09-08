@@ -1,0 +1,5 @@
+# Optional GTSAM fixed-lag pose-graph backend. Python 3.10/3.11 use the
+# stable bindings; Isaac Sim's Python 3.12 environment uses the newer binding
+# where IncrementalFixedLagSmoother is exposed directly from gtsam.
+gtsam==4.2; python_version < "3.12"
+gtsam==4.3a2; python_version >= "3.12"
