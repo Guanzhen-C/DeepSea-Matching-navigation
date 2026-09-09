@@ -98,6 +98,13 @@ def main() -> int:
         "_pose_graph_factors.json",
         required=False,
     )
+    relative_odometry = _resolve_related(
+        metrics_path,
+        payload,
+        "relative_odometry_evaluation",
+        "_relative_odometry.json",
+        required=False,
+    )
 
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -106,6 +113,7 @@ def main() -> int:
         "position_errors": output / f"{args.stem}_position_errors.csv",
         "progress": output / f"{args.stem}_progress.json",
         "pose_graph_factors": output / f"{args.stem}_pose_graph_factors.json",
+        "relative_odometry": output / f"{args.stem}_relative_odometry.json",
         "manifest": output / f"{args.stem}_manifest.json",
     }
     material_destinations = [
@@ -117,6 +125,8 @@ def main() -> int:
         material_destinations.append(destinations["progress"])
     if factor_log is not None:
         material_destinations.append(destinations["pose_graph_factors"])
+    if relative_odometry is not None:
+        material_destinations.append(destinations["relative_odometry"])
     existing = [path for path in material_destinations if path.exists()]
     if existing and not args.force:
         raise FileExistsError(
@@ -130,6 +140,8 @@ def main() -> int:
         shutil.copy2(progress, destinations["progress"])
     if factor_log is not None:
         shutil.copy2(factor_log, destinations["pose_graph_factors"])
+    if relative_odometry is not None:
+        shutil.copy2(relative_odometry, destinations["relative_odometry"])
 
     archived_metrics = dict(payload)
     archived_metrics["position_error_csv"] = destinations[
@@ -138,6 +150,10 @@ def main() -> int:
     if factor_log is not None:
         archived_metrics["pose_graph_factor_log"] = destinations[
             "pose_graph_factors"
+        ].name
+    if relative_odometry is not None:
+        archived_metrics["relative_odometry_evaluation"] = destinations[
+            "relative_odometry"
         ].name
     archived_metrics["archive_source_metrics"] = str(metrics_path)
     archived_metrics["archive_source_revision"] = args.source_revision
@@ -152,6 +168,10 @@ def main() -> int:
     if factor_log is not None:
         artifact_paths["pose_graph_factors"] = destinations[
             "pose_graph_factors"
+        ]
+    if relative_odometry is not None:
+        artifact_paths["relative_odometry"] = destinations[
+            "relative_odometry"
         ]
     manifest = {
         "schema": "oceansim.backend_ab_run_archive.v1",

@@ -567,6 +567,88 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--enable-global-terrain-relocalization",
+        action="store_true",
+        help=(
+            "after every bounded terrain-recovery layer fails, correlate a "
+            "long motion-compensated MBES/side-scan strip against the complete "
+            "measured map; the proposal still needs local refinement and a "
+            "second temporally disjoint confirmation before graph fusion"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-window-pings",
+        type=int,
+        default=1200,
+        help="pings retained for rare whole-map relocalization proposals",
+    )
+    parser.add_argument(
+        "--terrain-global-pyramid-stride",
+        type=int,
+        default=4,
+        help="source-map cells per whole-map proposal-lattice cell",
+    )
+    parser.add_argument(
+        "--terrain-global-yaw-window-deg",
+        type=float,
+        default=45.0,
+        help="whole-map proposal yaw half-window around IMU/DVL dead reckoning",
+    )
+    parser.add_argument(
+        "--terrain-global-yaw-step-deg",
+        type=float,
+        default=5.0,
+        help="whole-map proposal yaw sampling interval",
+    )
+    parser.add_argument(
+        "--terrain-global-minimum-correlation",
+        type=float,
+        default=0.30,
+        help="minimum joint bathymetry/backscatter proposal correlation",
+    )
+    parser.add_argument(
+        "--terrain-global-maximum-bathymetry-rmse-m",
+        type=float,
+        default=6.0,
+        help=(
+            "maximum absolute depth residual for a whole-map proposal; "
+            "pressure depth and the registered map share the vertical datum"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-bathymetry-absolute-weight",
+        type=float,
+        default=0.50,
+        help=(
+            "fraction of the bathymetry proposal score assigned to absolute "
+            "pressure-depth consistency rather than zero-mean relief shape"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-minimum-score-gap",
+        type=float,
+        default=0.08,
+        help="minimum best-versus-second spatial-basin proposal score gap",
+    )
+    parser.add_argument(
+        "--terrain-global-confirmation-position-tolerance-m",
+        type=float,
+        default=25.0,
+        help=(
+            "maximum disagreement between two disjoint whole-map strip "
+            "matches after IMU/DVL propagation"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-confirmation-yaw-tolerance-deg",
+        type=float,
+        default=5.0,
+        help=(
+            "maximum yaw disagreement between two disjoint whole-map strip "
+            "matches after IMU/DVL propagation"
+        ),
+    )
+    parser.add_argument(
         "--terrain-match-yaw-window-deg",
         type=float,
         default=8.0,
@@ -815,6 +897,38 @@ def parse_args() -> argparse.Namespace:
         )
         or args.terrain_emergency_recovery_translation_window_m < 0.0
         or args.terrain_emergency_recovery_translation_window_m > 150.0
+        or args.terrain_global_window_pings < 2
+        or args.terrain_global_pyramid_stride < 1
+        or not math.isfinite(args.terrain_global_yaw_window_deg)
+        or args.terrain_global_yaw_window_deg <= 0.0
+        or args.terrain_global_yaw_window_deg > 180.0
+        or not math.isfinite(args.terrain_global_yaw_step_deg)
+        or args.terrain_global_yaw_step_deg <= 0.0
+        or args.terrain_global_yaw_step_deg
+        > 2.0 * args.terrain_global_yaw_window_deg
+        or not math.isfinite(args.terrain_global_minimum_correlation)
+        or not 0.0 < args.terrain_global_minimum_correlation <= 1.0
+        or not math.isfinite(
+            args.terrain_global_maximum_bathymetry_rmse_m
+        )
+        or args.terrain_global_maximum_bathymetry_rmse_m <= 0.0
+        or not math.isfinite(
+            args.terrain_global_bathymetry_absolute_weight
+        )
+        or not 0.0
+        <= args.terrain_global_bathymetry_absolute_weight
+        <= 1.0
+        or not math.isfinite(args.terrain_global_minimum_score_gap)
+        or not 0.0 < args.terrain_global_minimum_score_gap <= 2.0
+        or not math.isfinite(
+            args.terrain_global_confirmation_position_tolerance_m
+        )
+        or args.terrain_global_confirmation_position_tolerance_m <= 0.0
+        or not math.isfinite(
+            args.terrain_global_confirmation_yaw_tolerance_deg
+        )
+        or args.terrain_global_confirmation_yaw_tolerance_deg <= 0.0
+        or args.terrain_global_confirmation_yaw_tolerance_deg >= 45.0
         or args.terrain_match_yaw_window_deg <= 0.0
         or args.terrain_match_yaw_window_deg >= 45.0
         or args.terrain_prior_optimize_interval < 1
@@ -931,6 +1045,22 @@ def parse_args() -> argparse.Namespace:
                 "emergency terrain recovery requires "
                 "--terrain-require-yaw-observable"
             )
+    if args.enable_global_terrain_relocalization:
+        if args.terrain_emergency_recovery_translation_window_m <= 0.0:
+            parser.error(
+                "global terrain relocalization requires all preceding bounded "
+                "terrain-recovery layers"
+            )
+        if not args.enable_backscatter_map_matching:
+            parser.error(
+                "global terrain relocalization requires co-registered "
+                "backscatter map matching"
+            )
+        if args.terrain_global_window_pings <= args.terrain_match_window_pings:
+            parser.error(
+                "--terrain-global-window-pings must exceed the ordinary "
+                "terrain-matching window"
+            )
     sys.argv = [sys.argv[0], *kit_args]
     return args
 
@@ -994,6 +1124,8 @@ from isaacsim.oceansim.slam import (
     ESIKFConfig,
     FastSonarSLAM,
     FastSonarSLAMConfig,
+    GlobalTerrainRelocalizer,
+    GlobalTerrainRelocalizerConfig,
     InertialState,
     NavigationInitialization,
     PoseGraphConfig,
@@ -1006,13 +1138,14 @@ from isaacsim.oceansim.slam import (
     map_to_odom_change_metrics,
     make_terrain_recovery_config,
     motion_compensate_to_body,
+    se3_relative_pose_error_by_distance,
     voxel_average_backscatter_patch,
     voxel_average_terrain_patch,
 )
 from isaacsim.oceansim.slam.large_scale_sim import (
     LargeScaleSensorSimulator,
 )
-from isaacsim.oceansim.slam.math3d import rpy_from_rotation
+from isaacsim.oceansim.slam.math3d import rotation_from_rpy, rpy_from_rotation
 from isaacsim.oceansim.slam.real_bathymetry import (
     MeasuredBathymetryGrid,
     TerrainFollowingSurvey,
@@ -1304,7 +1437,13 @@ def _relative_position_error_metrics(
     cumulative_distance_m: np.ndarray,
     interval_m: float,
 ) -> dict[str, float | int | bool | None]:
-    """Translation RPE over approximately fixed truth-distance intervals."""
+    """Legacy world-frame displacement error over fixed route intervals.
+
+    This quantity is intentionally retained for result-file compatibility.  It
+    is not a gauge-invariant relative-pose error: a constant global rotation of
+    an otherwise exact trajectory changes the reported value.  Use
+    ``se3_relative_pose_error_by_distance`` for odometry-accuracy claims.
+    """
 
     estimates = np.asarray(estimates, dtype=np.float64).reshape(-1, 3)
     truth = np.asarray(truth, dtype=np.float64).reshape(-1, 3)
@@ -2202,6 +2341,33 @@ def main() -> int:
         )
         else None
     )
+    global_backscatter_refinement_matcher = (
+        BackscatterMapMatcher(
+            world_model,
+            replace(
+                backscatter_matcher.config,
+                maximum_points=max(
+                    4_096, ARGS.backscatter_match_maximum_points
+                ),
+                maximum_translation_m=(
+                    ARGS.terrain_match_translation_window_m
+                ),
+                maximum_yaw_deg=max(
+                    6.0, ARGS.terrain_global_yaw_step_deg
+                ),
+                coarse_translation_step_m=min(
+                    5.0, ARGS.terrain_match_translation_window_m
+                ),
+                coarse_yaw_step_deg=1.0,
+                basin_translation_separation_m=max(
+                    10.0, 2.0 * world_model.resolution_m
+                ),
+                basin_yaw_separation_deg=2.0,
+            ),
+        )
+        if ARGS.enable_global_terrain_relocalization
+        else None
+    )
     terrain_recovery_config = (
         make_terrain_recovery_config(
             terrain_matcher_config,
@@ -2244,6 +2410,30 @@ def main() -> int:
         if terrain_emergency_recovery_config is not None
         else None
     )
+    global_terrain_relocalizer = (
+        GlobalTerrainRelocalizer(
+            world_model,
+            GlobalTerrainRelocalizerConfig(
+                pyramid_stride=ARGS.terrain_global_pyramid_stride,
+                yaw_half_window_deg=ARGS.terrain_global_yaw_window_deg,
+                yaw_step_deg=ARGS.terrain_global_yaw_step_deg,
+                minimum_joint_correlation=(
+                    ARGS.terrain_global_minimum_correlation
+                ),
+                maximum_bathymetry_rmse_m=(
+                    ARGS.terrain_global_maximum_bathymetry_rmse_m
+                ),
+                bathymetry_absolute_weight=(
+                    ARGS.terrain_global_bathymetry_absolute_weight
+                ),
+                minimum_basin_score_gap=(
+                    ARGS.terrain_global_minimum_score_gap
+                ),
+            ),
+        )
+        if ARGS.enable_global_terrain_relocalization
+        else None
+    )
     terrain_recovery = TerrainRecoveryController(
         enabled=terrain_recovery_matcher is not None,
         after_rejections=ARGS.terrain_recovery_after_rejections,
@@ -2262,6 +2452,12 @@ def main() -> int:
     terrain_patch_scans = deque(maxlen=ARGS.terrain_match_window_pings)
     terrain_patch_inertial_states = deque(
         maxlen=ARGS.terrain_match_window_pings
+    )
+    global_terrain_patch_scans = deque(
+        maxlen=ARGS.terrain_global_window_pings
+    )
+    global_terrain_patch_inertial_states = deque(
+        maxlen=ARGS.terrain_global_window_pings
     )
     last_terrain_retained_full_swath_pings = 0
     last_terrain_patch_raw_points = 0
@@ -2282,8 +2478,32 @@ def main() -> int:
             "prior_factor_rejections": 0,
             "wall_time_s": 0.0,
         }
-        for mode in ("normal", "recovery", "emergency")
+        for mode in ("normal", "recovery", "emergency", "global")
     }
+    global_relocalization_stats = {
+        "invocations": 0,
+        "accepted_proposals": 0,
+        "rejected_proposals": 0,
+        "proposal_rejection_reasons": Counter(),
+        "bathymetry_refinement_accepts": 0,
+        "bathymetry_refinement_rejections": 0,
+        "bathymetry_refinement_rejection_reasons": Counter(),
+        "bathymetry_position_fallback_invocations": 0,
+        "bathymetry_position_fallback_accepts": 0,
+        "bathymetry_position_fallback_rejections": 0,
+        "bathymetry_position_fallback_rejection_reasons": Counter(),
+        "dual_modal_refinement_accepts": 0,
+        "dual_modal_refinement_rejections": 0,
+        "dual_modal_refinement_rejection_reasons": Counter(),
+        "wall_time_s": 0.0,
+        "last_best_score": float("nan"),
+        "last_second_basin_score": float("nan"),
+        "last_score_gap": float("nan"),
+        "last_candidate_count": 0,
+        "last_evaluated_yaws": 0,
+        "last_finite_lattice_candidates": 0,
+    }
+    global_relocalization_records: list[dict] = []
     terrain_accepted_invocation_stats = {
         "count": 0,
         "rmse_before_sum": 0.0,
@@ -2482,15 +2702,27 @@ def main() -> int:
         patch_intensities,
         *,
         truth_state,
+        use_global_refinement=False,
     ):
         """Return a covariance-weighted bathymetry/backscatter absolute fix."""
 
-        if backscatter_matcher is None:
+        selected_backscatter_matcher = (
+            global_backscatter_refinement_matcher
+            if use_global_refinement
+            else backscatter_matcher
+        )
+        selected_boundary_retry_matcher = (
+            None
+            if use_global_refinement
+            else backscatter_boundary_yaw_retry_matcher
+        )
+        if selected_backscatter_matcher is None:
             return (
                 terrain_result.matched_pose2,
                 terrain_result.information,
                 bool(terrain_result.yaw_observable),
                 True,
+                False,
                 False,
             )
         bathymetric_pose2 = np.asarray(
@@ -2524,7 +2756,7 @@ def main() -> int:
         backscatter_seed.position[:2] = bathymetric_pose2[:2]
 
         match_started = time.perf_counter()
-        primary_backscatter_result = backscatter_matcher.match(
+        primary_backscatter_result = selected_backscatter_matcher.match(
             patch_points_body, patch_intensities, backscatter_seed
         )
         elapsed_s = time.perf_counter() - match_started
@@ -2538,7 +2770,7 @@ def main() -> int:
             stats["primary_rejection_reasons"][
                 primary_backscatter_result.rejection_reason or "unspecified"
             ] += 1
-        primary_config = backscatter_matcher.config
+        primary_config = selected_backscatter_matcher.config
         primary_translation_boundary = bool(
             np.linalg.norm(primary_backscatter_result.correction[:2])
             >= primary_config.maximum_translation_m
@@ -2550,7 +2782,7 @@ def main() -> int:
             - 0.5 * primary_config.refinement_yaw_step_deg
         )
         if (
-            backscatter_boundary_yaw_retry_matcher is not None
+            selected_boundary_retry_matcher is not None
             and primary_backscatter_result.rejection_reason
             == "search_boundary_reached"
             and primary_yaw_boundary
@@ -2559,7 +2791,7 @@ def main() -> int:
             boundary_retry_attempted = True
             stats["boundary_yaw_retries"] += 1
             match_started = time.perf_counter()
-            retry_result = backscatter_boundary_yaw_retry_matcher.match(
+            retry_result = selected_boundary_retry_matcher.match(
                 patch_points_body, patch_intensities, backscatter_seed
             )
             retry_elapsed_s = time.perf_counter() - match_started
@@ -2691,6 +2923,11 @@ def main() -> int:
         fused_errors = errors(fused_pose2)
         backscatter_match_records.append(
             {
+                "refinement_scope": (
+                    "global_relocalization"
+                    if use_global_refinement
+                    else "ordinary_tracking"
+                ),
                 "timestamp_s": float(terrain_result.state_timestamp),
                 "primary_accepted": bool(
                     primary_backscatter_result.accepted
@@ -2753,7 +2990,88 @@ def main() -> int:
             ),
             bool(cross_modal_compatible),
             bool(information_includes_model_floors),
+            bool(backscatter_result.accepted),
         )
+
+    def build_global_relocalization_patch():
+        """Build the long, inertially deskewed strip used only after loss."""
+
+        scans = list(global_terrain_patch_scans)
+        inertial_states = list(global_terrain_patch_inertial_states)
+        if (
+            global_terrain_relocalizer is None
+            or len(scans) != ARGS.terrain_global_window_pings
+            or len(inertial_states) != len(scans)
+        ):
+            return None
+        reference_state = inertial_states[-1].copy()
+        terrain_chunks = [
+            motion_compensate_to_body(
+                scan[1],
+                acquisition_state,
+                reference_state,
+                sensor_rotation_body=slam.filter.sensor_rotation_body,
+                sensor_translation_body=slam.filter.sensor_translation_body,
+            )
+            for acquisition_state, scan in zip(inertial_states, scans)
+            if scan[1].size
+        ]
+        if not terrain_chunks:
+            return None
+        terrain_full = np.vstack(terrain_chunks)
+        terrain_points, terrain_voxel_size_m = voxel_average_terrain_patch(
+            terrain_full,
+            max(8_192, 4 * ARGS.terrain_match_maximum_points),
+            minimum_voxel_size_m=world_model.resolution_m,
+        )
+
+        backscatter_point_chunks = []
+        backscatter_value_chunks = []
+        for acquisition_state, scan in zip(inertial_states, scans):
+            if scan[2].size == 0:
+                continue
+            backscatter_point_chunks.append(
+                motion_compensate_to_body(
+                    scan[2],
+                    acquisition_state,
+                    reference_state,
+                    sensor_rotation_body=slam.filter.sensor_rotation_body,
+                    sensor_translation_body=slam.filter.sensor_translation_body,
+                )
+            )
+            backscatter_value_chunks.append(
+                np.asarray(scan[3], dtype=np.float64).reshape(-1)
+            )
+        if not backscatter_point_chunks:
+            return None
+        backscatter_full = np.vstack(backscatter_point_chunks)
+        backscatter_values_full = np.concatenate(backscatter_value_chunks)
+        (
+            backscatter_points,
+            backscatter_values,
+            backscatter_voxel_size_m,
+        ) = voxel_average_backscatter_patch(
+            backscatter_full,
+            backscatter_values_full,
+            max(8_192, 4 * ARGS.backscatter_match_maximum_points),
+            minimum_voxel_size_m=world_model.resolution_m,
+        )
+        if backscatter_points.size == 0:
+            return None
+        return {
+            "reference_state": reference_state,
+            "terrain_points_body": terrain_points,
+            "terrain_raw_points": int(terrain_full.shape[0]),
+            "terrain_voxel_size_m": float(terrain_voxel_size_m),
+            "backscatter_points_body": backscatter_points,
+            "backscatter_values": backscatter_values,
+            "backscatter_raw_points": int(backscatter_full.shape[0]),
+            "backscatter_voxel_size_m": float(backscatter_voxel_size_m),
+            "patch_start_timestamp": float(scans[0][4]),
+            "patch_end_timestamp": float(scans[-1][4]),
+            "patch_start_observation_id": int(scans[0][5]),
+            "patch_end_observation_id": int(scans[-1][5]),
+        }
 
     def terrain_prior_information(
         result,
@@ -3079,7 +3397,7 @@ def main() -> int:
         initialize_global_gauge = bool(
             ARGS.terrain_initialize_global_gauge
             and terrain_prior_factor_stats["accepts"] == 0
-            and mode != "emergency"
+            and mode not in ("emergency", "global")
         )
         gauge_seed_pose2 = None
         factor_matched_pose2 = np.asarray(
@@ -3109,7 +3427,10 @@ def main() -> int:
             if held_for_confirmation:
                 return False, True
             factor_matched_pose2 = gauge_seed_pose2
-        elif ARGS.terrain_confirm_every_prior and mode != "emergency":
+        elif ARGS.terrain_confirm_every_prior and mode not in (
+            "emergency",
+            "global",
+        ):
             (
                 factor_matched_pose2,
                 held_for_confirmation,
@@ -3156,13 +3477,13 @@ def main() -> int:
             # would trigger optimization.
             optimize_interval=(
                 1
-                if mode in ("recovery", "emergency")
+                if mode in ("recovery", "emergency", "global")
                 else ARGS.terrain_prior_optimize_interval
             ),
             # Initial two-patch x/y baselines estimate a common SE(2) gauge;
             # emergency re-seeding has its own stricter confirmation policy.
             relocalization_seed=(
-                gauge_seed_pose2 is not None or mode == "emergency"
+                gauge_seed_pose2 is not None or mode in ("emergency", "global")
             ),
             relocalization_seed_pose2=gauge_seed_pose2,
         )
@@ -3416,6 +3737,21 @@ def main() -> int:
                     f"{terrain_emergency_recovery.confirmation_yaw_tolerance_deg:g} deg.",
                     flush=True,
                 )
+            if global_terrain_relocalizer is not None:
+                print(
+                    "[OceanSim] whole-map joint terrain relocalization enabled: "
+                    f"{ARGS.terrain_global_window_pings} inertially deskewed pings "
+                    f"({ARGS.terrain_global_window_pings / ARGS.ping_hz:.0f} s, "
+                    f"nominal {ARGS.terrain_global_window_pings * ARGS.survey_speed_mps / ARGS.ping_hz:.0f} m), "
+                    f"{global_terrain_relocalizer.resolution_m:g} m proposal grid, "
+                    f"+/-{ARGS.terrain_global_yaw_window_deg:g} deg around "
+                    "IMU/DVL yaw; joint bathymetry/backscatter proposals require "
+                    "5 m dual-modal refinement (global side-scan window "
+                    f"+/-{global_backscatter_refinement_matcher.config.maximum_translation_m:g} m/"
+                    f"{global_backscatter_refinement_matcher.config.maximum_yaw_deg:g} deg) "
+                    "and a disjoint-strip confirmation.",
+                    flush=True,
+                )
 
         while simulation_app.is_running():
             if ARGS.duration and time.monotonic() - started >= ARGS.duration:
@@ -3575,19 +3911,25 @@ def main() -> int:
                             in ("acoustic-predictive", "acoustic-fixed-lag")
                             else dead_reckoning.state
                         )
-                        terrain_patch_scans.append(
-                            (
-                                patch_motion_state.copy(),
-                                terrain_points_sensor.copy(),
-                                slam_acoustic_points.copy(),
-                                slam_acoustic_backscatter.copy(),
-                                float(sonar_ping.timestamp),
-                                int(observation_id),
+                        stored_terrain_scan = (
+                            patch_motion_state.copy(),
+                            terrain_points_sensor.copy(),
+                            slam_acoustic_points.copy(),
+                            slam_acoustic_backscatter.copy(),
+                            float(sonar_ping.timestamp),
+                            int(observation_id),
+                        )
+                        stored_inertial_state = dead_reckoning.state.copy()
+                        terrain_patch_scans.append(stored_terrain_scan)
+                        terrain_patch_inertial_states.append(stored_inertial_state)
+                        if global_terrain_relocalizer is not None:
+                            # Both deques reference the same immutable scan
+                            # snapshots, so the longer recovery history does not
+                            # duplicate acoustic arrays in memory.
+                            global_terrain_patch_scans.append(stored_terrain_scan)
+                            global_terrain_patch_inertial_states.append(
+                                stored_inertial_state
                             )
-                        )
-                        terrain_patch_inertial_states.append(
-                            dead_reckoning.state.copy()
-                        )
                     if (
                         terrain_matcher is not None
                         and len(terrain_patch_scans)
@@ -3845,6 +4187,7 @@ def main() -> int:
                                         yaw_observable_override,
                                         cross_modal_compatible,
                                         information_override_includes_model_floors,
+                                        _backscatter_refinement_accepted,
                                     ) = refine_terrain_fix_with_backscatter(
                                         terrain_result,
                                         backscatter_patch_body,
@@ -4129,6 +4472,12 @@ def main() -> int:
                                             and recovery_graph_diagnostics
                                             .last_terrain_prefit_performed
                                         ),
+                                        "graph_prefit_bypassed_for_relocalization": bool(
+                                            recovery_graph_diagnostics
+                                            is not None
+                                            and recovery_graph_diagnostics
+                                            .last_terrain_prefit_bypassed_for_relocalization
+                                        ),
                                         "graph_prefit_chi2": (
                                             None
                                             if recovery_graph_diagnostics is None
@@ -4154,9 +4503,11 @@ def main() -> int:
 
                             raw_pose2 = np.array(
                                 [
-                                    slam.state.position[0],
-                                    slam.state.position[1],
-                                    rpy_from_rotation(slam.state.rotation)[2],
+                                    dead_reckoning.state.position[0],
+                                    dead_reckoning.state.position[1],
+                                    rpy_from_rotation(
+                                        dead_reckoning.state.rotation
+                                    )[2],
                                 ],
                                 dtype=np.float64,
                             )
@@ -4224,51 +4575,563 @@ def main() -> int:
                                     match_elapsed_s,
                                     truth_state=truth,
                                 )
-                                last_terrain_match = terrain_result
-                                last_terrain_match_mode = "emergency"
-                                observation_matcher_accepted |= bool(
+                                confirmation_result = terrain_result
+                                confirmation_mode = "emergency"
+                                confirmation_matched_pose2 = np.asarray(
+                                    terrain_result.matched_pose2,
+                                    dtype=np.float64,
+                                )
+                                confirmation_information_override = None
+                                confirmation_information_has_floors = False
+                                confirmation_yaw_observable = bool(
+                                    terrain_result.yaw_observable
+                                )
+                                confirmation_observable_rank = int(
+                                    terrain_result.observable_rank
+                                )
+                                confirmation_translation_observable_rank = int(
+                                    terrain_result.translation_observable_rank
+                                )
+                                confirmation_accepted = bool(
                                     terrain_result.accepted
                                 )
+                                confirmation_patch_body = patch_body
+                                confirmation_patch_ping_count = len(
+                                    terrain_patch_scans
+                                )
+                                confirmation_patch_start_timestamp = (
+                                    patch_start_timestamp
+                                )
+                                confirmation_patch_end_timestamp = (
+                                    patch_end_timestamp
+                                )
+                                confirmation_patch_start_observation_id = (
+                                    patch_start_observation_id
+                                )
+                                confirmation_patch_end_observation_id = (
+                                    patch_end_observation_id
+                                )
+                                global_search_result = None
+                                global_patch = None
+                                pending_confirmation_source = (
+                                    terrain_emergency_recovery
+                                    .pending_confirmation_source
+                                )
+
+                                # A bounded failure may mean the navigation
+                                # estimate has simply left every local search
+                                # window.  The rare whole-map layer uses a much
+                                # longer strip deskewed only by IMU/DVL/depth,
+                                # proposes on a 20 m pyramid, and then returns to
+                                # the ordinary 5 m matchers for metric refinement.
+                                if (
+                                    global_terrain_relocalizer is not None
+                                    and (
+                                        (
+                                            not confirmation_accepted
+                                            and pending_confirmation_source
+                                            in (None, "global")
+                                        )
+                                        or pending_confirmation_source
+                                        == "global"
+                                    )
+                                ):
+                                    # Once a global hypothesis is pending, a
+                                    # bathymetry-only bounded result cannot
+                                    # self-confirm it.  This observation must
+                                    # supply another complete global chain.
+                                    if pending_confirmation_source == "global":
+                                        confirmation_mode = "global"
+                                        confirmation_accepted = False
+                                    global_patch = (
+                                        build_global_relocalization_patch()
+                                    )
+                                    if global_patch is not None:
+                                        global_started = time.perf_counter()
+                                        global_search_result = (
+                                            global_terrain_relocalizer.search(
+                                                global_patch[
+                                                    "terrain_points_body"
+                                                ],
+                                                global_patch[
+                                                    "reference_state"
+                                                ],
+                                                backscatter_points_body=(
+                                                    global_patch[
+                                                        "backscatter_points_body"
+                                                    ]
+                                                ),
+                                                backscatter_values=(
+                                                    global_patch[
+                                                        "backscatter_values"
+                                                    ]
+                                                ),
+                                                yaw_center_rad=raw_pose2[2],
+                                            )
+                                        )
+                                        global_elapsed_s = (
+                                            time.perf_counter() - global_started
+                                        )
+                                        global_stats = global_relocalization_stats
+                                        global_stats["invocations"] += 1
+                                        global_stats["wall_time_s"] += (
+                                            global_elapsed_s
+                                        )
+                                        global_stats[
+                                            "last_best_score"
+                                        ] = global_search_result.best_score
+                                        global_stats[
+                                            "last_second_basin_score"
+                                        ] = (
+                                            global_search_result
+                                            .second_basin_score
+                                        )
+                                        global_stats[
+                                            "last_score_gap"
+                                        ] = global_search_result.basin_score_gap
+                                        global_stats[
+                                            "last_candidate_count"
+                                        ] = len(global_search_result.candidates)
+                                        global_stats[
+                                            "last_evaluated_yaws"
+                                        ] = global_search_result.evaluated_yaws
+                                        global_stats[
+                                            "last_finite_lattice_candidates"
+                                        ] = (
+                                            global_search_result
+                                            .finite_lattice_candidates
+                                        )
+                                        if global_search_result.accepted:
+                                            global_stats[
+                                                "accepted_proposals"
+                                            ] += 1
+                                        else:
+                                            global_stats[
+                                                "rejected_proposals"
+                                            ] += 1
+                                            global_stats[
+                                                "proposal_rejection_reasons"
+                                            ][
+                                                global_search_result
+                                                .rejection_reason
+                                                or "unspecified"
+                                            ] += 1
+
+                                        truth_pose2 = np.array(
+                                            [
+                                                truth.position[0],
+                                                truth.position[1],
+                                                rpy_from_rotation(
+                                                    truth.rotation
+                                                )[2],
+                                            ],
+                                            dtype=np.float64,
+                                        )
+                                        global_relocalization_records.append(
+                                            {
+                                                "timestamp_s": float(sim_time),
+                                                "observation_id": int(
+                                                    observation_id
+                                                ),
+                                                "accepted": bool(
+                                                    global_search_result.accepted
+                                                ),
+                                                "rejection_reason": (
+                                                    global_search_result
+                                                    .rejection_reason
+                                                ),
+                                                "best_score": (
+                                                    _finite_float_or_none(
+                                                        global_search_result
+                                                        .best_score
+                                                    )
+                                                ),
+                                                "second_basin_score": (
+                                                    _finite_float_or_none(
+                                                        global_search_result
+                                                        .second_basin_score
+                                                    )
+                                                ),
+                                                "basin_score_gap": (
+                                                    _finite_float_or_none(
+                                                        global_search_result
+                                                        .basin_score_gap
+                                                    )
+                                                ),
+                                                "evaluated_yaws": int(
+                                                    global_search_result
+                                                    .evaluated_yaws
+                                                ),
+                                                "finite_lattice_candidates": int(
+                                                    global_search_result
+                                                    .finite_lattice_candidates
+                                                ),
+                                                "patch_ping_count": int(
+                                                    len(
+                                                        global_terrain_patch_scans
+                                                    )
+                                                ),
+                                                "patch_start_timestamp_s": (
+                                                    global_patch[
+                                                        "patch_start_timestamp"
+                                                    ]
+                                                ),
+                                                "patch_end_timestamp_s": (
+                                                    global_patch[
+                                                        "patch_end_timestamp"
+                                                    ]
+                                                ),
+                                                "terrain_raw_points": (
+                                                    global_patch[
+                                                        "terrain_raw_points"
+                                                    ]
+                                                ),
+                                                "terrain_reduced_points": int(
+                                                    global_patch[
+                                                        "terrain_points_body"
+                                                    ].shape[0]
+                                                ),
+                                                "backscatter_raw_points": (
+                                                    global_patch[
+                                                        "backscatter_raw_points"
+                                                    ]
+                                                ),
+                                                "backscatter_reduced_points": int(
+                                                    global_patch[
+                                                        "backscatter_points_body"
+                                                    ].shape[0]
+                                                ),
+                                                "yaw_center_rad": float(
+                                                    raw_pose2[2]
+                                                ),
+                                                "candidates": [
+                                                    {
+                                                        "pose2": (
+                                                            candidate.pose2.tolist()
+                                                        ),
+                                                        "joint_correlation": float(
+                                                            candidate
+                                                            .joint_correlation
+                                                        ),
+                                                        "bathymetry_correlation": float(
+                                                            candidate
+                                                            .bathymetry_correlation
+                                                        ),
+                                                        "bathymetry_evidence_score": float(
+                                                            candidate
+                                                            .bathymetry_evidence_score
+                                                        ),
+                                                        "bathymetry_rmse_m": float(
+                                                            candidate
+                                                            .bathymetry_rmse_m
+                                                        ),
+                                                        "backscatter_correlation": float(
+                                                            candidate
+                                                            .backscatter_correlation
+                                                        ),
+                                                        "horizontal_error_m": float(
+                                                            np.linalg.norm(
+                                                                candidate.pose2[
+                                                                    :2
+                                                                ]
+                                                                - truth_pose2[
+                                                                    :2
+                                                                ]
+                                                            )
+                                                        ),
+                                                        "yaw_error_deg": float(
+                                                            np.rad2deg(
+                                                                math.atan2(
+                                                                    math.sin(
+                                                                        candidate.pose2[
+                                                                            2
+                                                                        ]
+                                                                        - truth_pose2[
+                                                                            2
+                                                                        ]
+                                                                    ),
+                                                                    math.cos(
+                                                                        candidate.pose2[
+                                                                            2
+                                                                        ]
+                                                                        - truth_pose2[
+                                                                            2
+                                                                        ]
+                                                                    ),
+                                                                )
+                                                            )
+                                                        ),
+                                                    }
+                                                    for candidate in (
+                                                        global_search_result
+                                                        .candidates
+                                                    )
+                                                ],
+                                                "truth_evaluation_only": True,
+                                                "truth_used_by_search": False,
+                                                "wall_time_s": float(
+                                                    global_elapsed_s
+                                                ),
+                                            }
+                                        )
+
+                                        if global_search_result.accepted:
+                                            proposal = (
+                                                global_search_result.candidates[0]
+                                            )
+                                            proposal_state = global_patch[
+                                                "reference_state"
+                                            ].copy()
+                                            proposal_rpy = rpy_from_rotation(
+                                                proposal_state.rotation
+                                            )
+                                            proposal_state.rotation = (
+                                                rotation_from_rpy(
+                                                    float(proposal_rpy[0]),
+                                                    float(proposal_rpy[1]),
+                                                    float(proposal.pose2[2]),
+                                                )
+                                            )
+                                            proposal_state.position[:2] = (
+                                                proposal.pose2[:2]
+                                            )
+                                            refine_started = time.perf_counter()
+                                            refined_result = terrain_matcher.match(
+                                                global_patch[
+                                                    "terrain_points_body"
+                                                ],
+                                                proposal_state,
+                                                points_are_body_frame=True,
+                                            )
+                                            refine_elapsed_s = (
+                                                time.perf_counter()
+                                                - refine_started
+                                            )
+                                            record_terrain_match_invocation(
+                                                "global",
+                                                refined_result,
+                                                refine_elapsed_s,
+                                                truth_state=truth,
+                                            )
+                                            if (
+                                                not refined_result.accepted
+                                                and refined_result.rejection_reason
+                                                == "yaw_unobservable"
+                                                and terrain_position_fallback_matcher
+                                                is not None
+                                            ):
+                                                global_stats[
+                                                    "bathymetry_position_fallback_invocations"
+                                                ] += 1
+                                                refine_started = (
+                                                    time.perf_counter()
+                                                )
+                                                refined_result = (
+                                                    terrain_position_fallback_matcher
+                                                    .match(
+                                                        global_patch[
+                                                            "terrain_points_body"
+                                                        ],
+                                                        proposal_state,
+                                                        points_are_body_frame=True,
+                                                    )
+                                                )
+                                                refine_elapsed_s = (
+                                                    time.perf_counter()
+                                                    - refine_started
+                                                )
+                                                record_terrain_match_invocation(
+                                                    "global",
+                                                    refined_result,
+                                                    refine_elapsed_s,
+                                                    truth_state=truth,
+                                                )
+                                                if refined_result.accepted:
+                                                    global_stats[
+                                                        "bathymetry_position_fallback_accepts"
+                                                    ] += 1
+                                                else:
+                                                    global_stats[
+                                                        "bathymetry_position_fallback_rejections"
+                                                    ] += 1
+                                                    global_stats[
+                                                        "bathymetry_position_fallback_rejection_reasons"
+                                                    ][
+                                                        refined_result.rejection_reason
+                                                        or "unspecified"
+                                                    ] += 1
+                                            confirmation_result = refined_result
+                                            confirmation_mode = "global"
+                                            confirmation_accepted = False
+                                            confirmation_observable_rank = int(
+                                                refined_result.observable_rank
+                                            )
+                                            confirmation_translation_observable_rank = int(
+                                                refined_result
+                                                .translation_observable_rank
+                                            )
+                                            if refined_result.accepted:
+                                                global_stats[
+                                                    "bathymetry_refinement_accepts"
+                                                ] += 1
+                                                (
+                                                    refined_pose2,
+                                                    refined_information,
+                                                    refined_yaw_observable,
+                                                    refined_compatible,
+                                                    refined_information_has_floors,
+                                                    refined_backscatter_accepted,
+                                                ) = refine_terrain_fix_with_backscatter(
+                                                    refined_result,
+                                                    global_patch[
+                                                        "backscatter_points_body"
+                                                    ],
+                                                    global_patch[
+                                                        "backscatter_values"
+                                                    ],
+                                                    truth_state=truth,
+                                                    use_global_refinement=True,
+                                                )
+                                                # Whole-map proposals require
+                                                # both modalities at both the
+                                                # coarse and local stages.
+                                                confirmation_accepted = bool(
+                                                    refined_compatible
+                                                    and refined_backscatter_accepted
+                                                )
+                                                if confirmation_accepted:
+                                                    global_stats[
+                                                        "dual_modal_refinement_accepts"
+                                                    ] += 1
+                                                    confirmation_mode = "global"
+                                                    confirmation_matched_pose2 = (
+                                                        refined_pose2
+                                                    )
+                                                    confirmation_information_override = (
+                                                        refined_information
+                                                    )
+                                                    confirmation_information_has_floors = (
+                                                        refined_information_has_floors
+                                                    )
+                                                    confirmation_yaw_observable = bool(
+                                                        refined_yaw_observable
+                                                    )
+                                                    confirmation_observable_rank = (
+                                                        3
+                                                        if (
+                                                            refined_backscatter_accepted
+                                                            and refined_result
+                                                            .translation_observable_rank
+                                                            == 2
+                                                        )
+                                                        else int(
+                                                            refined_result
+                                                            .observable_rank
+                                                        )
+                                                    )
+                                                    confirmation_patch_body = (
+                                                        global_patch[
+                                                            "terrain_points_body"
+                                                        ]
+                                                    )
+                                                    confirmation_patch_ping_count = len(
+                                                        global_terrain_patch_scans
+                                                    )
+                                                    confirmation_patch_start_timestamp = (
+                                                        global_patch[
+                                                            "patch_start_timestamp"
+                                                        ]
+                                                    )
+                                                    confirmation_patch_end_timestamp = (
+                                                        global_patch[
+                                                            "patch_end_timestamp"
+                                                        ]
+                                                    )
+                                                    confirmation_patch_start_observation_id = (
+                                                        global_patch[
+                                                            "patch_start_observation_id"
+                                                        ]
+                                                    )
+                                                    confirmation_patch_end_observation_id = (
+                                                        global_patch[
+                                                            "patch_end_observation_id"
+                                                        ]
+                                                    )
+                                                else:
+                                                    global_stats[
+                                                        "dual_modal_refinement_rejections"
+                                                    ] += 1
+                                                    rejection_reason = (
+                                                        "backscatter_refinement_rejected"
+                                                        if not refined_backscatter_accepted
+                                                        else "cross_modal_incompatible"
+                                                    )
+                                                    global_stats[
+                                                        "dual_modal_refinement_rejection_reasons"
+                                                    ][rejection_reason] += 1
+                                            else:
+                                                global_stats[
+                                                    "bathymetry_refinement_rejections"
+                                                ] += 1
+                                                global_stats[
+                                                    "bathymetry_refinement_rejection_reasons"
+                                                ][
+                                                    refined_result.rejection_reason
+                                                    or "unspecified"
+                                                ] += 1
+                                last_terrain_match = terrain_result
+                                if global_search_result is not None:
+                                    last_terrain_match = confirmation_result
+                                last_terrain_match_mode = confirmation_mode
+                                observation_matcher_accepted |= bool(
+                                    confirmation_accepted
+                                )
                                 seed_pose2 = np.array(
-                                    [
-                                        global_position_seed[0],
-                                        global_position_seed[1],
-                                        rpy_from_rotation(
-                                            global_rotation_seed
-                                        )[2],
-                                    ],
+                                    raw_pose2,
                                     dtype=np.float64,
                                 )
                                 emergency_confirmation = (
                                     terrain_emergency_recovery
                                     .consider_recovery_match(
-                                        accepted=terrain_result.accepted,
+                                        accepted=confirmation_accepted,
                                         observable_rank=(
-                                            terrain_result.observable_rank
+                                            confirmation_observable_rank
                                         ),
                                         translation_observable_rank=(
-                                            terrain_result
-                                            .translation_observable_rank
+                                            confirmation_translation_observable_rank
                                         ),
                                         yaw_observable=(
-                                            terrain_result.yaw_observable
+                                            confirmation_yaw_observable
                                         ),
                                         seed_pose2=seed_pose2,
                                         matched_pose2=(
-                                            terrain_result.matched_pose2
+                                            confirmation_matched_pose2
                                         ),
                                         patch_start_timestamp=(
-                                            patch_start_timestamp
+                                            confirmation_patch_start_timestamp
                                         ),
                                         patch_end_timestamp=(
-                                            patch_end_timestamp
+                                            confirmation_patch_end_timestamp
                                         ),
                                         patch_start_observation_id=(
-                                            patch_start_observation_id
+                                            confirmation_patch_start_observation_id
                                         ),
                                         patch_end_observation_id=(
-                                            patch_end_observation_id
+                                            confirmation_patch_end_observation_id
                                         ),
+                                        confirmation_position_tolerance_m=(
+                                            ARGS
+                                            .terrain_global_confirmation_position_tolerance_m
+                                            if confirmation_mode == "global"
+                                            else None
+                                        ),
+                                        confirmation_yaw_tolerance_deg=(
+                                            ARGS
+                                            .terrain_global_confirmation_yaw_tolerance_deg
+                                            if confirmation_mode == "global"
+                                            else None
+                                        ),
+                                        confirmation_source=confirmation_mode,
                                     )
                                 )
                                 emergency_prior_attempted = False
@@ -4279,22 +5142,34 @@ def main() -> int:
                                         terrain_prior_added,
                                         _terrain_prior_held,
                                     ) = try_add_terrain_prior_result(
-                                        terrain_result,
-                                        mode="emergency",
+                                        confirmation_result,
+                                        mode=confirmation_mode,
                                         timestamp=sim_time,
                                         observation_id=observation_id,
-                                        patch_body=patch_body,
+                                        patch_body=confirmation_patch_body,
                                         patch_start_timestamp=(
-                                            patch_start_timestamp
+                                            confirmation_patch_start_timestamp
                                         ),
                                         patch_end_timestamp=(
-                                            patch_end_timestamp
+                                            confirmation_patch_end_timestamp
                                         ),
                                         patch_start_observation_id=(
-                                            patch_start_observation_id
+                                            confirmation_patch_start_observation_id
                                         ),
                                         patch_end_observation_id=(
-                                            patch_end_observation_id
+                                            confirmation_patch_end_observation_id
+                                        ),
+                                        matched_pose2_override=(
+                                            confirmation_matched_pose2
+                                        ),
+                                        information_override=(
+                                            confirmation_information_override
+                                        ),
+                                        information_override_includes_model_floors=(
+                                            confirmation_information_has_floors
+                                        ),
+                                        yaw_observable_override=(
+                                            confirmation_yaw_observable
                                         ),
                                     )
                                     emergency_graph_diagnostics = (
@@ -4307,26 +5182,26 @@ def main() -> int:
 
                                 terrain_recovery_invocation_records.append(
                                     {
-                                        "mode": "emergency",
+                                        "mode": confirmation_mode,
                                         "timestamp_s": float(sim_time),
                                         "observation_id": int(observation_id),
                                         "patch_ping_count": int(
-                                            len(terrain_patch_scans)
+                                            confirmation_patch_ping_count
                                         ),
                                         "patch_start_timestamp_s": (
-                                            patch_start_timestamp
+                                            confirmation_patch_start_timestamp
                                         ),
                                         "patch_end_timestamp_s": (
-                                            patch_end_timestamp
+                                            confirmation_patch_end_timestamp
                                         ),
                                         "patch_start_observation_id": (
-                                            patch_start_observation_id
+                                            confirmation_patch_start_observation_id
                                         ),
                                         "patch_end_observation_id": (
-                                            patch_end_observation_id
+                                            confirmation_patch_end_observation_id
                                         ),
                                         "patch_point_count": int(
-                                            patch_body.shape[0]
+                                            confirmation_patch_body.shape[0]
                                         ),
                                         "match_wall_time_s": float(
                                             match_elapsed_s
@@ -4376,84 +5251,100 @@ def main() -> int:
                                             ]
                                         ),
                                         "matcher_accepted": bool(
-                                            terrain_result.accepted
+                                            confirmation_accepted
                                         ),
                                         "matcher_rejection_reason": (
-                                            terrain_result.rejection_reason
+                                            None
+                                            if confirmation_accepted
+                                            else confirmation_result.rejection_reason
+                                            or "global_cross_modal_refinement_rejected"
                                         ),
                                         "correction_xyyaw": [
                                             _finite_float_or_none(value)
-                                            for value in terrain_result.correction
+                                            for value in confirmation_result.correction
                                         ],
                                         "translation_correction_m": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .translation_correction_m
                                             )
                                         ),
                                         "yaw_correction_deg": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .yaw_correction_deg
                                             )
                                         ),
                                         "matched_pose2": [
                                             _finite_float_or_none(value)
-                                            for value in terrain_result
-                                            .matched_pose2
+                                            for value in confirmation_matched_pose2
                                         ],
                                         "correspondences": int(
-                                            terrain_result.correspondences
+                                            confirmation_result.correspondences
                                         ),
                                         "inliers": int(
-                                            terrain_result.inliers
+                                            confirmation_result.inliers
                                         ),
                                         "observable_rank": int(
-                                            terrain_result.observable_rank
+                                            confirmation_observable_rank
                                         ),
                                         "translation_observable_rank": int(
-                                            terrain_result
-                                            .translation_observable_rank
+                                            confirmation_translation_observable_rank
                                         ),
                                         "yaw_observable": bool(
-                                            terrain_result.yaw_observable
+                                            confirmation_yaw_observable
                                         ),
                                         "rmse_before_m": _finite_float_or_none(
-                                            terrain_result.rmse_before
+                                            confirmation_result.rmse_before
                                         ),
                                         "rmse_after_m": _finite_float_or_none(
-                                            terrain_result.rmse_after
+                                            confirmation_result.rmse_after
                                         ),
                                         "reduced_chi_square": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .reduced_chi_square
                                             )
                                         ),
                                         "reached_search_boundary": bool(
-                                            terrain_result
+                                            confirmation_result
                                             .reached_search_boundary
                                         ),
                                         "distinct_basin_count": int(
-                                            terrain_result
+                                            confirmation_result
                                             .distinct_basin_count
                                         ),
                                         "best_basin_cost": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .best_basin_cost
                                             )
                                         ),
                                         "second_best_basin_cost": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .second_best_basin_cost
                                             )
                                         ),
                                         "basin_log_likelihood_ratio": (
                                             _finite_float_or_none(
-                                                terrain_result
+                                                confirmation_result
                                                 .basin_log_likelihood_ratio
+                                            )
+                                        ),
+                                        "whole_map_search_invoked": bool(
+                                            global_search_result is not None
+                                        ),
+                                        "whole_map_search_accepted": bool(
+                                            global_search_result is not None
+                                            and global_search_result.accepted
+                                        ),
+                                        "whole_map_search_score_gap": (
+                                            None
+                                            if global_search_result is None
+                                            else _finite_float_or_none(
+                                                global_search_result
+                                                .basin_score_gap
                                             )
                                         ),
                                         "confirmation_status": (
@@ -4527,6 +5418,12 @@ def main() -> int:
                                             is not None
                                             and emergency_graph_diagnostics
                                             .last_terrain_prefit_performed
+                                        ),
+                                        "graph_prefit_bypassed_for_relocalization": bool(
+                                            emergency_graph_diagnostics
+                                            is not None
+                                            and emergency_graph_diagnostics
+                                            .last_terrain_prefit_bypassed_for_relocalization
                                         ),
                                         "graph_prefit_chi2": (
                                             None
@@ -4694,6 +5591,14 @@ def main() -> int:
                             "terrain_emergency_recovery_invocations": (
                                 terrain_match_mode_stats["emergency"][
                                     "invocations"
+                                ]
+                            ),
+                            "terrain_global_relocalization_invocations": int(
+                                global_relocalization_stats["invocations"]
+                            ),
+                            "terrain_global_relocalization_accepts": int(
+                                global_relocalization_stats[
+                                    "accepted_proposals"
                                 ]
                             ),
                             "terrain_consecutive_failed_observations": (
@@ -5015,6 +5920,25 @@ def main() -> int:
             }
             for name, estimates in estimate_tracks.items()
         }
+        position_errors["translation_rpe_definition"] = (
+            "legacy difference between estimate and truth displacement vectors "
+            "expressed in the shared world frame; retained for compatibility "
+            "and not invariant to a constant position/yaw gauge"
+        )
+        position_errors["se3_rpe_by_truth_distance"] = {
+            name: {
+                f"{int(interval_m)}m": se3_relative_pose_error_by_distance(
+                    estimates,
+                    estimate_rotation_tracks[name],
+                    truth_samples,
+                    truth_rotation_samples,
+                    cumulative_distance_m,
+                    interval_m,
+                )
+                for interval_m in (100.0, 1000.0, 10000.0)
+            }
+            for name, estimates in estimate_tracks.items()
+        }
         position_errors["five_kilometre_segments"] = {
             name: _five_kilometre_error_segments(
                 estimates, truth_samples, cumulative_distance_m
@@ -5128,30 +6052,36 @@ def main() -> int:
         normal_terrain_stats = terrain_match_mode_stats["normal"]
         recovery_terrain_stats = terrain_match_mode_stats["recovery"]
         emergency_terrain_stats = terrain_match_mode_stats["emergency"]
+        global_terrain_stats = terrain_match_mode_stats["global"]
         terrain_match_invocations = int(
             normal_terrain_stats["invocations"]
             + recovery_terrain_stats["invocations"]
             + emergency_terrain_stats["invocations"]
+            + global_terrain_stats["invocations"]
         )
         terrain_match_invocation_accepts = int(
             normal_terrain_stats["accepts"]
             + recovery_terrain_stats["accepts"]
             + emergency_terrain_stats["accepts"]
+            + global_terrain_stats["accepts"]
         )
         terrain_match_elapsed_s = float(
             normal_terrain_stats["wall_time_s"]
             + recovery_terrain_stats["wall_time_s"]
             + emergency_terrain_stats["wall_time_s"]
+            + global_terrain_stats["wall_time_s"]
         )
         terrain_match_rejection_reasons = (
             normal_terrain_stats["rejection_reasons"]
             + recovery_terrain_stats["rejection_reasons"]
             + emergency_terrain_stats["rejection_reasons"]
+            + global_terrain_stats["rejection_reasons"]
         )
         terrain_match_rank_counts = (
             normal_terrain_stats["rank_counts"]
             + recovery_terrain_stats["rank_counts"]
             + emergency_terrain_stats["rank_counts"]
+            + global_terrain_stats["rank_counts"]
         )
         accepted_invocation_count = int(
             terrain_accepted_invocation_stats["count"]
@@ -5918,6 +6848,100 @@ def main() -> int:
                 "maximum_automatic_translation_window_m": 150.0,
                 "uses_truth": False,
             },
+            "terrain_global_relocalization": {
+                "enabled": global_terrain_relocalizer is not None,
+                "search_scope": "complete_measured_map",
+                "proposal_only": True,
+                "requires_preceding_bounded_failure": True,
+                "requires_joint_bathymetry_backscatter": True,
+                "requires_local_bathymetry_refinement": True,
+                "requires_local_backscatter_refinement": True,
+                "requires_second_disjoint_strip_confirmation": True,
+                "confirmation_motion_source": "imu_dvl_depth_dead_reckoning",
+                "patch_motion_source": "imu_dvl_depth_dead_reckoning",
+                "window_pings": ARGS.terrain_global_window_pings,
+                "nominal_window_duration_s": float(
+                    ARGS.terrain_global_window_pings / ARGS.ping_hz
+                ),
+                "nominal_window_along_track_m": float(
+                    ARGS.terrain_global_window_pings
+                    * ARGS.survey_speed_mps
+                    / ARGS.ping_hz
+                ),
+                "pyramid_stride_source_cells": (
+                    ARGS.terrain_global_pyramid_stride
+                ),
+                "pyramid_resolution_m": (
+                    None
+                    if global_terrain_relocalizer is None
+                    else global_terrain_relocalizer.resolution_m
+                ),
+                "yaw_half_window_deg": ARGS.terrain_global_yaw_window_deg,
+                "yaw_step_deg": ARGS.terrain_global_yaw_step_deg,
+                "minimum_joint_correlation": (
+                    ARGS.terrain_global_minimum_correlation
+                ),
+                "maximum_bathymetry_rmse_m": (
+                    ARGS.terrain_global_maximum_bathymetry_rmse_m
+                ),
+                "bathymetry_absolute_weight": (
+                    ARGS.terrain_global_bathymetry_absolute_weight
+                ),
+                "minimum_basin_score_gap": (
+                    ARGS.terrain_global_minimum_score_gap
+                ),
+                "local_backscatter_refinement": {
+                    "maximum_points": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.maximum_points
+                    ),
+                    "maximum_translation_m": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.maximum_translation_m
+                    ),
+                    "maximum_yaw_deg": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.maximum_yaw_deg
+                    ),
+                    "basin_translation_separation_m": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.basin_translation_separation_m
+                    ),
+                    "basin_yaw_separation_deg": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.basin_yaw_separation_deg
+                    ),
+                    "minimum_correlation": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.minimum_correlation
+                    ),
+                    "minimum_basin_correlation_gap": (
+                        None
+                        if global_backscatter_refinement_matcher is None
+                        else global_backscatter_refinement_matcher
+                        .config.minimum_basin_correlation_gap
+                    ),
+                },
+                "confirmation_position_tolerance_m": (
+                    ARGS.terrain_global_confirmation_position_tolerance_m
+                ),
+                "confirmation_yaw_tolerance_deg": (
+                    ARGS.terrain_global_confirmation_yaw_tolerance_deg
+                ),
+                "uses_truth": False,
+            },
             "terrain_match_yaw_window_deg": (
                 ARGS.terrain_match_yaw_window_deg
             ),
@@ -6073,6 +7097,46 @@ def main() -> int:
             "emergency_terrain_matching_wall_time_s": float(
                 emergency_terrain_stats["wall_time_s"]
             ),
+            "global_terrain_match_invocations": int(
+                global_terrain_stats["invocations"]
+            ),
+            "global_terrain_match_accepts": int(
+                global_terrain_stats["accepts"]
+            ),
+            "global_terrain_match_rejections": int(
+                global_terrain_stats["rejections"]
+            ),
+            "global_terrain_match_rejection_reasons": dict(
+                global_terrain_stats["rejection_reasons"]
+            ),
+            "global_terrain_match_observable_rank_counts": dict(
+                global_terrain_stats["rank_counts"]
+            ),
+            "global_terrain_prior_factor_attempts": int(
+                global_terrain_stats["prior_factor_attempts"]
+            ),
+            "global_terrain_prior_factor_accepts": int(
+                global_terrain_stats["prior_factor_accepts"]
+            ),
+            "global_terrain_prior_factor_rejections": int(
+                global_terrain_stats["prior_factor_rejections"]
+            ),
+            "global_terrain_matching_wall_time_s": float(
+                global_terrain_stats["wall_time_s"]
+            ),
+            "global_relocalization_proposal_statistics": {
+                key: (
+                    dict(value)
+                    if isinstance(value, Counter)
+                    else (
+                        _finite_float_or_none(value)
+                        if isinstance(value, (float, np.floating))
+                        else value
+                    )
+                )
+                for key, value in global_relocalization_stats.items()
+            },
+            "global_relocalization_records": global_relocalization_records,
             "emergency_recovery_attempts": int(
                 terrain_emergency_recovery.recovery_attempts
             ),
@@ -6411,6 +7475,11 @@ def main() -> int:
             ),
             "last_terrain_prefit_performed": getattr(
                 diagnostics.pose_graph, "last_terrain_prefit_performed", False
+            ),
+            "last_terrain_prefit_bypassed_for_relocalization": getattr(
+                diagnostics.pose_graph,
+                "last_terrain_prefit_bypassed_for_relocalization",
+                False,
             ),
             "last_terrain_prefit_chi2": _finite_float_or_none(getattr(
                 diagnostics.pose_graph, "last_terrain_prefit_chi2", None

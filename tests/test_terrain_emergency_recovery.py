@@ -318,6 +318,106 @@ def test_two_strict_matches_confirm_only_current_then_insertion_resets() -> None
     assert controller.consecutive_without_prior == 1
 
 
+def test_long_strip_can_use_an_explicit_confirmation_tolerance() -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+    _consider(
+        controller,
+        accepted=True,
+        observable_rank=3,
+        translation_observable_rank=2,
+        yaw_observable=True,
+        seed_pose2=np.array([600.0, 0.0, 0.0]),
+        matched_pose2=np.array([10.0, 20.0, 0.0]),
+        confirmation_source="global",
+    )
+    assert controller.pending_confirmation_source == "global"
+    assert _next_observation(controller, x_m=660.0).should_attempt
+
+    # The propagated first match is [70, 20, 0].  A 55 m disagreement is
+    # invalid for the ordinary 20 m patch policy, but remains within the
+    # explicitly configured tolerance for a much longer global strip.
+    confirmed = _consider(
+        controller,
+        accepted=True,
+        observable_rank=3,
+        translation_observable_rank=2,
+        yaw_observable=True,
+        seed_pose2=np.array([660.0, 0.0, 0.0]),
+        matched_pose2=np.array([125.0, 20.0, np.deg2rad(4.5)]),
+        confirmation_position_tolerance_m=75.0,
+        confirmation_yaw_tolerance_deg=5.0,
+        confirmation_source="global",
+    )
+
+    assert confirmed.fuse_current_match
+    assert confirmed.status == "confirmed_current_match"
+    assert confirmed.position_disagreement_m == pytest.approx(55.0)
+    assert confirmed.yaw_disagreement_deg == pytest.approx(4.5)
+    assert controller.pending_confirmation_source is None
+
+
+def test_confirmation_requires_the_same_matcher_family() -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+    _consider(
+        controller,
+        accepted=True,
+        observable_rank=3,
+        translation_observable_rank=2,
+        yaw_observable=True,
+        seed_pose2=np.array([600.0, 0.0, 0.0]),
+        matched_pose2=np.array([10.0, 20.0, 0.0]),
+        confirmation_source="global",
+    )
+    assert _next_observation(controller, x_m=660.0).should_attempt
+
+    mismatched = _consider(
+        controller,
+        accepted=True,
+        observable_rank=3,
+        translation_observable_rank=2,
+        yaw_observable=True,
+        seed_pose2=np.array([660.0, 0.0, 0.0]),
+        matched_pose2=np.array([70.0, 20.0, 0.0]),
+        confirmation_source="emergency",
+    )
+
+    assert not mismatched.fuse_current_match
+    assert mismatched.status == "pending_wait_matching_source"
+    assert mismatched.pending
+    assert controller.pending_confirmation_source == "global"
+
+
+@pytest.mark.parametrize(
+    ("override_name", "override_value"),
+    [
+        ("confirmation_position_tolerance_m", 0.0),
+        ("confirmation_position_tolerance_m", float("inf")),
+        ("confirmation_yaw_tolerance_deg", -1.0),
+        ("confirmation_yaw_tolerance_deg", float("nan")),
+    ],
+)
+def test_confirmation_tolerance_overrides_must_be_positive_and_finite(
+    override_name: str,
+    override_value: float,
+) -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+    kwargs = {
+        "accepted": True,
+        "observable_rank": 3,
+        "translation_observable_rank": 2,
+        "yaw_observable": True,
+        "seed_pose2": np.array([600.0, 0.0, 0.0]),
+        "matched_pose2": np.array([10.0, 20.0, 0.0]),
+        override_name: override_value,
+    }
+
+    with pytest.raises(ValueError, match="must be positive and finite"):
+        _consider(controller, **kwargs)
+
+
 def test_confirmation_requires_a_nonoverlapping_time_window_despite_pose_jump() -> None:
     controller = TerrainEmergencyRecoveryController(
         confirmation_minimum_time_separation_s=20.0

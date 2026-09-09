@@ -218,6 +218,7 @@ class PoseGraphDiagnostics:
     )
     last_terrain_prior_rejection_reason: str | None = None
     last_terrain_prefit_performed: bool = False
+    last_terrain_prefit_bypassed_for_relocalization: bool = False
     last_terrain_prefit_chi2: float = 0.0
     last_terrain_prefit_dof: int = 0
     terrain_relocalization_seeds: int = 0
@@ -1600,6 +1601,7 @@ class AcousticPoseGraph:
         self._terrain_prior_rejection_reasons: Counter[str] = Counter()
         self._last_terrain_prior_rejection_reason: str | None = None
         self._last_terrain_prefit_performed = False
+        self._last_terrain_prefit_bypassed_for_relocalization = False
         self._last_terrain_prefit_chi2 = 0.0
         self._last_terrain_prefit_dof = 0
         self._terrain_prior_observations: set[int] = set()
@@ -1629,6 +1631,7 @@ class AcousticPoseGraph:
         self._terrain_prior_rejection_reasons.clear()
         self._last_terrain_prior_rejection_reason = None
         self._last_terrain_prefit_performed = False
+        self._last_terrain_prefit_bypassed_for_relocalization = False
         self._last_terrain_prefit_chi2 = 0.0
         self._last_terrain_prefit_dof = 0
         self._terrain_prior_observations.clear()
@@ -1911,6 +1914,59 @@ class AcousticPoseGraph:
         )
         self._last_terrain_relocalization_anchor_index = anchor
 
+    def _terrain_prior_prefit_is_consistent(
+        self,
+        predicted_pose2: np.ndarray,
+        matched_pose2: np.ndarray,
+        information_world: np.ndarray,
+    ) -> bool:
+        """Apply the catastrophic-jump gate to an ordinary unary factor."""
+
+        prefit_error = _prior_error(predicted_pose2, matched_pose2)
+        try:
+            yaw_scale = float(self.config.terrain_prior_prefit_yaw_scale_m)
+            if not np.isfinite(yaw_scale) or yaw_scale <= 0.0:
+                raise ValueError
+            # q = Q u, with u_yaw expressed in metre-like units.  This is the
+            # same congruence used by the matcher for observability analysis.
+            q_from_u = np.diag([1.0, 1.0, 1.0 / yaw_scale])
+            scaled_information = (
+                q_from_u.T @ information_world @ q_from_u
+            )
+            scaled_information = 0.5 * (
+                scaled_information + scaled_information.T
+            )
+            eigenvalues, eigenvectors = np.linalg.eigh(scaled_information)
+            eigenvalues = np.maximum(eigenvalues, 0.0)
+            rank_tolerance = max(1.0, float(eigenvalues[-1])) * 1.0e-9
+            observable = eigenvalues > rank_tolerance
+            observable_rank = int(np.count_nonzero(observable))
+            scaled_error = prefit_error.copy()
+            scaled_error[2] *= yaw_scale
+            observable_error = eigenvectors[:, observable].T @ scaled_error
+            prefit_chi2 = float(
+                np.sum(eigenvalues[observable] * observable_error**2)
+            )
+            threshold = float(
+                self.config.terrain_prior_prefit_chi2_rank2
+                if observable_rank == 2
+                else self.config.terrain_prior_prefit_chi2_rank3
+            )
+        except (TypeError, ValueError, OverflowError, np.linalg.LinAlgError):
+            observable_rank = 0
+            prefit_chi2 = float("inf")
+            threshold = float("nan")
+        self._last_terrain_prefit_performed = True
+        self._last_terrain_prefit_chi2 = prefit_chi2
+        self._last_terrain_prefit_dof = observable_rank
+        return bool(
+            observable_rank in (2, 3)
+            and np.isfinite(prefit_chi2)
+            and np.isfinite(threshold)
+            and threshold > 0.0
+            and prefit_chi2 <= threshold
+        )
+
     def add_terrain_prior(
         self,
         *,
@@ -1952,6 +2008,7 @@ class AcousticPoseGraph:
             return False
         self._last_terrain_prior_rejection_reason = None
         self._last_terrain_prefit_performed = False
+        self._last_terrain_prefit_bypassed_for_relocalization = False
         self._last_terrain_prefit_chi2 = 0.0
         self._last_terrain_prefit_dof = 0
 
@@ -2087,51 +2144,18 @@ class AcousticPoseGraph:
             else:
                 predicted_target = raw_pose
 
-        prefit_error = _prior_error(predicted_target, matched)
-        try:
-            yaw_scale = float(self.config.terrain_prior_prefit_yaw_scale_m)
-            if not np.isfinite(yaw_scale) or yaw_scale <= 0.0:
-                raise ValueError
-            # q = Q u, with u_yaw expressed in metre-like units.  This is the
-            # same congruence used by the matcher for observability analysis.
-            q_from_u = np.diag([1.0, 1.0, 1.0 / yaw_scale])
-            scaled_information = (
-                q_from_u.T @ factor_information @ q_from_u
-            )
-            scaled_information = 0.5 * (
-                scaled_information + scaled_information.T
-            )
-            eigenvalues, eigenvectors = np.linalg.eigh(scaled_information)
-            eigenvalues = np.maximum(eigenvalues, 0.0)
-            rank_tolerance = max(1.0, float(eigenvalues[-1])) * 1.0e-9
-            observable = eigenvalues > rank_tolerance
-            observable_rank = int(np.count_nonzero(observable))
-            scaled_error = prefit_error.copy()
-            scaled_error[2] *= yaw_scale
-            observable_error = (
-                eigenvectors[:, observable].T @ scaled_error
-            )
-            prefit_chi2 = float(
-                np.sum(eigenvalues[observable] * observable_error**2)
-            )
-            threshold = float(
-                self.config.terrain_prior_prefit_chi2_rank2
-                if observable_rank == 2
-                else self.config.terrain_prior_prefit_chi2_rank3
-            )
-        except (TypeError, ValueError, OverflowError, np.linalg.LinAlgError):
-            observable_rank = 0
-            prefit_chi2 = float("inf")
-            threshold = float("nan")
-        self._last_terrain_prefit_performed = True
-        self._last_terrain_prefit_chi2 = prefit_chi2
-        self._last_terrain_prefit_dof = observable_rank
-        if (
-            observable_rank not in (2, 3)
-            or not np.isfinite(prefit_chi2)
-            or not np.isfinite(threshold)
-            or threshold <= 0.0
-            or prefit_chi2 > threshold
+        # A normal single match is compared with the current graph estimate.
+        # A confirmed relocalization exists specifically because that graph
+        # estimate has left the correct basin; comparing the two here would
+        # deterministically reject every successful long-range recovery.  The
+        # caller may request this bypass only after its external independent-
+        # strip confirmation policy has accepted the match.
+        if use_relocalization_seed:
+            self._last_terrain_prefit_bypassed_for_relocalization = True
+        elif not self._terrain_prior_prefit_is_consistent(
+            predicted_target,
+            matched,
+            factor_information,
         ):
             return self._reject_terrain_prior("prefit_inconsistent")
 
@@ -2868,6 +2892,9 @@ class AcousticPoseGraph:
             ),
             last_terrain_prefit_performed=(
                 self._last_terrain_prefit_performed
+            ),
+            last_terrain_prefit_bypassed_for_relocalization=(
+                self._last_terrain_prefit_bypassed_for_relocalization
             ),
             last_terrain_prefit_chi2=float(
                 self._last_terrain_prefit_chi2

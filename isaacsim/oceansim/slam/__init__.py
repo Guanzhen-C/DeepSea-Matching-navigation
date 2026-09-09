@@ -12,13 +12,23 @@ from .esikf import (
     IntensityUpdateResult,
     SonarUpdateResult,
 )
-from .evaluation import map_to_odom_change_metrics
+from .evaluation import (
+    map_to_odom_change_metrics,
+    se2_relative_pose_error_by_distance,
+    se3_relative_pose_error_by_distance,
+)
 from .fast_sonar_slam import FastSonarSLAM, FastSonarSLAMConfig
 from .intensity_map import AcousticIntensityMap, IntensityMapSample
 from .initialization import (
     NavigationInitialization,
     gauge_anchored_initial_covariance,
     initialize_from_imu_dvl_depth,
+)
+from .global_relocalization import (
+    GlobalTerrainCandidate,
+    GlobalTerrainRelocalizer,
+    GlobalTerrainRelocalizerConfig,
+    GlobalTerrainSearchResult,
 )
 from .pose_graph import (
     AcousticKeyframe,
@@ -78,6 +88,10 @@ __all__ = [
     "FastSonarSLAM",
     "FastSonarSLAMConfig",
     "GTSAMPlanarPoseGraph",
+    "GlobalTerrainCandidate",
+    "GlobalTerrainRelocalizer",
+    "GlobalTerrainRelocalizerConfig",
+    "GlobalTerrainSearchResult",
     "InertialState",
     "IntensityMapSample",
     "IntensityUpdateResult",
@@ -107,6 +121,8 @@ __all__ = [
     "gauge_anchored_initial_covariance",
     "initialize_from_imu_dvl_depth",
     "map_to_odom_change_metrics",
+    "se2_relative_pose_error_by_distance",
+    "se3_relative_pose_error_by_distance",
     "make_terrain_recovery_config",
     "match_bathymetric_terrain",
     "motion_compensate_to_body",

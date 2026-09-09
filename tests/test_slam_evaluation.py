@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from oceansim.slam import map_to_odom_change_metrics
+from oceansim.slam import (
+    map_to_odom_change_metrics,
+    se2_relative_pose_error_by_distance,
+    se3_relative_pose_error_by_distance,
+)
 from oceansim.slam.math3d import rotation_from_rpy
 
 
@@ -75,3 +79,110 @@ def test_map_to_odom_audit_rejects_mismatched_track_lengths() -> None:
             np.zeros((1, 3)),
             np.eye(3)[None, :, :],
         )
+
+
+def test_se3_rpe_removes_one_constant_global_gauge() -> None:
+    truth_positions = np.array(
+        [[0.0, 0.0, -5.0], [50.0, 0.0, -5.0], [100.0, 0.0, -5.0]]
+    )
+    truth_rotations = np.repeat(np.eye(3)[None, :, :], 3, axis=0)
+    gauge = rotation_from_rpy(0.0, 0.0, np.deg2rad(50.0))
+    estimate_positions = truth_positions @ gauge.T + np.array(
+        [400.0, -300.0, 20.0]
+    )
+    estimate_rotations = np.einsum(
+        "ij,njk->nik", gauge, truth_rotations
+    )
+
+    metrics = se3_relative_pose_error_by_distance(
+        estimate_positions,
+        estimate_rotations,
+        truth_positions,
+        truth_rotations,
+        np.array([0.0, 50.0, 100.0]),
+        100.0,
+    )
+
+    assert metrics["available"]
+    assert metrics["samples"] == 1
+    assert metrics["rmse_translation_m"] == pytest.approx(0.0, abs=1.0e-12)
+    assert metrics["rmse_rotation_deg"] == pytest.approx(0.0, abs=1.0e-12)
+
+
+def test_se2_rpe_removes_one_constant_global_gauge() -> None:
+    truth = np.array(
+        [[0.0, 0.0, 0.0], [40.0, 0.0, 0.1], [99.0, 10.0, 0.2]]
+    )
+    gauge_yaw = np.deg2rad(50.0)
+    gauge_rotation = np.array(
+        [
+            [np.cos(gauge_yaw), -np.sin(gauge_yaw)],
+            [np.sin(gauge_yaw), np.cos(gauge_yaw)],
+        ]
+    )
+    estimate = truth.copy()
+    estimate[:, :2] = truth[:, :2] @ gauge_rotation.T + np.array(
+        [400.0, -300.0]
+    )
+    estimate[:, 2] = truth[:, 2] + gauge_yaw
+
+    metrics = se2_relative_pose_error_by_distance(
+        estimate, truth, np.array([0.0, 40.0, 100.0]), 100.0
+    )
+
+    assert metrics["samples"] == 1
+    assert metrics["rmse_translation_m"] == pytest.approx(0.0, abs=1.0e-12)
+    assert metrics["rmse_yaw_deg"] == pytest.approx(0.0, abs=1.0e-12)
+
+
+def test_se2_rpe_reports_relative_translation_and_yaw_error() -> None:
+    truth = np.array([[0.0, 0.0, 0.0], [100.0, 0.0, 0.0]])
+    estimate = np.array([[0.0, 0.0, 0.0], [110.0, 0.0, np.deg2rad(3.0)]])
+
+    metrics = se2_relative_pose_error_by_distance(
+        estimate, truth, np.array([0.0, 100.0]), 100.0
+    )
+
+    assert metrics["rmse_translation_m"] == pytest.approx(10.0)
+    assert metrics["rmse_yaw_deg"] == pytest.approx(3.0)
+
+
+def test_se3_rpe_reports_relative_scale_and_yaw_error() -> None:
+    truth_positions = np.array([[0.0, 0.0, 0.0], [100.0, 0.0, 0.0]])
+    estimate_positions = np.array([[0.0, 0.0, 0.0], [110.0, 0.0, 0.0]])
+    truth_rotations = np.repeat(np.eye(3)[None, :, :], 2, axis=0)
+    estimate_rotations = np.array(
+        [
+            np.eye(3),
+            rotation_from_rpy(0.0, 0.0, np.deg2rad(3.0)),
+        ]
+    )
+
+    metrics = se3_relative_pose_error_by_distance(
+        estimate_positions,
+        estimate_rotations,
+        truth_positions,
+        truth_rotations,
+        np.array([0.0, 100.0]),
+        100.0,
+    )
+
+    assert metrics["rmse_translation_m"] == pytest.approx(10.0)
+    assert metrics["rmse_rotation_deg"] == pytest.approx(3.0)
+
+
+def test_se3_rpe_reports_an_unavailable_too_long_interval() -> None:
+    positions = np.zeros((2, 3))
+    rotations = np.repeat(np.eye(3)[None, :, :], 2, axis=0)
+    metrics = se3_relative_pose_error_by_distance(
+        positions,
+        rotations,
+        positions,
+        rotations,
+        np.array([0.0, 1.0]),
+        10.0,
+    )
+
+    assert not metrics["available"]
+    assert metrics["samples"] == 0
+    assert metrics["rmse_translation_m"] is None

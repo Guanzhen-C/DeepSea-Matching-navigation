@@ -399,6 +399,7 @@ class TerrainEmergencyRecoveryConfirmation:
 
 @dataclass(frozen=True)
 class _PendingTerrainEmergencyMatch:
+    source: str
     observation_index: int
     timestamp: float
     raw_arc_m: float
@@ -649,6 +650,12 @@ class TerrainEmergencyRecoveryController:
     @property
     def has_pending_hypothesis(self) -> bool:
         return self._pending is not None
+
+    @property
+    def pending_confirmation_source(self) -> str | None:
+        """Return the matcher family that created the pending hypothesis."""
+
+        return None if self._pending is None else self._pending.source
 
     @property
     def last_prior_timestamp(self) -> float | None:
@@ -920,8 +927,16 @@ class TerrainEmergencyRecoveryController:
         patch_end_timestamp: float,
         patch_start_observation_id: int,
         patch_end_observation_id: int,
+        confirmation_position_tolerance_m: float | None = None,
+        confirmation_yaw_tolerance_deg: float | None = None,
+        confirmation_source: str = "emergency",
     ) -> TerrainEmergencyRecoveryConfirmation:
-        """Validate one requested strict result and possibly confirm fusion."""
+        """Validate one requested strict result and possibly confirm fusion.
+
+        The optional per-match tolerances support a longer, independently
+        configured whole-map strip.  Omitting them preserves the controller's
+        ordinary bounded-recovery policy.
+        """
 
         if self._requested_observation != self.observation_index:
             raise RuntimeError(
@@ -953,6 +968,26 @@ class TerrainEmergencyRecoveryController:
         translation_rank = int(translation_observable_rank)
         seed = self._pose2(seed_pose2, "seed_pose2")
         matched = self._pose2(matched_pose2, "matched_pose2")
+        if not isinstance(confirmation_source, str) or not confirmation_source:
+            raise ValueError("confirmation_source must be a nonempty string")
+        position_tolerance_m = (
+            self.confirmation_position_tolerance_m
+            if confirmation_position_tolerance_m is None
+            else float(confirmation_position_tolerance_m)
+        )
+        yaw_tolerance_deg = (
+            self.confirmation_yaw_tolerance_deg
+            if confirmation_yaw_tolerance_deg is None
+            else float(confirmation_yaw_tolerance_deg)
+        )
+        if not np.isfinite(position_tolerance_m) or position_tolerance_m <= 0.0:
+            raise ValueError(
+                "confirmation_position_tolerance_m must be positive and finite"
+            )
+        if not np.isfinite(yaw_tolerance_deg) or yaw_tolerance_deg <= 0.0:
+            raise ValueError(
+                "confirmation_yaw_tolerance_deg must be positive and finite"
+            )
         (
             patch_start_time,
             patch_end_time,
@@ -972,6 +1007,7 @@ class TerrainEmergencyRecoveryController:
 
         if self._pending is None:
             self._pending = _PendingTerrainEmergencyMatch(
+                source=confirmation_source,
                 observation_index=self.observation_index,
                 timestamp=float(self._current_timestamp),
                 raw_arc_m=self.raw_arc_since_prior_m,
@@ -984,6 +1020,9 @@ class TerrainEmergencyRecoveryController:
             )
             self.pending_hypotheses += 1
             return self._confirmation(False, "pending_created")
+
+        if confirmation_source != self._pending.source:
+            return self._confirmation(False, "pending_wait_matching_source")
 
         time_separation_s = float(
             self._current_timestamp - self._pending.timestamp
@@ -1026,9 +1065,9 @@ class TerrainEmergencyRecoveryController:
         yaw_disagreement_deg = float(np.rad2deg(yaw_disagreement))
         if (
             position_disagreement
-            > self.confirmation_position_tolerance_m
+            > position_tolerance_m
             or yaw_disagreement_deg
-            > self.confirmation_yaw_tolerance_deg
+            > yaw_tolerance_deg
         ):
             self._pending = None
             self.inconsistent_hypotheses += 1

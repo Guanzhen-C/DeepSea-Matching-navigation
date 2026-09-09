@@ -334,6 +334,51 @@ def test_external_relocalization_seed_forces_a_safe_solver_rebuild() -> None:
     assert np.isfinite(graph.global_isam_poses).all()
 
 
+def test_confirmed_distant_terrain_relocalization_rebuilds_live_window() -> None:
+    backend = AcousticPoseGraph(
+        _gtsam_config(
+            fixed_lag_seconds=2.0,
+            keyframe_distance_m=0.1,
+            keyframe_max_interval_s=1.0,
+            terrain_prior_optimize_interval=1,
+        )
+    )
+    identity = np.eye(3)
+    empty = np.empty((0, 3), dtype=np.float64)
+    for observation_id in range(8):
+        assert backend.add_if_needed(
+            float(observation_id),
+            identity,
+            np.array([float(observation_id), 0.0, -5.0]),
+            empty,
+            observation_id=observation_id,
+            force=True,
+            detect_loops=False,
+        )
+        backend.graph.optimize()
+
+    matched = np.array([4_007.0, -2_500.0, 0.35])
+    assert backend.add_terrain_prior(
+        timestamp=7.0,
+        observation_id=7,
+        prior_pose2=np.array([7.0, 0.0, 0.0]),
+        raw_rotation_world_body=identity,
+        raw_position_world=np.array([7.0, 0.0, -5.0]),
+        matched_pose2=matched,
+        information_world=np.diag([10_000.0, 10_000.0, 10_000.0]),
+        optimize_interval=1,
+        relocalization_seed=True,
+    )
+
+    np.testing.assert_allclose(backend.graph.poses[-1], matched, atol=2.0e-4)
+    diagnostics = backend.diagnostics()
+    assert diagnostics.last_terrain_prefit_bypassed_for_relocalization
+    assert not diagnostics.last_terrain_prefit_performed
+    assert diagnostics.terrain_relocalization_seeds == 1
+    assert diagnostics.optimizer_backend == "gtsam_isam2_incremental_fixed_lag"
+    assert diagnostics.fixed_lag_active_variables == 3
+
+
 def test_rebuild_bridges_a_new_cross_window_factor_exactly_once() -> None:
     graph = GTSAMPlanarPoseGraph(_gtsam_config(fixed_lag_seconds=2.0))
     _add_chain(graph, 8)

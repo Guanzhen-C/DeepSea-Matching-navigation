@@ -221,11 +221,56 @@ def test_confirmed_terrain_relocalization_rebases_an_unknown_initial_gauge() -> 
     assert not backend.graph.priors[-1].robust
     diagnostics = backend.diagnostics()
     assert diagnostics.terrain_relocalization_seeds == 1
+    assert not diagnostics.last_terrain_prefit_performed
+    assert diagnostics.last_terrain_prefit_bypassed_for_relocalization
     assert diagnostics.last_terrain_relocalization_translation_m == pytest.approx(
         120.0
     )
     assert diagnostics.last_terrain_relocalization_yaw_deg == pytest.approx(0.0)
     assert diagnostics.last_terrain_relocalization_anchor_index is None
+
+
+def test_confirmed_relocalization_can_cross_a_distant_graph_basin() -> None:
+    """Independent confirmation, not the stale graph, gates relocalization."""
+
+    backend = AcousticPoseGraph(
+        PoseGraphConfig(
+            optimizer_iterations=30,
+            terrain_prior_optimize_interval=1,
+        )
+    )
+    identity = np.eye(3)
+    empty = np.empty((0, 3), dtype=np.float64)
+    for observation_id, x_m in enumerate((0.0, 10.0, 20.0)):
+        assert backend.add_if_needed(
+            float(observation_id),
+            identity,
+            np.array([x_m, 0.0, -5.0]),
+            empty,
+            observation_id=observation_id,
+            force=True,
+            detect_loops=False,
+        )
+
+    matched = np.array([5_020.0, -3_000.0, 0.4])
+    assert backend.add_terrain_prior(
+        timestamp=2.0,
+        observation_id=2,
+        prior_pose2=np.array([20.0, 0.0, 0.0]),
+        raw_rotation_world_body=identity,
+        raw_position_world=np.array([20.0, 0.0, -5.0]),
+        matched_pose2=matched,
+        information_world=np.diag([10_000.0, 10_000.0, 10_000.0]),
+        optimize_interval=1,
+        relocalization_seed=True,
+    )
+
+    np.testing.assert_allclose(backend.graph.poses[-1], matched, atol=1.0e-7)
+    diagnostics = backend.diagnostics()
+    assert diagnostics.last_terrain_prefit_bypassed_for_relocalization
+    assert not diagnostics.last_terrain_prefit_performed
+    assert diagnostics.last_terrain_prefit_chi2 == 0.0
+    assert diagnostics.last_terrain_prefit_dof == 0
 
 
 def test_confirmed_relocalization_starts_after_latest_absolute_anchor() -> None:

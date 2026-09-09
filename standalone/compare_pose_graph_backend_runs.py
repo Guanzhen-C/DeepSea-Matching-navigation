@@ -188,6 +188,31 @@ def _resolve_csv(metrics_path: Path, payload: dict[str, Any]) -> Path:
     return sibling
 
 
+def _load_optional_related_json(
+    metrics_path: Path,
+    payload: dict[str, Any],
+    payload_key: str,
+    sibling_suffix: str,
+) -> dict[str, Any] | None:
+    recorded = payload.get(payload_key)
+    candidates: list[Path] = []
+    if recorded:
+        recorded_path = Path(str(recorded))
+        candidates.append(recorded_path)
+        if not recorded_path.is_absolute():
+            candidates.append(metrics_path.parent / recorded_path)
+    candidates.append(
+        metrics_path.with_name(f"{metrics_path.stem}{sibling_suffix}")
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            value = json.loads(candidate.read_text(encoding="utf-8"))
+            if not isinstance(value, dict):
+                raise ValueError(f"related JSON must be an object: {candidate}")
+            return value
+    return None
+
+
 def _finite_tree(value: Any) -> bool:
     if isinstance(value, dict):
         return all(_finite_tree(item) for item in value.values())
@@ -200,12 +225,24 @@ def _finite_tree(value: Any) -> bool:
 
 def _upper_bound_check(
     name: str,
-    baseline: float,
-    candidate: float,
+    baseline: float | None,
+    candidate: float | None,
     *,
     relative_allowance: float,
     absolute_allowance: float,
 ) -> dict[str, Any]:
+    if baseline is None or candidate is None:
+        return {
+            "name": name,
+            "lower_is_better": True,
+            "baseline": baseline,
+            "candidate": candidate,
+            "relative_allowance": relative_allowance,
+            "absolute_allowance": absolute_allowance,
+            "failure_limit": None,
+            "passed": False,
+            "reason": "metric_unavailable",
+        }
     limit = float(baseline) * (1.0 + relative_allowance) + absolute_allowance
     return {
         "name": name,
@@ -256,6 +293,36 @@ def _markdown(report: dict[str, Any]) -> str:
                 f"| {track} | {interval} | {pair['baseline']:.6g} | "
                 f"{pair['candidate']:.6g} | {pair['delta']:+.6g} |"
             )
+    relative_odometry = report.get("candidate_relative_odometry")
+    if relative_odometry is not None:
+        incremental = relative_odometry["incremental_keyframe_odometry"]
+        lines.extend(
+            [
+                "",
+                "## Gauge-invariant local odometry (candidate factor stream)",
+                "",
+                (
+                    "This composes only sequential front-end odometry factors; "
+                    "global graph corrections are excluded."
+                ),
+                "",
+                "| Baseline | Translation RMSE (m) | Yaw RMSE (deg) |",
+                "|---|---:|---:|",
+                (
+                    "| One keyframe | "
+                    f"{incremental['translation_error_m']['rmse']:.6g} | "
+                    f"{incremental['absolute_yaw_error_deg']['rmse']:.6g} |"
+                ),
+            ]
+        )
+        for interval, metrics in relative_odometry[
+            "se2_rpe_by_truth_route_distance"
+        ].items():
+            if metrics["available"]:
+                lines.append(
+                    f"| {interval} | {metrics['rmse_translation_m']:.6g} | "
+                    f"{metrics['rmse_yaw_deg']:.6g} |"
+                )
     lines.extend(
         [
             "",
@@ -286,6 +353,12 @@ def main() -> int:
     args = _arguments()
     baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
     candidate = json.loads(args.candidate.read_text(encoding="utf-8"))
+    candidate_relative_odometry = _load_optional_related_json(
+        args.candidate.resolve(),
+        candidate,
+        "relative_odometry_evaluation",
+        "_relative_odometry.json",
+    )
     invariant_mismatches = []
     for path in INVARIANT_PATHS:
         first = _nested(baseline, path)
@@ -545,6 +618,7 @@ def main() -> int:
         "accuracy_acceptance_checks": accuracy_checks,
         "position_error": position_error,
         "translation_rpe_rmse_m": rpe,
+        "candidate_relative_odometry": candidate_relative_odometry,
         "orientation_error": orientation,
         "five_kilometre_segments": segments,
         "factor_counts": factor_counts,

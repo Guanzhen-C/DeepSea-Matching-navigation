@@ -39,6 +39,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # remains the seed and the fallback when texture matching is rejected. This
 # avoids carrying the measured low-pass bathymetry bias back into an accepted
 # side-scan result through an unjustified independence assumption.
+# The recorded full-route front end reaches 78.6 degrees absolute yaw error;
+# the rare whole-map recovery therefore searches +/-90 degrees around its
+# inertial yaw, leaving measured margin without paying for a blind 360-degree
+# search at every recovery attempt.
 # A 20x render time scale was measurably faster than both 8x and 30x on the
 # validated UI workload, while retaining 50% more rendered frames than 30x.
 # Append command-line arguments to override these presentation settings.
@@ -91,6 +95,17 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --terrain-recovery-translation-window-m 100 \
     --terrain-recovery-after-rejections 3 \
     --terrain-emergency-recovery-translation-window-m 150 \
+    --enable-global-terrain-relocalization \
+    --terrain-global-window-pings 1200 \
+    --terrain-global-pyramid-stride 4 \
+    --terrain-global-yaw-window-deg 90 \
+    --terrain-global-yaw-step-deg 5 \
+    --terrain-global-minimum-correlation 0.30 \
+    --terrain-global-maximum-bathymetry-rmse-m 6 \
+    --terrain-global-bathymetry-absolute-weight 0.50 \
+    --terrain-global-minimum-score-gap 0.08 \
+    --terrain-global-confirmation-position-tolerance-m 25 \
+    --terrain-global-confirmation-yaw-tolerance-deg 5 \
     --terrain-match-yaw-window-deg 8 \
     --terrain-prior-optimize-interval 1 \
     --association-map-half-extent-m 275 \

@@ -5,6 +5,239 @@ from __future__ import annotations
 import numpy as np
 
 
+def se2_relative_pose_error_by_distance(
+    estimate_poses: np.ndarray,
+    truth_poses: np.ndarray,
+    cumulative_truth_distance_m: np.ndarray,
+    interval_m: float,
+) -> dict[str, float | int | bool | None]:
+    """Return gauge-invariant planar relative-pose error by route distance.
+
+    Poses use ``[x, y, yaw]`` with yaw in radians.  Estimate and truth motion
+    are each expressed in their own starting body frame, so one constant SE(2)
+    transform between the two trajectories has no effect on this metric.
+    """
+
+    estimate = np.asarray(estimate_poses, dtype=np.float64).reshape(-1, 3)
+    truth = np.asarray(truth_poses, dtype=np.float64).reshape(-1, 3)
+    distance = np.asarray(
+        cumulative_truth_distance_m, dtype=np.float64
+    ).reshape(-1)
+    if estimate.shape != truth.shape or estimate.shape[0] != distance.size:
+        raise ValueError("SE(2) RPE tracks must have equal length")
+    if not np.isfinite(float(interval_m)) or interval_m <= 0.0:
+        raise ValueError("SE(2) RPE interval must be positive and finite")
+    if (
+        distance.size == 0
+        or not np.isfinite(distance).all()
+        or not np.isfinite(estimate).all()
+        or not np.isfinite(truth).all()
+        or np.any(np.diff(distance) < 0.0)
+    ):
+        raise ValueError("SE(2) RPE inputs must be finite and distance monotonic")
+
+    target_distance = distance + float(interval_m)
+    ending = np.searchsorted(distance, target_distance, side="left")
+    starting = np.arange(distance.size, dtype=np.int64)
+    available = ending < distance.size
+    starting = starting[available]
+    ending = ending[available]
+    if starting.size == 0:
+        return {
+            "available": False,
+            "samples": 0,
+            "requested_interval_m": float(interval_m),
+            "mean_actual_interval_m": None,
+            "rmse_translation_m": None,
+            "mean_translation_m": None,
+            "p95_translation_m": None,
+            "max_translation_m": None,
+            "rmse_yaw_deg": None,
+            "mean_abs_yaw_deg": None,
+            "p95_abs_yaw_deg": None,
+            "max_abs_yaw_deg": None,
+        }
+
+    def relative_motion(poses: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        delta = poses[ending, :2] - poses[starting, :2]
+        yaw = poses[starting, 2]
+        cosine = np.cos(yaw)
+        sine = np.sin(yaw)
+        translation = np.column_stack(
+            (
+                cosine * delta[:, 0] + sine * delta[:, 1],
+                -sine * delta[:, 0] + cosine * delta[:, 1],
+            )
+        )
+        relative_yaw = (
+            poses[ending, 2] - poses[starting, 2] + np.pi
+        ) % (2.0 * np.pi) - np.pi
+        return translation, relative_yaw
+
+    estimate_translation, estimate_yaw = relative_motion(estimate)
+    truth_translation, truth_yaw = relative_motion(truth)
+    translation_error = np.linalg.norm(
+        estimate_translation - truth_translation, axis=1
+    )
+    yaw_error_deg = np.abs(
+        np.rad2deg(
+            (estimate_yaw - truth_yaw + np.pi) % (2.0 * np.pi) - np.pi
+        )
+    )
+    return {
+        "available": True,
+        "samples": int(starting.size),
+        "requested_interval_m": float(interval_m),
+        "mean_actual_interval_m": float(
+            np.mean(distance[ending] - distance[starting])
+        ),
+        "rmse_translation_m": float(
+            np.sqrt(np.mean(translation_error**2))
+        ),
+        "mean_translation_m": float(np.mean(translation_error)),
+        "p95_translation_m": float(
+            np.percentile(translation_error, 95.0)
+        ),
+        "max_translation_m": float(np.max(translation_error)),
+        "rmse_yaw_deg": float(np.sqrt(np.mean(yaw_error_deg**2))),
+        "mean_abs_yaw_deg": float(np.mean(yaw_error_deg)),
+        "p95_abs_yaw_deg": float(np.percentile(yaw_error_deg, 95.0)),
+        "max_abs_yaw_deg": float(np.max(yaw_error_deg)),
+    }
+
+
+def se3_relative_pose_error_by_distance(
+    estimate_positions: np.ndarray,
+    estimate_rotations: np.ndarray,
+    truth_positions: np.ndarray,
+    truth_rotations: np.ndarray,
+    cumulative_truth_distance_m: np.ndarray,
+    interval_m: float,
+) -> dict[str, float | int | bool | None]:
+    """Return gauge-invariant SE(3) RPE over a truth-distance interval.
+
+    Each motion is expressed in its own starting body frame before the truth
+    relative transform is removed.  A single rigid translation/rotation of an
+    otherwise exact estimated trajectory therefore produces zero error.
+    """
+
+    estimate_xyz = np.asarray(
+        estimate_positions, dtype=np.float64
+    ).reshape(-1, 3)
+    truth_xyz = np.asarray(truth_positions, dtype=np.float64).reshape(-1, 3)
+    estimate_rotation = np.asarray(
+        estimate_rotations, dtype=np.float64
+    ).reshape(-1, 3, 3)
+    truth_rotation = np.asarray(
+        truth_rotations, dtype=np.float64
+    ).reshape(-1, 3, 3)
+    distance = np.asarray(
+        cumulative_truth_distance_m, dtype=np.float64
+    ).reshape(-1)
+    count = distance.size
+    if (
+        estimate_xyz.shape != truth_xyz.shape
+        or estimate_xyz.shape[0] != count
+        or estimate_rotation.shape != truth_rotation.shape
+        or estimate_rotation.shape[0] != count
+    ):
+        raise ValueError("SE(3) RPE tracks must have equal length")
+    if not np.isfinite(float(interval_m)) or interval_m <= 0.0:
+        raise ValueError("SE(3) RPE interval must be positive and finite")
+    if (
+        count == 0
+        or not np.isfinite(distance).all()
+        or not np.isfinite(estimate_xyz).all()
+        or not np.isfinite(truth_xyz).all()
+        or not np.isfinite(estimate_rotation).all()
+        or not np.isfinite(truth_rotation).all()
+        or np.any(np.diff(distance) < 0.0)
+    ):
+        raise ValueError("SE(3) RPE inputs must be finite and distance monotonic")
+
+    target_distance = distance + float(interval_m)
+    ending = np.searchsorted(distance, target_distance, side="left")
+    starting = np.arange(count, dtype=np.int64)
+    available = ending < count
+    starting = starting[available]
+    ending = ending[available]
+    if starting.size == 0:
+        return {
+            "available": False,
+            "samples": 0,
+            "requested_interval_m": float(interval_m),
+            "mean_actual_interval_m": None,
+            "rmse_translation_m": None,
+            "mean_translation_m": None,
+            "p95_translation_m": None,
+            "max_translation_m": None,
+            "rmse_rotation_deg": None,
+            "mean_rotation_deg": None,
+            "p95_rotation_deg": None,
+            "max_rotation_deg": None,
+        }
+
+    estimate_relative_rotation = np.einsum(
+        "nji,njk->nik",
+        estimate_rotation[starting],
+        estimate_rotation[ending],
+    )
+    truth_relative_rotation = np.einsum(
+        "nji,njk->nik",
+        truth_rotation[starting],
+        truth_rotation[ending],
+    )
+    estimate_relative_translation = np.einsum(
+        "nji,nj->ni",
+        estimate_rotation[starting],
+        estimate_xyz[ending] - estimate_xyz[starting],
+    )
+    truth_relative_translation = np.einsum(
+        "nji,nj->ni",
+        truth_rotation[starting],
+        truth_xyz[ending] - truth_xyz[starting],
+    )
+    relative_error_rotation = np.einsum(
+        "nji,njk->nik",
+        truth_relative_rotation,
+        estimate_relative_rotation,
+    )
+    relative_error_translation = np.einsum(
+        "nji,nj->ni",
+        truth_relative_rotation,
+        estimate_relative_translation - truth_relative_translation,
+    )
+    translation_error = np.linalg.norm(relative_error_translation, axis=1)
+    trace = np.trace(relative_error_rotation, axis1=1, axis2=2)
+    rotation_error_deg = np.rad2deg(
+        np.arccos(np.clip(0.5 * (trace - 1.0), -1.0, 1.0))
+    )
+    return {
+        "available": True,
+        "samples": int(starting.size),
+        "requested_interval_m": float(interval_m),
+        "mean_actual_interval_m": float(
+            np.mean(distance[ending] - distance[starting])
+        ),
+        "rmse_translation_m": float(
+            np.sqrt(np.mean(translation_error**2))
+        ),
+        "mean_translation_m": float(np.mean(translation_error)),
+        "p95_translation_m": float(
+            np.percentile(translation_error, 95.0)
+        ),
+        "max_translation_m": float(np.max(translation_error)),
+        "rmse_rotation_deg": float(
+            np.sqrt(np.mean(rotation_error_deg**2))
+        ),
+        "mean_rotation_deg": float(np.mean(rotation_error_deg)),
+        "p95_rotation_deg": float(
+            np.percentile(rotation_error_deg, 95.0)
+        ),
+        "max_rotation_deg": float(np.max(rotation_error_deg)),
+    }
+
+
 def map_to_odom_change_metrics(
     timestamps: np.ndarray,
     local_positions: np.ndarray,
