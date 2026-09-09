@@ -295,27 +295,50 @@ def _markdown(report: dict[str, Any]) -> str:
             )
     relative_odometry = report.get("candidate_relative_odometry")
     if relative_odometry is not None:
-        incremental = relative_odometry["incremental_keyframe_odometry"]
+        exact_local = relative_odometry.get("exact_local_acoustic_esikf", {})
+        if exact_local.get("available"):
+            selected_track = exact_local
+            track_label = "Exact raw local acoustic ESIKF"
+            track_explanation = (
+                "Raw front-end keyframe posteriors are evaluated before every "
+                "global graph correction."
+            )
+        else:
+            selected_track = relative_odometry.get(
+                "odometry_factor_chain_ablation",
+                {
+                    "incremental_keyframe_motion": relative_odometry.get(
+                        "incremental_keyframe_odometry", {}
+                    ),
+                    "se2_rpe_by_truth_route_distance": relative_odometry.get(
+                        "se2_rpe_by_truth_route_distance", {}
+                    ),
+                },
+            )
+            track_label = "Pre-image odometry-factor ablation"
+            track_explanation = (
+                "The older stream lacks raw local posteriors; these numbers "
+                "exclude unrecoverable local intensity steps and are not the "
+                "complete local trajectory."
+            )
+        incremental = selected_track["incremental_keyframe_motion"]
         lines.extend(
             [
                 "",
                 "## Gauge-invariant local odometry (candidate factor stream)",
                 "",
-                (
-                    "This composes only sequential front-end odometry factors; "
-                    "global graph corrections are excluded."
-                ),
+                track_explanation,
                 "",
                 "| Baseline | Translation RMSE (m) | Yaw RMSE (deg) |",
                 "|---|---:|---:|",
                 (
-                    "| One keyframe | "
+                    f"| {track_label}: one keyframe | "
                     f"{incremental['translation_error_m']['rmse']:.6g} | "
                     f"{incremental['absolute_yaw_error_deg']['rmse']:.6g} |"
                 ),
             ]
         )
-        for interval, metrics in relative_odometry[
+        for interval, metrics in selected_track[
             "se2_rpe_by_truth_route_distance"
         ].items():
             if metrics["available"]:

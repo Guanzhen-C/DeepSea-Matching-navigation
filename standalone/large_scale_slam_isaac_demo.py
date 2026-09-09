@@ -6021,7 +6021,7 @@ def main() -> int:
         factor_log = ARGS.metrics.with_name(
             f"{ARGS.metrics.stem}_pose_graph_factors.json"
         )
-        factor_payload = slam.pose_graph.graph.factor_stream_payload()
+        factor_payload = slam.pose_graph.factor_stream_payload()
         temporary_factor_log = factor_log.with_suffix(
             f"{factor_log.suffix}.tmp"
         )

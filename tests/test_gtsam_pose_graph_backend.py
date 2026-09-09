@@ -549,6 +549,21 @@ def test_acoustic_frontend_constructs_identical_factors_for_both_solvers() -> No
     for key in ("pose_initializations", "pose_timestamps_s", "edges", "priors"):
         assert candidate_stream[key] == reference_stream[key]
     json.dumps(candidate_stream)
+    extended_stream = candidate.factor_stream_payload()
+    assert len(extended_stream["raw_local_keyframe_pose2"]) == len(
+        candidate.keyframes
+    )
+    np.testing.assert_allclose(
+        np.asarray(extended_stream["raw_local_keyframe_positions_xyz"]),
+        np.asarray([frame.raw_position for frame in candidate.keyframes]),
+    )
+    np.testing.assert_allclose(
+        np.asarray(
+            extended_stream["raw_local_keyframe_rotations_world_body"]
+        ),
+        np.asarray([frame.raw_rotation for frame in candidate.keyframes]),
+    )
+    json.dumps(extended_stream)
     np.testing.assert_allclose(
         candidate.graph.poses, reference.graph.poses, atol=1.0e-4
     )

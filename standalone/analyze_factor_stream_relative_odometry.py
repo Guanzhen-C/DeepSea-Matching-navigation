@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Evaluate local planar odometry without penalising a global pose gauge.
+"""Evaluate recorded local planar motion without penalising a global gauge.
 
-The factor stream records every sequential odometry measurement before the
-global graph changes it.  Composing only those factors therefore reconstructs
-the local front-end trajectory independently of terrain priors, loop closures,
-and the selected graph backend.
+New factor streams explicitly contain the untouched local ESIKF keyframe
+posteriors.  Older streams can still be audited by composing their sequential
+pre-image odometry factors, but that ablation is labelled separately because
+it omits local intensity-posterior steps that are not recoverable afterward.
 """
 
 from __future__ import annotations
@@ -76,7 +76,12 @@ def _relative_pose2(source: np.ndarray, target: np.ndarray) -> np.ndarray:
 
 
 def reconstruct_local_odometry(payload: dict[str, Any]) -> np.ndarray:
-    """Compose the unique sequential odometry chain in a zero pose gauge."""
+    """Compose the sequential pre-image odometry-factor chain.
+
+    This is a useful backend-independent ablation, not necessarily the complete
+    local ESIKF posterior trajectory.  Direct image updates can change a raw
+    keyframe after its incoming odometry factor has been constructed.
+    """
 
     timestamps = np.asarray(payload["pose_timestamps_s"], dtype=np.float64)
     if timestamps.ndim != 1 or timestamps.size == 0:
@@ -202,6 +207,28 @@ def _incremental_metrics(
     }
 
 
+def _track_metrics(
+    poses: np.ndarray,
+    truth_poses: np.ndarray,
+    cumulative_distance_m: np.ndarray,
+    intervals_m: list[float],
+) -> dict[str, Any]:
+    return {
+        "incremental_keyframe_motion": _incremental_metrics(
+            poses, truth_poses, cumulative_distance_m
+        ),
+        "se2_rpe_by_truth_route_distance": {
+            f"{interval_m:g}m": se2_relative_pose_error_by_distance(
+                poses,
+                truth_poses,
+                cumulative_distance_m,
+                interval_m,
+            )
+            for interval_m in intervals_m
+        },
+    }
+
+
 def analyze(
     factor_payload: dict[str, Any],
     metrics: dict[str, Any],
@@ -221,32 +248,60 @@ def analyze(
         or np.any(np.diff(timestamps) < 0.0)
     ):
         raise ValueError("pose timestamps must be finite, monotonic, and nonempty")
-    local_poses = reconstruct_local_odometry(factor_payload)
+    odometry_factor_poses = reconstruct_local_odometry(factor_payload)
     truth_poses, cumulative_distance_m = _truth_planar_poses(
         timestamps, metrics
     )
+    raw_local = factor_payload.get("raw_local_keyframe_pose2")
+    exact_local: dict[str, Any]
+    if raw_local is None:
+        exact_local = {
+            "available": False,
+            "reason": "raw_local_keyframe_pose2_not_recorded",
+        }
+    else:
+        raw_local_poses = np.asarray(raw_local, dtype=np.float64)
+        if raw_local_poses.shape != (timestamps.size, 3):
+            raise ValueError("raw local keyframes and timestamps disagree")
+        if not np.isfinite(raw_local_poses).all():
+            raise ValueError("raw local keyframes must be finite")
+        exact_local = {
+            "available": True,
+            "definition": (
+                "raw local acoustic ESIKF keyframe posteriors before all "
+                "map->odom pose-graph corrections"
+            ),
+            **_track_metrics(
+                raw_local_poses,
+                truth_poses,
+                cumulative_distance_m,
+                intervals_m,
+            ),
+        }
     return {
-        "schema": "oceansim.relative_odometry_evaluation.v1",
+        "schema": "oceansim.relative_odometry_evaluation.v2",
         "definition": (
-            "only sequential local-front-end odometry factors are composed; "
-            "terrain priors, loops, graph optimization, and the constant global "
-            "position/yaw gauge are excluded"
+            "all reported SE(2) motions are expressed in each track's starting "
+            "body frame; terrain priors, loops, graph optimization, and one "
+            "constant global position/yaw gauge do not affect the metric"
         ),
         "nodes": int(timestamps.size),
         "start_timestamp_s": float(timestamps[0]),
         "end_timestamp_s": float(timestamps[-1]),
         "evaluated_truth_route_distance_m": float(cumulative_distance_m[-1]),
-        "incremental_keyframe_odometry": _incremental_metrics(
-            local_poses, truth_poses, cumulative_distance_m
-        ),
-        "se2_rpe_by_truth_route_distance": {
-            f"{interval_m:g}m": se2_relative_pose_error_by_distance(
-                local_poses,
+        "exact_local_acoustic_esikf": exact_local,
+        "odometry_factor_chain_ablation": {
+            "definition": (
+                "composition of sequential pre-image odometry factors only; "
+                "it can omit local intensity-posterior steps and must not be "
+                "reported as the complete local trajectory"
+            ),
+            **_track_metrics(
+                odometry_factor_poses,
                 truth_poses,
                 cumulative_distance_m,
-                interval_m,
-            )
-            for interval_m in intervals_m
+                intervals_m,
+            ),
         },
     }
 

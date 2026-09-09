@@ -1641,6 +1641,35 @@ class AcousticPoseGraph:
         self._last_terrain_relocalization_anchor_index = None
         self._geometry_keyframe_count = 0
 
+    def factor_stream_payload(self) -> dict[str, object]:
+        """Return solver factors plus the untouched local keyframe states.
+
+        Solver pose initializations may already contain a ``map->odom`` graph
+        correction.  They therefore cannot be used to audit the front-end
+        trajectory.  Recording each keyframe's raw ESIKF posterior separately
+        keeps backend replay and local-odometry evaluation unambiguous.
+        """
+
+        if len(self.keyframes) != self.graph.poses.shape[0]:
+            raise RuntimeError("keyframes and graph poses diverged")
+        payload = self.graph.factor_stream_payload()
+        payload["raw_local_keyframe_pose2"] = [
+            frame.raw_pose2.tolist() for frame in self.keyframes
+        ]
+        payload["raw_local_keyframe_positions_xyz"] = [
+            frame.raw_position.tolist() for frame in self.keyframes
+        ]
+        payload["raw_local_keyframe_rotations_world_body"] = [
+            frame.raw_rotation.tolist() for frame in self.keyframes
+        ]
+        payload["keyframe_observation_ids"] = [
+            int(frame.observation_id) for frame in self.keyframes
+        ]
+        payload["keyframe_loop_eligible"] = [
+            bool(frame.loop_eligible) for frame in self.keyframes
+        ]
+        return payload
+
     def _reject_intensity_factor(self, reason: str) -> bool:
         """Record a rejected attempted factor and preserve the bool API."""
 
