@@ -281,7 +281,9 @@ def _markdown(report: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Translation RPE RMSE",
+            "## Legacy world-frame displacement-vector error",
+            "",
+            "This historical metric is not invariant to a constant global yaw gauge.",
             "",
             "| Track | Interval | Baseline (m) | Candidate (m) | Delta (m) |",
             "|---|---|---:|---:|---:|",
@@ -346,6 +348,25 @@ def _markdown(report: dict[str, Any]) -> str:
                     f"| {interval} | {metrics['rmse_translation_m']:.6g} | "
                     f"{metrics['rmse_yaw_deg']:.6g} |"
                 )
+    se3_rpe = report.get("candidate_gauge_invariant_se3_rpe")
+    if se3_rpe:
+        lines.extend(
+            [
+                "",
+                "## Gauge-invariant dense SE(3) RPE (candidate)",
+                "",
+                "| Track | Interval | Translation RMSE (m) | Rotation RMSE (deg) |",
+                "|---|---|---:|---:|",
+            ]
+        )
+        for track, intervals in se3_rpe.items():
+            for interval, metrics in intervals.items():
+                if metrics.get("available"):
+                    lines.append(
+                        f"| {track} | {interval} | "
+                        f"{metrics['rmse_translation_m']:.6g} | "
+                        f"{metrics['rmse_rotation_deg']:.6g} |"
+                    )
     lines.extend(
         [
             "",
@@ -641,6 +662,9 @@ def main() -> int:
         "accuracy_acceptance_checks": accuracy_checks,
         "position_error": position_error,
         "translation_rpe_rmse_m": rpe,
+        "candidate_gauge_invariant_se3_rpe": candidate_position.get(
+            "se3_rpe_by_truth_distance"
+        ),
         "candidate_relative_odometry": candidate_relative_odometry,
         "orientation_error": orientation,
         "five_kilometre_segments": segments,
