@@ -232,6 +232,28 @@ class TerrainMatcherConfig:
             )
 
 
+def terrain_prior_prefit_bypass_allowed(
+    *, mode: str, initializes_global_gauge: bool
+) -> bool:
+    """Return whether a confirmed absolute factor may bypass graph prefit.
+
+    A wider local ``recovery`` search is still centred on the drifting graph
+    seed and is not a relocalization proof.  It must therefore pass the normal
+    pose-graph innovation test.  Only initial two-strip gauge establishment,
+    or an ``emergency``/``global`` hypothesis already confirmed by the
+    disjoint-strip controller, may deliberately re-anchor a stale graph.
+    """
+
+    normalized_mode = str(mode).strip().lower()
+    allowed_modes = {"normal", "recovery", "emergency", "global"}
+    if normalized_mode not in allowed_modes:
+        raise ValueError(f"unsupported terrain factor mode: {mode!r}")
+    return bool(initializes_global_gauge) or normalized_mode in {
+        "emergency",
+        "global",
+    }
+
+
 def make_terrain_recovery_config(
     normal_config: TerrainMatcherConfig,
     *,

@@ -1140,6 +1140,7 @@ from isaacsim.oceansim.slam import (
     motion_compensate_to_body,
     sanitize_for_strict_json,
     se3_relative_pose_error_by_distance,
+    terrain_prior_prefit_bypass_allowed,
     voxel_average_backscatter_patch,
     voxel_average_terrain_patch,
 )
@@ -3472,10 +3473,9 @@ def main() -> int:
                 ),
             ),
             points_body=patch_body,
-            # A recovered gauge must affect the next seed immediately.  If it
-            # waited for the ordinary batched cadence, a vehicle outside the
-            # normal search window could never generate the next factor that
-            # would trigger optimization.
+            # Recovery candidates still pass graph prefit; only a disjoint-
+            # strip-confirmed emergency/global re-anchor must affect the next
+            # seed immediately.
             optimize_interval=(
                 1
                 if mode in ("recovery", "emergency", "global")
@@ -3483,8 +3483,9 @@ def main() -> int:
             ),
             # Initial two-patch x/y baselines estimate a common SE(2) gauge;
             # emergency re-seeding has its own stricter confirmation policy.
-            relocalization_seed=(
-                gauge_seed_pose2 is not None or mode in ("emergency", "global")
+            relocalization_seed=terrain_prior_prefit_bypass_allowed(
+                mode=mode,
+                initializes_global_gauge=gauge_seed_pose2 is not None,
             ),
             relocalization_seed_pose2=gauge_seed_pose2,
         )

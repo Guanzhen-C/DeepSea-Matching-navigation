@@ -18,6 +18,7 @@ from oceansim.slam import (
     fixed_lag_fused_deskew_states,
     make_terrain_recovery_config,
     motion_compensate_to_body,
+    terrain_prior_prefit_bypass_allowed,
     uniform_full_swath_scan_indices,
     voxel_average_backscatter_patch,
     voxel_average_terrain_patch,
@@ -770,4 +771,33 @@ def test_recovery_config_is_wide_strict_and_preserves_statistical_gates() -> Non
         make_terrain_recovery_config(
             _matcher_config(require_yaw_observable=False),
             maximum_translation_m=100.0,
+        )
+
+
+@pytest.mark.parametrize("mode", ["normal", "recovery"])
+def test_local_terrain_modes_cannot_bypass_graph_prefit(mode: str) -> None:
+    assert not terrain_prior_prefit_bypass_allowed(
+        mode=mode, initializes_global_gauge=False
+    )
+
+
+@pytest.mark.parametrize("mode", ["emergency", "global"])
+def test_confirmed_relocalization_modes_can_bypass_graph_prefit(
+    mode: str,
+) -> None:
+    assert terrain_prior_prefit_bypass_allowed(
+        mode=mode, initializes_global_gauge=False
+    )
+
+
+def test_initial_gauge_confirmation_can_bypass_graph_prefit() -> None:
+    assert terrain_prior_prefit_bypass_allowed(
+        mode="normal", initializes_global_gauge=True
+    )
+
+
+def test_unknown_terrain_factor_mode_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unsupported terrain factor mode"):
+        terrain_prior_prefit_bypass_allowed(
+            mode="typo", initializes_global_gauge=False
         )
