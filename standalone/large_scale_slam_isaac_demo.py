@@ -1138,6 +1138,7 @@ from isaacsim.oceansim.slam import (
     map_to_odom_change_metrics,
     make_terrain_recovery_config,
     motion_compensate_to_body,
+    sanitize_for_strict_json,
     se3_relative_pose_error_by_distance,
     voxel_average_backscatter_patch,
     voxel_average_terrain_patch,
@@ -5620,7 +5621,12 @@ def main() -> int:
                         with temporary_progress_path.open(
                             "w", encoding="utf-8"
                         ) as stream:
-                            json.dump(checkpoint, stream, indent=2)
+                            json.dump(
+                                checkpoint,
+                                stream,
+                                indent=2,
+                                allow_nan=False,
+                            )
                             stream.write("\n")
                         temporary_progress_path.replace(progress_path)
                         print(
@@ -6026,7 +6032,7 @@ def main() -> int:
             f"{factor_log.suffix}.tmp"
         )
         with temporary_factor_log.open("w", encoding="utf-8") as stream:
-            json.dump(factor_payload, stream, indent=2)
+            json.dump(factor_payload, stream, indent=2, allow_nan=False)
             stream.write("\n")
         temporary_factor_log.replace(factor_log)
         travelled_distance_m = float(cumulative_distance_m[-1])
@@ -7576,10 +7582,21 @@ def main() -> int:
             "position_error_csv": str(error_csv),
             "pose_graph_factor_log": str(factor_log),
         }
+        metrics, nonfinite_replacements = sanitize_for_strict_json(metrics)
+        metrics["json_serialization"] = {
+            "strict_json": True,
+            "nonfinite_diagnostic_values_replaced_with_null": int(
+                nonfinite_replacements
+            ),
+        }
         with ARGS.metrics.open("w", encoding="utf-8") as stream:
-            json.dump(metrics, stream, indent=2)
+            json.dump(metrics, stream, indent=2, allow_nan=False)
             stream.write("\n")
-        print(f"[OceanSim] live metrics: {json.dumps(metrics)}", flush=True)
+        print(
+            "[OceanSim] live metrics: "
+            f"{json.dumps(metrics, allow_nan=False)}",
+            flush=True,
+        )
         try:
             world.stop()
         except Exception:

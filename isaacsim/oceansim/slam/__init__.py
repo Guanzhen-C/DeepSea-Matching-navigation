@@ -14,6 +14,7 @@ from .esikf import (
 )
 from .evaluation import (
     map_to_odom_change_metrics,
+    sanitize_for_strict_json,
     se2_relative_pose_error_by_distance,
     se3_relative_pose_error_by_distance,
 )
@@ -121,6 +122,7 @@ __all__ = [
     "gauge_anchored_initial_covariance",
     "initialize_from_imu_dvl_depth",
     "map_to_odom_change_metrics",
+    "sanitize_for_strict_json",
     "se2_relative_pose_error_by_distance",
     "se3_relative_pose_error_by_distance",
     "make_terrain_recovery_config",

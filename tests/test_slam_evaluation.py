@@ -1,12 +1,37 @@
+import json
+
 import numpy as np
 import pytest
 
 from oceansim.slam import (
     map_to_odom_change_metrics,
+    sanitize_for_strict_json,
     se2_relative_pose_error_by_distance,
     se3_relative_pose_error_by_distance,
 )
 from oceansim.slam.math3d import rotation_from_rpy
+
+
+def test_strict_json_sanitizer_replaces_only_nonfinite_numbers() -> None:
+    payload = {
+        "finite": np.float64(1.25),
+        "diagnostic": [np.nan, np.inf, -np.inf],
+        "array": np.array([2.0, np.nan]),
+        "integer": np.int64(7),
+        "boolean": np.bool_(True),
+    }
+
+    safe, replacements = sanitize_for_strict_json(payload)
+
+    assert replacements == 4
+    assert safe == {
+        "finite": 1.25,
+        "diagnostic": [None, None, None],
+        "array": [2.0, None],
+        "integer": 7,
+        "boolean": True,
+    }
+    assert "NaN" not in json.dumps(safe, allow_nan=False)
 
 
 def test_map_to_odom_audit_is_zero_for_identical_frames() -> None:

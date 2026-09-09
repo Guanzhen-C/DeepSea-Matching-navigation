@@ -2,7 +2,49 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+
+
+def sanitize_for_strict_json(value: Any) -> tuple[Any, int]:
+    """Return a JSON-safe copy and its non-finite replacement count.
+
+    Python's JSON encoder emits ``NaN`` and ``Infinity`` by default even
+    though neither token is valid JSON.  Long-run diagnostic records can
+    legitimately contain unavailable covariance or chi-square values.  Keep
+    that distinction explicit as ``null`` without weakening serialization of
+    the rest of the run artifact.
+    """
+
+    if isinstance(value, dict):
+        result: dict[Any, Any] = {}
+        replacements = 0
+        for key, item in value.items():
+            safe_item, item_replacements = sanitize_for_strict_json(item)
+            result[key] = safe_item
+            replacements += item_replacements
+        return result, replacements
+    if isinstance(value, (list, tuple)):
+        result = []
+        replacements = 0
+        for item in value:
+            safe_item, item_replacements = sanitize_for_strict_json(item)
+            result.append(safe_item)
+            replacements += item_replacements
+        return result, replacements
+    if isinstance(value, np.ndarray):
+        return sanitize_for_strict_json(value.tolist())
+    if isinstance(value, np.bool_):
+        return bool(value), 0
+    if isinstance(value, np.integer):
+        return int(value), 0
+    if isinstance(value, (float, np.floating)):
+        numeric = float(value)
+        if not np.isfinite(numeric):
+            return None, 1
+        return numeric, 0
+    return value, 0
 
 
 def se2_relative_pose_error_by_distance(
