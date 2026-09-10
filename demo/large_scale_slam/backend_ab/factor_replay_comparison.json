@@ -1,0 +1,113 @@
+{
+  "schema": "oceansim.pose_graph_factor_replay_comparison.v1",
+  "overall_verdict": "pass",
+  "scope": "solver comparison on the same final factor snapshot; this is not an exact replay of online factor arrival or in-place factor replacement timing",
+  "checks": {
+    "factor_counts_identical": true,
+    "all_replays_finite": true,
+    "full_window_translation_max_le_0p02m": true,
+    "full_window_yaw_max_le_0p02deg": true,
+    "full_window_cost_equivalent": true,
+    "full_window_retains_all_variables": true,
+    "fixed_lag_actually_marginalizes": true
+  },
+  "factor_counts": {
+    "poses": {
+      "numpy_batch": 1781,
+      "gtsam_full_window": 1781,
+      "gtsam_fixed_lag": 1781
+    },
+    "edges": {
+      "numpy_batch": 1938,
+      "gtsam_full_window": 1938,
+      "gtsam_fixed_lag": 1938
+    },
+    "priors": {
+      "numpy_batch": 635,
+      "gtsam_full_window": 635,
+      "gtsam_fixed_lag": 635
+    }
+  },
+  "solver_summaries": {
+    "numpy_batch": {
+      "backend": "numpy_batch",
+      "poses": 1781,
+      "edges": 1938,
+      "priors": 635,
+      "optimization_runs": 2,
+      "initial_cost": 1907.1111850171947,
+      "final_cost": 1907.1111844123006,
+      "finite": true,
+      "maximum_absolute_delta_from_logged_online_pose": 102.45597523441302,
+      "fixed_lag_active_variables": 0,
+      "fixed_lag_marginalized_variables": 0,
+      "fixed_lag_global_only_factors": 0
+    },
+    "gtsam_full_window": {
+      "backend": "gtsam_isam2_incremental_fixed_lag",
+      "poses": 1781,
+      "edges": 1938,
+      "priors": 635,
+      "optimization_runs": 2,
+      "initial_cost": 1907.116256890403,
+      "final_cost": 1907.116256890403,
+      "finite": true,
+      "maximum_absolute_delta_from_logged_online_pose": 102.45268108050641,
+      "fixed_lag_active_variables": 1781,
+      "fixed_lag_marginalized_variables": 0,
+      "fixed_lag_global_only_factors": 0
+    },
+    "gtsam_fixed_lag": {
+      "backend": "gtsam_isam2_incremental_fixed_lag",
+      "poses": 1781,
+      "edges": 1938,
+      "priors": 635,
+      "optimization_runs": 2,
+      "initial_cost": 12481.096074480616,
+      "final_cost": 12481.096074480616,
+      "finite": true,
+      "maximum_absolute_delta_from_logged_online_pose": 8.192395850858247,
+      "fixed_lag_active_variables": 8,
+      "fixed_lag_marginalized_variables": 1773,
+      "fixed_lag_global_only_factors": 0
+    }
+  },
+  "full_window_cost_comparison": {
+    "numpy_batch": 1907.1111844123006,
+    "gtsam_full_window": 1907.116256890403,
+    "absolute_delta": 0.005072478102420064,
+    "acceptance_limit": 0.02
+  },
+  "pose_differences": {
+    "gtsam_full_window_vs_numpy_batch": {
+      "translation_rmse_m": 0.0017572184886700806,
+      "translation_max_m": 0.0089078705294499,
+      "yaw_rmse_deg": 0.000530581967849187,
+      "yaw_max_deg": 0.008520919233481491
+    },
+    "gtsam_fixed_lag_vs_gtsam_full_window": {
+      "translation_rmse_m": 39.02457357437383,
+      "translation_max_m": 123.95893892825526,
+      "yaw_rmse_deg": 1.7094780491781891,
+      "yaw_max_deg": 15.665254462946963
+    },
+    "gtsam_fixed_lag_rebuild_vs_logged_online": {
+      "translation_rmse_m": 0.7251418557094036,
+      "translation_max_m": 8.773700268117807,
+      "yaw_rmse_deg": 0.07004038741569835,
+      "yaw_max_deg": 0.9689344404538983
+    },
+    "gtsam_full_window_rebuild_vs_logged_global": {
+      "translation_rmse_m": 0.05987717269625356,
+      "translation_max_m": 0.34843754451775183,
+      "yaw_rmse_deg": 0.004446795553787525,
+      "yaw_max_deg": 0.0330890717331349
+    },
+    "numpy_batch_vs_logged_global": {
+      "translation_rmse_m": 0.06090561940053921,
+      "translation_max_m": 0.35100537465185305,
+      "yaw_rmse_deg": 0.004521371629895377,
+      "yaw_max_deg": 0.03331485084328454
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema": "oceansim.relative_odometry_evaluation.v2",
+  "definition": "all reported SE(2) motions are expressed in each track's starting body frame; terrain priors, loops, graph optimization, and one constant global position/yaw gauge do not affect the metric",
+  "nodes": 1781,
+  "start_timestamp_s": 0.0,
+  "end_timestamp_s": 48690.0,
+  "evaluated_truth_route_distance_m": 73035.0,
+  "exact_local_acoustic_esikf": {
+    "available": false,
+    "reason": "raw_local_keyframe_pose2_not_recorded"
+  },
+  "odometry_factor_chain_ablation": {
+    "definition": "composition of sequential pre-image odometry factors only; it can omit local intensity-posterior steps and must not be reported as the complete local trajectory",
+    "incremental_keyframe_motion": {
+      "samples": 1780,
+      "truth_route_spacing_m": {
+        "mean": 41.03089887640449,
+        "median": 45.0,
+        "p95": 45.0,
+        "maximum": 45.0
+      },
+      "translation_error_m": {
+        "mean": 0.4186169696614871,
+        "median": 0.380807471832202,
+        "p95": 0.9212866825790471,
+        "maximum": 1.6935543262002268,
+        "rmse": 0.49344120227705024
+      },
+      "absolute_yaw_error_deg": {
+        "mean": 0.23524016237780146,
+        "median": 0.17218323726777157,
+        "p95": 0.67125904462706,
+        "maximum": 1.6363181533638231,
+        "rmse": 0.3212740045525409
+      }
+    },
+    "se2_rpe_by_truth_route_distance": {
+      "100m": {
+        "available": true,
+        "samples": 1778,
+        "requested_interval_m": 100.0,
+        "mean_actual_interval_m": 133.0183633295838,
+        "rmse_translation_m": 1.6172031627286965,
+        "mean_translation_m": 1.385700523599538,
+        "p95_translation_m": 3.0749909896343484,
+        "max_translation_m": 5.120831563926627,
+        "rmse_yaw_deg": 0.687914050647069,
+        "mean_abs_yaw_deg": 0.5133403534818344,
+        "p95_abs_yaw_deg": 1.4758262521122918,
+        "max_abs_yaw_deg": 2.70557563057679
+      },
+      "1000m": {
+        "available": true,
+        "samples": 1756,
+        "requested_interval_m": 1000.0,
+        "mean_actual_interval_m": 1033.0074601366741,
+        "rmse_translation_m": 30.902917676066142,
+        "mean_translation_m": 24.035949334317685,
+        "p95_translation_m": 64.36775010915873,
+        "max_translation_m": 114.91025250431969,
+        "rmse_yaw_deg": 2.8972650114283827,
+        "mean_abs_yaw_deg": 2.177998387248708,
+        "p95_abs_yaw_deg": 5.974527030232168,
+        "max_abs_yaw_deg": 10.021821481121755
+      },
+      "10000m": {
+        "available": true,
+        "samples": 1536,
+        "requested_interval_m": 10000.0,
+        "mean_actual_interval_m": 10032.991894531251,
+        "rmse_translation_m": 1114.160456171183,
+        "mean_translation_m": 928.3281740298472,
+        "p95_translation_m": 2134.699623330369,
+        "max_translation_m": 2655.5638325981336,
+        "rmse_yaw_deg": 15.690234477177968,
+        "mean_abs_yaw_deg": 13.420092675362909,
+        "p95_abs_yaw_deg": 26.78693345441975,
+        "max_abs_yaw_deg": 30.818717159189568
+      }
+    }
+  },
+  "factor_stream": "/tmp/oceansim_gtsam_fixed_lag_full_route_truth_ui_pose_graph_factors.json",
+  "metrics": "/tmp/oceansim_gtsam_fixed_lag_full_route_truth_ui.json"
+}

@@ -1,0 +1,30 @@
+{
+  "schema": "oceansim.backend_ab_run_archive.v1",
+  "archived_at_utc": "2026-09-09T05:47:04.794075+00:00",
+  "stem": "numpy_batch_full_route_seed31",
+  "source_revision": "7b5c1809d3587cacba841f8fe3ce5bcedab5dc0e",
+  "source_metrics": "/tmp/oceansim_7b5c180_full_route_truth_ui.json",
+  "source_metrics_sha256": "56d049be899996fb4b323bcccebb0ba582ef938b80105a31191d812637aba328",
+  "launch_command": "DISPLAY=:0 ./standalone/run_v2_full_map_slam_isaac.sh --initialize-from-truth --initial-position-offset-x-m 0 --initial-position-offset-y-m 0 --initial-yaw-offset-deg 0 --metrics /tmp/oceansim_7b5c180_full_route_truth_ui.json",
+  "run_status": "completed",
+  "termination_reason": "requested_survey_laps_reached",
+  "completed_requested_route": true,
+  "survey_travelled_distance_m": 73070.36490604805,
+  "artifacts": {
+    "metrics": {
+      "file": "numpy_batch_full_route_seed31.json",
+      "bytes": 7244134,
+      "sha256": "d02eec50651e37aa7571e0e04797df18955816f7669d705ac6c01237bd34f729"
+    },
+    "position_errors": {
+      "file": "numpy_batch_full_route_seed31_position_errors.csv",
+      "bytes": 60892240,
+      "sha256": "aa2e21ad3543fd34c56aa5d195484dde8e82945cf735a7b2f21870436a78710b"
+    },
+    "progress": {
+      "file": "numpy_batch_full_route_seed31_progress.json",
+      "bytes": 777,
+      "sha256": "5b4aed69d6c7e73dd4ea94e4af9df211560ce2f6802a000f07d858cf817fa292"
+    }
+  }
+}
