@@ -18,6 +18,7 @@ from oceansim.slam import (
     covariance_intersection_pose2,
     fixed_lag_fused_deskew_states,
     information_with_covariance_floor,
+    reporting_covariance_from_information,
     make_terrain_recovery_config,
     motion_compensate_to_body,
     terrain_prior_prefit_bypass_allowed,
@@ -177,6 +178,39 @@ def test_covariance_floor_matches_full_rank_covariance_addition() -> None:
     actual = information_with_covariance_floor(information, floor)
 
     np.testing.assert_allclose(actual, expected, rtol=1.0e-11, atol=1.0e-12)
+
+
+def test_rank_aware_reporting_covariance_does_not_turn_nullspace_precise() -> None:
+    information = np.diag([4.0, 9.0, 0.0])
+
+    covariance = reporting_covariance_from_information(
+        information,
+        yaw_scale_m=20.0,
+        unobservable_variance_scaled_m2=1.0e6,
+    )
+
+    assert np.all(np.linalg.eigvalsh(covariance) > 0.0)
+    assert covariance[0, 0] == pytest.approx(0.25)
+    assert covariance[1, 1] == pytest.approx(1.0 / 9.0)
+    assert covariance[2, 2] == pytest.approx(1.0e6 / 20.0**2)
+    # The finite covariance is explicitly not used to reconstruct the exact
+    # graph factor: doing so would add tiny yaw information.
+    assert information[2, 2] == 0.0
+
+
+def test_reporting_covariance_matches_inverse_for_full_rank_information() -> None:
+    information = np.array(
+        [[5.0, 1.0, 0.2], [1.0, 3.0, -0.1], [0.2, -0.1, 8.0]]
+    )
+
+    covariance = reporting_covariance_from_information(information)
+
+    np.testing.assert_allclose(
+        covariance,
+        np.linalg.inv(information),
+        rtol=1.0e-10,
+        atol=1.0e-12,
+    )
 
 
 def test_full_swath_budget_preserves_cross_track_fans_across_ping_rates() -> None:

@@ -22,7 +22,10 @@ import numpy as np
 from .esikf import InertialState
 from .math3d import rpy_from_rotation
 from .real_bathymetry import MeasuredBathymetryGrid
-from .terrain_matching import information_with_covariance_floor
+from .terrain_matching import (
+    information_with_covariance_floor,
+    reporting_covariance_from_information,
+)
 
 
 def _readonly(values: np.ndarray) -> np.ndarray:
@@ -833,19 +836,13 @@ class AcousticTerrainParticleLikelihood:
         final_eigenvalues = np.maximum(final_eigenvalues, 0.0)
         final_scale = max(float(np.max(final_eigenvalues)), 1.0)
         observable = final_eigenvalues > 1.0e-10 * final_scale
-        variances = np.full(
-            3,
-            self.config.unobservable_variance_scaled_m2,
-            dtype=np.float64,
+        covariance = reporting_covariance_from_information(
+            information,
+            yaw_scale_m=self.config.yaw_rank_scale_m,
+            unobservable_variance_scaled_m2=(
+                self.config.unobservable_variance_scaled_m2
+            ),
         )
-        variances[observable] = 1.0 / final_eigenvalues[observable]
-        covariance_scaled = (
-            final_eigenvectors * variances
-        ) @ final_eigenvectors.T
-        covariance = (
-            q_from_scaled @ covariance_scaled @ q_from_scaled.T
-        )
-        covariance = 0.5 * (covariance + covariance.T)
 
         return TerrainLikelihoodGaussianApproximation(
             pose2=mode,

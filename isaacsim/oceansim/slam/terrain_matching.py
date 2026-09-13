@@ -84,6 +84,87 @@ def information_with_covariance_floor(
     return 0.5 * (result + result.T)
 
 
+def reporting_covariance_from_information(
+    information: np.ndarray,
+    *,
+    yaw_scale_m: float = 20.0,
+    unobservable_variance_scaled_m2: float = 1.0e6,
+) -> np.ndarray:
+    """Return a finite positive-definite covariance for a rank-aware factor.
+
+    ``pinv(information)`` is not a covariance when ``information`` is rank
+    deficient: it assigns *zero* variance to every unobservable direction.
+    That is the opposite of the intended statement and can also fail code
+    which quite reasonably requires a positive-definite sampling covariance.
+
+    This helper preserves the exact observable subspace in ``information``
+    while constructing a separate, finite covariance suitable for reporting
+    and particle proposal sampling.  Translation and yaw are first expressed
+    in the same metre-like coordinates used by the terrain observability
+    analysis.  Null-space directions receive a deliberately broad variance;
+    observable directions receive the reciprocal information eigenvalue.
+    The returned matrix must never be inverted to recover the factor -- pass
+    the original information matrix to the graph instead.
+    """
+
+    source = np.asarray(information, dtype=np.float64)
+    if source.shape != (3, 3):
+        raise ValueError("information must have shape (3, 3)")
+    source = 0.5 * (source + source.T)
+    if not np.isfinite(source).all():
+        raise ValueError("information must be finite")
+    yaw_scale = float(yaw_scale_m)
+    unobservable_variance = float(unobservable_variance_scaled_m2)
+    if not np.isfinite(yaw_scale) or yaw_scale <= 0.0:
+        raise ValueError("yaw_scale_m must be positive and finite")
+    if (
+        not np.isfinite(unobservable_variance)
+        or unobservable_variance <= 0.0
+    ):
+        raise ValueError(
+            "unobservable_variance_scaled_m2 must be positive and finite"
+        )
+
+    q_from_scaled = np.diag([1.0, 1.0, 1.0 / yaw_scale])
+    scaled_information = q_from_scaled.T @ source @ q_from_scaled
+    scaled_information = 0.5 * (
+        scaled_information + scaled_information.T
+    )
+    try:
+        eigenvalues, eigenvectors = np.linalg.eigh(scaled_information)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("information eigendecomposition failed") from exc
+    scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+    tolerance = 1.0e-10 * scale
+    if float(eigenvalues[0]) < -tolerance:
+        raise ValueError("information must be positive semidefinite")
+    observable = eigenvalues > tolerance
+    variances = np.full(3, unobservable_variance, dtype=np.float64)
+    variances[observable] = 1.0 / eigenvalues[observable]
+    covariance_scaled = (eigenvectors * variances) @ eigenvectors.T
+    covariance = q_from_scaled @ covariance_scaled @ q_from_scaled.T
+    covariance = 0.5 * (covariance + covariance.T)
+
+    # Very different observable/null-space scales can leave a tiny negative
+    # eigenvalue from round-off.  Repair only that numerical residue.  This is
+    # a reporting covariance; the exact rank remains in ``information``.
+    covariance_eigenvalues, covariance_eigenvectors = np.linalg.eigh(
+        covariance
+    )
+    numerical_floor = (
+        np.finfo(np.float64).eps
+        * max(float(covariance_eigenvalues[-1]), 1.0)
+        * 16.0
+    )
+    covariance_eigenvalues = np.maximum(
+        covariance_eigenvalues, numerical_floor
+    )
+    covariance = (
+        covariance_eigenvectors * covariance_eigenvalues
+    ) @ covariance_eigenvectors.T
+    return 0.5 * (covariance + covariance.T)
+
+
 def covariance_intersection_pose2(
     first_pose2: np.ndarray,
     first_information: np.ndarray,

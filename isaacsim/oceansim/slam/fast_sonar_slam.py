@@ -17,7 +17,7 @@ from .esikf import (
 )
 from .intensity_map import AcousticIntensityMap
 from .map_odom import MapOdomSoftCorrectionConfig, MapOdomSoftCorrector
-from .math3d import transform_points
+from .math3d import rotation_from_rpy, rpy_from_rotation, transform_points
 from .pose_graph import (
     AcousticPoseGraph,
     PoseGraphConfig,
@@ -1184,15 +1184,45 @@ class FastSonarSLAM:
             self.state.rotation, self.state.position
         )
 
-    def global_pose(self) -> tuple[np.ndarray, np.ndarray]:
+    def global_pose(
+        self, *, map_pose2_target: np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Return the online ``map`` pose without disturbing the ESIKF.
 
         When configured, only this published map-frame output is softened.
         :meth:`raw_global_pose` and :meth:`global_trajectory` retain the exact
         graph solution for matcher seeds and final scientific evaluation.
+
+        ``map_pose2_target`` lets a terrain-navigation filter publish its
+        current MAP hypothesis through the same output-only ``map -> odom``
+        follower while retaining front-end depth, roll, and pitch. It changes
+        neither the front-end state nor the pose graph; only independently
+        confirmed measurements are inserted as graph factors by the caller.
         """
 
         target_rotation, target_position = self.raw_global_pose()
+        if map_pose2_target is not None:
+            try:
+                terrain_target = np.asarray(
+                    map_pose2_target, dtype=np.float64
+                ).reshape(3)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "map_pose2_target must have shape (3,)"
+                ) from exc
+            if not np.isfinite(terrain_target).all():
+                raise ValueError("map_pose2_target must be finite")
+            target_position = np.asarray(
+                target_position, dtype=np.float64
+            ).reshape(3).copy()
+            target_position[:2] = terrain_target[:2]
+            target_position[2] = self.state.position[2]
+            target_roll, target_pitch, _ = rpy_from_rotation(
+                self.state.rotation
+            )
+            target_rotation = rotation_from_rpy(
+                target_roll, target_pitch, terrain_target[2]
+            )
         if not self.config.map_to_odom_soft_correction_enabled:
             return target_rotation, target_position
         return self.map_to_odom_corrector.correct_pose(

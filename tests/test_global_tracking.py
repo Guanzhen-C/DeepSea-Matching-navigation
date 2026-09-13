@@ -8,6 +8,7 @@ from oceansim.slam import (
     GlobalCohortTrackerConfig,
     GlobalPoseEvidence,
     ParticleLikelihoodObservation,
+    reporting_covariance_from_information,
 )
 
 
@@ -464,6 +465,66 @@ def test_nonmutating_prediction_seed_propagates_local_se2_motion() -> None:
     )
 
 
+def test_map_output_uses_spatial_map_and_rejects_null_dominant_state() -> None:
+    tracker = GlobalCohortTracker(
+        _permissive_config(
+            particles_per_cohort=128,
+            random_seed=19,
+            process_translation_std_per_m=0.0,
+            process_translation_std_per_s=0.0,
+            process_yaw_std_deg_per_m=0.0,
+            process_yaw_std_deg_per_s=0.0,
+        )
+    )
+    raw = np.array([4.0, -2.0, 0.2])
+    assert tracker.active_cohort_count == 0
+    assert tracker.maximum_a_posteriori_pose(raw) is None
+
+    decision = tracker.update(
+        timestamp_s=1.0,
+        raw_pose2=raw,
+        evidences=[
+            _evidence(
+                (100.0, 50.0, 0.3),
+                source_index=0,
+                start_id=0,
+                end_id=10,
+            )
+        ],
+    )
+    current_raw = np.array([14.0, 3.0, 0.25])
+    output = tracker.maximum_a_posteriori_pose(current_raw)
+    assert output is not None
+    assert tracker.active_cohort_count == 1
+    np.testing.assert_allclose(
+        output, tracker.prediction_seeds(current_raw)[0][1]
+    )
+    assert not output.flags.writeable
+    assert decision.best_probability > decision.null_probability
+
+    null_tracker = GlobalCohortTracker(
+        _permissive_config(particles_per_cohort=128, random_seed=23)
+    )
+    rejected = null_tracker.update(
+        timestamp_s=1.0,
+        raw_pose2=np.zeros(3),
+        evidences=[
+            _evidence(
+                (100.0, 50.0, 0.3),
+                source_index=0,
+                start_id=0,
+                end_id=10,
+                bathymetry_score=-1.0,
+                backscatter_score=-1.0,
+                geometry_score=0.0,
+                cross_modal_consistent=False,
+            )
+        ],
+    )
+    assert rejected.null_probability > rejected.best_probability
+    assert null_tracker.maximum_a_posteriori_pose(np.zeros(3)) is None
+
+
 def test_sharp_measurement_triggers_regularized_systematic_resampling() -> None:
     tracker = GlobalCohortTracker(
         _permissive_config(
@@ -888,3 +949,134 @@ def test_rank_deficient_measurement_information_is_preserved_for_graph_handoff()
 
     np.testing.assert_allclose(evidence.information, information)
     assert np.linalg.matrix_rank(evidence.information) == 2
+
+
+def test_rank_one_measurement_is_safe_but_cannot_authorize_pose_factor() -> None:
+    information = np.diag([0.25, 0.0, 0.0])
+    covariance = reporting_covariance_from_information(information)
+    evidence = GlobalPoseEvidence(
+        map_pose2=np.array([10.0, 20.0, 0.1]),
+        bathymetry_score=0.8,
+        backscatter_score=0.0,
+        bathymetry_observability=0.5,
+        backscatter_observability=0.0,
+        covariance_matrix=covariance,
+        information_matrix=information,
+        patch_start_timestamp_s=0.0,
+        patch_end_timestamp_s=10.0,
+        patch_start_observation_id=0,
+        patch_end_observation_id=10,
+        source_index=0,
+    )
+    tracker = GlobalCohortTracker(
+        _permissive_config(
+            minimum_total_evidence=1,
+            minimum_independent_evidence=1,
+        )
+    )
+
+    decision = tracker.update(
+        timestamp_s=10.0,
+        raw_pose2=np.zeros(3),
+        evidences=[evidence],
+    )
+
+    assert decision.cohorts
+    assert decision.cohorts[0].last_measurement_observable_rank == 1
+    assert not decision.cohorts[0].last_measurement_is_graph_ready
+    assert np.all(np.linalg.eigvalsh(covariance) > 0.0)
+
+
+def test_joint_raw_likelihood_can_reacquire_after_a_confident_wrong_mode() -> None:
+    """A current-map candidate must compete with the incumbent in one PMF."""
+
+    tracker = GlobalCohortTracker(
+        _permissive_config(
+            particles_per_cohort=512,
+            random_seed=5,
+            minimum_total_evidence=1,
+            minimum_independent_evidence=1,
+            confirmation_probability=0.50,
+            confirmation_odds_over_second=1.1,
+            confirmation_max_position_std_m=100.0,
+            confirmation_max_yaw_std_deg=30.0,
+            resample_effective_sample_fraction=0.01,
+        )
+    )
+
+    def normalized_observation(
+        centre_x: float, start_id: int, call_counter: list[int] | None = None
+    ) -> ParticleLikelihoodObservation:
+        def evaluate(particles: np.ndarray) -> np.ndarray:
+            if call_counter is not None:
+                call_counter[0] += 1
+            loss = (
+                (particles[:, 0] - centre_x) ** 2 / 4.0**2
+                + particles[:, 1] ** 2 / 4.0**2
+                + particles[:, 2] ** 2 / np.deg2rad(3.0) ** 2
+            )
+            # This mirrors a raw map likelihood whose relative term is
+            # normalized by the best particle in the supplied population.
+            return 4.0 + float(np.min(loss)) - loss
+
+        return ParticleLikelihoodObservation(
+            evaluator=evaluate,
+            patch_start_timestamp_s=float(start_id),
+            patch_end_timestamp_s=float(start_id + 10),
+            patch_start_observation_id=start_id,
+            patch_end_observation_id=start_id + 10,
+        )
+
+    # Build deliberately overwhelming history around the wrong terrain alias.
+    for index in range(6):
+        start_id = 100 * index
+        decision = tracker.update(
+            timestamp_s=float(index + 1),
+            raw_pose2=np.zeros(3),
+            evidences=[
+                _evidence(
+                    (0.0, 0.0, 0.0),
+                    source_index=0,
+                    start_id=start_id,
+                    end_id=start_id + 10,
+                    position_std_m=4.0,
+                    yaw_std_deg=2.0,
+                )
+            ],
+            particle_observation=normalized_observation(0.0, start_id),
+        )
+    assert decision.best_probability > 0.99
+    wrong_cohort_id = decision.cohorts[0].cohort_id
+
+    evaluator_calls = [0]
+    start_id = 700
+    decision = tracker.update(
+        timestamp_s=7.0,
+        raw_pose2=np.zeros(3),
+        evidences=[
+            _evidence(
+                (80.0, 0.0, 0.0),
+                source_index=0,
+                start_id=start_id,
+                end_id=start_id + 10,
+                position_std_m=4.0,
+                yaw_std_deg=2.0,
+            )
+        ],
+        particle_observation=normalized_observation(
+            80.0, start_id, evaluator_calls
+        ),
+    )
+
+    assert evaluator_calls == [1]
+    assert decision.confirmed_cohort is not None
+    assert decision.confirmed_cohort.cohort_id != wrong_cohort_id
+    assert decision.confirmed_cohort.map_pose2[0] == pytest.approx(
+        80.0, abs=1.0
+    )
+    assert decision.confirmed_cohort.probability > 0.90
+    diagnostics = tracker.diagnostics()
+    assert diagnostics["joint_particle_likelihood_updates"] == 7
+    assert diagnostics["candidate_birth_mass_allocations"] == 2
+    assert diagnostics["posterior_mode_switches"] == 1
+    assert diagnostics["last_joint_log_likelihood_span"] > 10.0

@@ -2,10 +2,12 @@
 """Deterministic, UI-free validation of the global relocalization chain.
 
 This is an algorithm-integration validation, not an independent field-trial
-accuracy claim.  It samples three disjoint synthetic long strips from the
-native Monterey bathymetry/backscatter product, matches bathymetry against the
-separately low-pass navigation surface, and uses simulator truth only after
-each estimate has been produced to calculate reported errors.
+accuracy claim. It samples a sequence of disjoint synthetic long strips from the
+native Monterey bathymetry/backscatter product and matches bathymetry against
+the separately low-pass navigation surface. Simulator truth generates the
+synthetic sonar and ideal roll/pitch/depth inputs; no map-frame horizontal
+position or yaw is passed to a matcher, filter, or graph. The hidden horizontal
+truth is inspected only after each estimate to calculate reported errors.
 """
 
 from __future__ import annotations
@@ -25,14 +27,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "isaacsim"))
 
 from oceansim.slam import (  # noqa: E402
+    AcousticTerrainParticleLikelihood,
     AcousticPoseGraph,
     BBS3DCandidateVerifier,
     BBS3DVerifierConfig,
     BackscatterMapMatcher,
     BackscatterMatcherConfig,
     BathymetricTerrainMatcher,
-    GlobalCohortTracker,
-    GlobalCohortTrackerConfig,
     GlobalPoseEvidence,
     GlobalTerrainRelocalizer,
     GlobalTerrainRelocalizerConfig,
@@ -40,9 +41,14 @@ from oceansim.slam import (  # noqa: E402
     MapOdomSoftCorrectionConfig,
     MapOdomSoftCorrector,
     MeasuredBathymetryGrid,
+    ParticleLikelihoodObservation,
     PoseGraphConfig,
+    TerrainNavigationFilter,
+    TerrainNavigationFilterConfig,
+    TerrainParticleLikelihoodConfig,
     TerrainMatcherConfig,
     WaypointTerrainFollowingSurvey,
+    reporting_covariance_from_information,
     sanitize_for_strict_json,
 )
 from oceansim.slam.math3d import (  # noqa: E402
@@ -77,10 +83,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate-count", type=int, default=8)
     parser.add_argument("--bbs-timeout-ms", type=int, default=5000)
     parser.add_argument(
+        "--confirmation-probability",
+        type=float,
+        default=0.95,
+        help="minimum posterior probability for graph-factor authorization",
+    )
+    parser.add_argument(
+        "--confirmation-odds",
+        type=float,
+        default=20.0,
+        help="minimum odds of the leading mode over the runner-up or null",
+    )
+    parser.add_argument(
         "--window-centres-s",
         type=float,
-        nargs=3,
-        default=(500.0, 1000.0, 1500.0),
+        nargs="+",
+        default=tuple(float(value) for value in range(500, 6500, 500)),
+        help=(
+            "ordered centres of independent sonar windows; at least three "
+            "are required and evaluation stops at the first safe confirmation"
+        ),
     )
     args = parser.parse_args()
     if not args.bathymetry.exists():
@@ -93,11 +115,17 @@ def parse_args() -> argparse.Namespace:
         or args.yaw_step_deg > 30.0
         or args.candidate_count < 1
         or args.bbs_timeout_ms < 0
+        or not math.isfinite(args.confirmation_probability)
+        or not 0.0 < args.confirmation_probability < 1.0
+        or not math.isfinite(args.confirmation_odds)
+        or args.confirmation_odds <= 0.0
+        or len(args.window_centres_s) < 3
         or not all(math.isfinite(value) for value in args.window_centres_s)
-        or not (
-            args.window_centres_s[0]
-            < args.window_centres_s[1]
-            < args.window_centres_s[2]
+        or not all(
+            earlier < later
+            for earlier, later in zip(
+                args.window_centres_s, args.window_centres_s[1:]
+            )
         )
     ):
         parser.error("invalid search or ordered-window configuration")
@@ -287,12 +315,12 @@ def main() -> int:
             minimum_context_points=24,
         ),
     )
-    tracker = GlobalCohortTracker(
-        GlobalCohortTrackerConfig(
+    tracker = TerrainNavigationFilter(
+        TerrainNavigationFilterConfig(
             minimum_total_evidence=3,
             minimum_independent_evidence=3,
-            confirmation_probability=0.97,
-            confirmation_odds_over_second=20.0,
+            confirmation_probability=args.confirmation_probability,
+            confirmation_odds_over_second=args.confirmation_odds,
         )
     )
     graph = AcousticPoseGraph(
@@ -339,6 +367,30 @@ def main() -> int:
         )
         points_body, intensities = make_strip_observation(world, truth, rng)
         observation_id = 100_000 + window_index
+        patch_duration_s = 360.0 / 1.5
+        patch_start_s = timestamp_s - patch_duration_s
+        patch_end_s = timestamp_s
+        ping_id_end = int(round(timestamp_s * 2.5))
+        ping_id_start = int(round(patch_start_s * 2.5))
+        raw_likelihood = AcousticTerrainParticleLikelihood(
+            prior,
+            raw_state,
+            points_body,
+            backscatter_terrain=world,
+            backscatter_points_body=points_body,
+            backscatter_values=intensities,
+            config=TerrainParticleLikelihoodConfig(
+                maximum_bathymetry_points=768,
+                maximum_backscatter_points=768,
+            ),
+        )
+        particle_observation = ParticleLikelihoodObservation(
+            evaluator=raw_likelihood,
+            patch_start_timestamp_s=patch_start_s,
+            patch_end_timestamp_s=patch_end_s,
+            patch_start_observation_id=ping_id_start,
+            patch_end_observation_id=ping_id_end,
+        )
         graph.add_if_needed(
             timestamp_s,
             raw_state.rotation,
@@ -514,11 +566,6 @@ def main() -> int:
                 )
                 * np.clip(backscatter_result.valid_fraction, 0.0, 1.0)
             )
-            patch_duration_s = 360.0 / 1.5
-            patch_start_s = timestamp_s - patch_duration_s
-            patch_end_s = timestamp_s
-            ping_id_end = int(round(timestamp_s * 2.5))
-            ping_id_start = int(round(patch_start_s * 2.5))
             evidence = GlobalPoseEvidence(
                 map_pose2=backscatter_result.matched_pose2,
                 bathymetry_score=candidate.bathymetry_evidence_score,
@@ -563,8 +610,10 @@ def main() -> int:
             timestamp_s=timestamp_s,
             raw_pose2=raw_pose2,
             evidences=evidences,
+            particle_observation=particle_observation,
         )
         decisions.append(decision)
+        particle_diagnostics = raw_likelihood.last_diagnostics
         selected_current = None
         if decision.confirmed_cohort is not None:
             selected_current = verified_by_source.get(
@@ -594,16 +643,70 @@ def main() -> int:
                     if decision.cohorts
                     else 0
                 ),
+                "cohorts": [
+                    {
+                        "cohort_id": cohort.cohort_id,
+                        "probability": cohort.probability,
+                        "independent_evidence": cohort.independent_evidence,
+                        "last_source_index": cohort.last_source_index,
+                        "last_update_was_independent": (
+                            cohort.last_update_was_independent
+                        ),
+                        "last_measurement_observable_rank": (
+                            cohort.last_measurement_observable_rank
+                        ),
+                        "last_measurement_is_graph_ready": (
+                            cohort.last_measurement_is_graph_ready
+                        ),
+                    }
+                    for cohort in decision.cohorts
+                ],
+                "joint_particle_likelihood": (
+                    None
+                    if particle_diagnostics is None
+                    else {
+                        "particle_count": int(
+                            particle_diagnostics.particle_count
+                        ),
+                        "bathymetry_points": int(
+                            particle_diagnostics.bathymetry_points
+                        ),
+                        "backscatter_points": int(
+                            particle_diagnostics.backscatter_points
+                        ),
+                        "bathymetry_observability": float(
+                            particle_diagnostics.bathymetry_observability
+                        ),
+                        "backscatter_observability": float(
+                            particle_diagnostics.backscatter_observability
+                        ),
+                        "log_likelihood_ratio_span": float(
+                            particle_diagnostics.log_likelihood_ratio_max
+                            - particle_diagnostics.log_likelihood_ratio_min
+                        ),
+                    }
+                ),
                 "elapsed_s": time.perf_counter() - window_started,
             }
         )
+        mode_summary = [
+            (
+                item.cohort_id,
+                round(item.probability, 4),
+                item.independent_evidence,
+            )
+            for item in decision.cohorts
+        ]
         print(
-            f"[OceanSim] window {window_index + 1}/3: "
+            f"[OceanSim] window {window_index + 1}/"
+            f"{len(args.window_centres_s)}: "
             f"search={'accepted' if search.accepted else search.rejection_reason}, "
             f"candidates={len(search.candidates)}, "
             f"verified={len(evidences)}, cohort={decision.status}, "
             f"posterior={decision.best_probability:.6f}, "
-            f"odds={decision.odds_over_second:.3f}",
+            f"null={decision.null_probability:.6f}, "
+            f"odds={decision.odds_over_second:.3f}, "
+            f"modes={mode_summary}",
             flush=True,
         )
         latest = {
@@ -616,23 +719,31 @@ def main() -> int:
             "observation_id": observation_id,
             "decision": decision,
             "selected_current": selected_current,
+            "raw_likelihood": raw_likelihood,
         }
+        if (
+            decision.confirmed
+            and decision.confirmed_with_new_independent_evidence
+        ):
+            break
 
     if latest is None:
         raise RuntimeError("no validation windows were evaluated")
     confirmed = latest["decision"].confirmed_cohort
     if confirmed is None or latest["selected_current"] is None:
-        raise RuntimeError("persistent cohort did not confirm after three windows")
+        raise RuntimeError(
+            "persistent cohort did not reach the configured posterior and "
+            "odds confirmation criteria within the available windows"
+        )
 
-    selected_evidence, selected_terrain, _selected_backscatter = latest[
+    _selected_evidence, _selected_terrain, _selected_backscatter = latest[
         "selected_current"
     ]
-    conservative_information = np.diag(
-        [
-            1.0 / 2.5**2,
-            1.0 / 2.5**2,
-            1.0 / math.radians(1.5) ** 2,
-        ]
+    current_measurement = latest[
+        "raw_likelihood"
+    ].approximate_local_measurement(confirmed.map_pose2)
+    reporting_covariance = reporting_covariance_from_information(
+        current_measurement.information
     )
     factor_added = graph.add_terrain_prior(
         timestamp=latest["timestamp_s"],
@@ -640,8 +751,8 @@ def main() -> int:
         prior_pose2=latest["raw_pose2"],
         raw_rotation_world_body=latest["raw_state"].rotation,
         raw_position_world=latest["raw_state"].position,
-        matched_pose2=selected_evidence.map_pose2,
-        information_world=conservative_information,
+        matched_pose2=current_measurement.pose2,
+        information_world=current_measurement.information,
         points_body=latest["points_body"],
         optimize_interval=1,
         relocalization_seed=True,
@@ -739,18 +850,37 @@ def main() -> int:
         for window in window_records
     ]
     checks = {
-        "three_disjoint_windows_have_verified_candidate": all(
-            window["verified_candidates"] >= 1 for window in window_records
+        "at_least_three_disjoint_windows_have_verified_candidate": (
+            len(window_records) >= 3
+            and all(
+                window["verified_candidates"] >= 1
+                for window in window_records
+            )
         ),
-        "confirmation_only_after_third_window": (
-            [decision.status for decision in decisions]
-            == ["tracking", "tracking", "confirmed"]
+        "no_confirmation_before_three_independent_windows": (
+            all(not decision.confirmed for decision in decisions[:2])
+            and decisions[-1].confirmed
+            and len(decisions) >= 3
         ),
-        "confirmed_posterior_at_least_0p97": (
-            decisions[-1].best_probability >= 0.97
+        "confirmation_uses_current_independent_evidence": (
+            decisions[-1].confirmed_with_new_independent_evidence
         ),
-        "confirmed_odds_at_least_20": (
-            decisions[-1].odds_over_second >= 20.0
+        "confirmed_posterior_at_least_configured_probability": (
+            decisions[-1].best_probability
+            >= args.confirmation_probability
+        ),
+        "confirmed_odds_at_least_configured_ratio": (
+            decisions[-1].odds_over_second >= args.confirmation_odds
+        ),
+        "all_windows_use_one_joint_raw_particle_likelihood": (
+            tracker.diagnostics()["joint_particle_likelihood_updates"]
+            == len(window_records)
+        ),
+        "current_raw_measurement_has_two_observable_directions": (
+            current_measurement.observable_rank >= 2
+        ),
+        "rank_aware_reporting_covariance_is_positive_definite": bool(
+            np.all(np.linalg.eigvalsh(reporting_covariance) > 0.0)
         ),
         "best_verified_horizontal_error_each_window_below_5m": all(
             value < 5.0 for value in best_error_per_window
@@ -787,7 +917,7 @@ def main() -> int:
     }
     passed = all(checks.values())
     report = {
-        "schema": "oceansim.global-relocalization-chain-validation/v1",
+        "schema": "oceansim.global-relocalization-chain-validation/v2",
         "passed": passed,
         "validation_scope": (
             "deterministic algorithm-integration validation on real map data; "
@@ -805,7 +935,12 @@ def main() -> int:
                 "same measured backscatter mosaic with simulated radiometric "
                 "nuisance/noise; algorithm wiring upper bound"
             ),
-            "truth_policy": "used only for post-estimate error reporting",
+            "truth_policy": (
+                "used to synthesize sonar and ideal roll/pitch/depth; "
+                "map-frame horizontal position/yaw hidden from every "
+                "matcher, filter, and graph; inspected after estimation for "
+                "error reporting"
+            ),
         },
         "algorithm": {
             "whole_map_search": "joint MBES relief/depth + side-scan appearance",
@@ -825,11 +960,22 @@ def main() -> int:
                 "SC-Match-inspired, not an exact SC-Match implementation"
             ),
             "persistent_hypotheses": (
-                "map-frame cohort particle filter (256 SE(2) particles per "
-                "cohort, ESS-triggered regularized systematic resampling) "
-                "plus explicit null and three non-overlapping acquisition "
-                "windows"
+                "jointly normalized map-frame point-mass/cohort particle "
+                "filter (256 SE(2) particles per cohort, ESS-triggered "
+                "regularized systematic resampling) plus explicit null, "
+                "change-point candidate mass, and non-overlapping acquisition "
+                "windows observed until the configured posterior is decisive"
             ),
+            "particle_measurement": (
+                "current raw bathymetry and co-registered side-scan map "
+                "likelihood evaluated jointly across every cohort"
+            ),
+            "validation_confirmation_probability": (
+                args.confirmation_probability
+            ),
+            "validation_confirmation_odds": args.confirmation_odds,
+            "production_launcher_confirmation_probability": 0.97,
+            "production_launcher_confirmation_odds": 20.0,
             "backend": "GTSAM IncrementalFixedLagSmoother + robust Cauchy prior",
             "map_to_odom": "output-only bounded first-order soft correction",
         },
@@ -848,6 +994,16 @@ def main() -> int:
             ),
             "yaw_error_deg": yaw_error_deg(
                 float(graph_pose2[2]), float(latest["truth_pose2"][2])
+            ),
+            "current_measurement_pose2": current_measurement.pose2.tolist(),
+            "current_measurement_observable_rank": int(
+                current_measurement.observable_rank
+            ),
+            "current_measurement_scaled_information_eigenvalues": (
+                current_measurement.scaled_information_eigenvalues.tolist()
+            ),
+            "reporting_covariance_positive_definite": bool(
+                np.all(np.linalg.eigvalsh(reporting_covariance) > 0.0)
             ),
             "pose_graph_backend": graph.diagnostics().optimizer_backend,
         },

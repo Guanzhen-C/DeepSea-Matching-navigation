@@ -188,3 +188,82 @@ def test_fast_sonar_slam_softens_output_but_not_raw_graph_or_esikf() -> None:
     assert np.rad2deg(yaw_delta) == pytest.approx(2.0)
     np.testing.assert_allclose(slam.state.rotation, state_rotation_before)
     np.testing.assert_allclose(slam.state.position, state_position_before)
+
+
+def test_fast_sonar_slam_accepts_output_only_terrain_map_target() -> None:
+    slam = FastSonarSLAM(FastSonarSLAMConfig())
+    initial_rotation = rotation_from_rpy(0.06, -0.04, 0.2)
+    initial_position = np.array([100.0, -50.0, -25.0])
+    slam.initialize(
+        0.0,
+        rotation=initial_rotation,
+        position=initial_position,
+    )
+    graph_rotation = rotation_from_rpy(0.03, -0.02, -0.5)
+    graph_position = np.array([900.0, 800.0, -24.5])
+    slam.pose_graph.corrected_pose = lambda _rotation, _position: (
+        graph_rotation.copy(),
+        graph_position.copy(),
+    )
+    terrain_target = np.array([120.0, -42.0, 0.35])
+
+    output_rotation, output_position = slam.global_pose(
+        map_pose2_target=terrain_target
+    )
+
+    np.testing.assert_allclose(output_position[:2], terrain_target[:2])
+    assert output_position[2] == pytest.approx(initial_position[2])
+    output_rpy = rpy_from_rotation(output_rotation)
+    initial_rpy = rpy_from_rotation(initial_rotation)
+    np.testing.assert_allclose(output_rpy[:2], initial_rpy[:2], atol=1.0e-12)
+    assert output_rpy[2] == pytest.approx(terrain_target[2])
+    np.testing.assert_allclose(slam.state.position, initial_position)
+    np.testing.assert_allclose(slam.state.rotation, initial_rotation)
+
+
+def test_terrain_map_target_uses_same_soft_map_to_odom_follower() -> None:
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            map_to_odom_soft_correction_enabled=True,
+            map_to_odom_translation_time_constant_s=0.1,
+            map_to_odom_yaw_time_constant_s=0.1,
+            map_to_odom_maximum_translation_rate_mps=2.0,
+            map_to_odom_maximum_yaw_rate_deg_s=10.0,
+        )
+    )
+    initial_rotation = rotation_from_rpy(0.02, -0.03, 0.4)
+    initial_position = np.array([100.0, -50.0, -25.0])
+    slam.initialize(
+        0.0,
+        rotation=initial_rotation,
+        position=initial_position,
+    )
+    slam.pose_graph.corrected_pose = lambda rotation, position: (
+        rotation.copy(), position.copy()
+    )
+    terrain_target = np.array(
+        [110.0, -50.0, 0.4 + np.deg2rad(20.0)]
+    )
+    _, initial_output = slam.global_pose(map_pose2_target=terrain_target)
+    np.testing.assert_allclose(initial_output, initial_position)
+
+    assert slam.process_imu(
+        0.2,
+        np.zeros(3),
+        initial_rotation.T @ np.array([0.0, 0.0, 9.80665]),
+    )
+    state_before = slam.state.copy()
+    output_rotation, output_position = slam.global_pose(
+        map_pose2_target=terrain_target
+    )
+
+    assert np.linalg.norm(
+        output_position[:2] - state_before.position[:2]
+    ) == pytest.approx(0.4)
+    yaw_delta = rpy_from_rotation(output_rotation)[2] - rpy_from_rotation(
+        state_before.rotation
+    )[2]
+    yaw_delta = np.arctan2(np.sin(yaw_delta), np.cos(yaw_delta))
+    assert np.rad2deg(yaw_delta) == pytest.approx(2.0)
+    np.testing.assert_allclose(slam.state.position, state_before.position)
+    np.testing.assert_allclose(slam.state.rotation, state_before.rotation)

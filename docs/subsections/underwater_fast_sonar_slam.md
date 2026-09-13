@@ -339,15 +339,28 @@ into a pose-graph factor. The recovery chain is:
 4. Refined duplicates from the same acquisition are merged. Genuinely
    separated aliases become separate particle cohorts alongside an explicit
    `no valid fix` state. Each cohort contains 256 weighted SE(2) particles;
-   local IMU/DVL/depth odometry propagates every particle, sonar evidence
-   updates its weight, and low effective sample size triggers systematic
-   resampling followed by covariance-preserving regularization. Overlapping
-   windows receive discounted weight, and three non-overlapping ping/time
-   windows must support the same cohort before confirmation.
-5. The confirmed pose re-seeds the outage segment and adds a robust Cauchy
-   x/y/yaw factor to GTSAM. The published `map -> odom` correction follows the
-   graph target with time and rate limits; it never writes into the local
-   15-state ESIKF, and all matchers continue to use the unsmoothed graph pose.
+   the FAST-LIVO2-style acoustic/IMU/DVL/depth front end propagates every
+   particle. All particles from all cohorts are evaluated in one raw-sonar
+   point-mass update, so the best residual is common to the complete posterior
+   instead of being renormalized separately inside each alias. Low effective
+   sample size triggers systematic resampling followed by covariance-preserving
+   regularization. A Bayesian change-point branch reserves proposal mass from
+   the complete prior, allowing a newly retrieved candidate to replace an old
+   but formerly confident false mode. Overlapping windows receive discounted
+   weight, and three non-overlapping ping/time windows must support the same
+   cohort before confirmation.
+5. The default `multimodal-map` output policy uses the GTSAM estimate while
+   the posterior has one spatial mode. When two or more separated modes exist,
+   GTSAM cannot represent that discrete ambiguity, so the most-probable valid
+   cohort is propagated by every new local odometry pose and supplies the
+   provisional online `map -> odom` target. This is output-only: it never
+   writes into the local 15-state ESIKF and does not by itself create a graph
+   constraint. Only a confirmed cohort re-seeds an outage segment and
+   authorizes a robust Cauchy x/y/yaw factor for GTSAM. Time and rate limits
+   keep changes continuous, and all matchers continue to use the unsmoothed
+   graph pose. While whole-map recovery is active, its global cohort MAP takes
+   priority over the ordinary bounded tracker until confirmation or rejection.
+   `graph` and `always-map` policies remain available for A/B.
 
 With `--enable-terrain-cohort-particle-backend`, the same particle policy also
 sits in front of ordinary bounded terrain factors. Persistent proposals retain
@@ -358,7 +371,9 @@ three non-overlapping observations must support the same propagated mode
 before GTSAM authorization.
 
 The graph never receives the recursive particle posterior as if it were a new
-sensor measurement. For every independent 300-ping window, the confirmed
+sensor measurement, although its MAP mode is the provisional online output
+during multimodal tracking.
+For every independent 300-ping window, the confirmed
 cohort selects only a local basin. A deterministic search and finite-
 difference Laplace approximation then derive the pose and information matrix
 from that current raw MBES/side-scan likelihood alone. This also supplies
@@ -366,7 +381,19 @@ ordinary factors when the compact matcher has no usable Gaussian proposal.
 The curvature is projected onto its positive-semidefinite observable subspace,
 and chart/model covariance floors are applied only inside that subspace; flat,
 textureless directions therefore contribute zero information rather than a
-false precise constraint.
+false precise constraint. A separate finite reporting covariance assigns broad
+variance to null-space directions; its inverse is never substituted for the
+exact rank-aware graph information.
+
+This posterior follows operational terrain-relative-navigation practice used
+by MB-System/MBARI. Its public `libtrnav` tree includes both
+`TNavPointMassFilter` and `TNavParticleFilter`: odometry supplies the motion
+update, raw multibeam soundings are compared directly with a prior bathymetric
+map, and the posterior is monitored for convergence. In OceanSim, the
+Fast-LIVO2-style acoustic/IMU/DVL/depth front end supplies that odometry and
+co-registered side-scan adds a conservative appearance likelihood. The
+implementation is independent OceanSim code. MB-System is GPL-3.0, so no
+MB-System source was copied into this BSD-3-Clause project.
 
 Build the native verifier and run the deterministic, UI-free integration
 check with:
@@ -378,20 +405,26 @@ PYTHONPATH=isaacsim \
   standalone/validate_global_relocalization_chain.py
 ```
 
-That check samples three disjoint strips from the complete Monterey product,
-injects a kilometre-class rigid local-frame error, and validates whole-map
-retrieval, native 3D-BBS, both metric refinements, persistent confirmation,
-the robust graph factor, and continuous output correction. Truth is used only
-after each estimate is produced to calculate error. Bathymetry is matched
-against a separately low-pass navigation surface, but side-scan observations
-and the prior still come from the same public backscatter survey. It is
-therefore a deterministic integration and wiring upper bound, not an
-independent chart-to-field or sea-trial accuracy result.
+That check samples a sequence of disjoint strips from the complete Monterey
+product and stops only after the configured posterior/odds criteria confirm a
+cohort. It injects a kilometre-class rigid local-frame error and validates
+whole-map retrieval, native 3D-BBS, both metric refinements, persistent
+confirmation, the robust graph factor, and continuous output correction. The
+validator uses 0.95 posterior and 20:1 odds; the production launcher retains
+the stricter 0.97 posterior and 20:1 odds. Truth synthesizes
+the sonar window and ideal roll/pitch/depth inputs; map-frame horizontal
+position and yaw remain hidden from the matchers, filter, and graph, and are
+inspected only afterward to calculate error. Bathymetry is matched against a
+separately low-pass navigation surface, but side-scan observations and the
+prior still come from the same public backscatter survey. It is therefore a
+deterministic integration and wiring upper bound, not an independent
+chart-to-field or sea-trial accuracy result.
 
-The complete-route candidate can be run without a UI using:
+The complete-route candidate can be run without a UI using either launcher:
 
 ```bash
 standalone/run_backend_ab_gtsam_global_utan_full_route_isaac.sh --headless
+standalone/run_backend_ab_gtsam_trn_full_route_isaac.sh --headless
 ```
 
 It preserves the archived seed-31 sensor, route, local front end, and fixed-lag
@@ -404,6 +437,8 @@ claim.
 The controlled 2 km same-seed A/B result and its scientific limitations
 are recorded in
 [`demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md`](../../demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md).
+The joint-likelihood, rank-safe 3.3 km critical regression is recorded in
+[`demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md`](../../demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md).
 
 ## Python sensor interface
 
@@ -479,6 +514,11 @@ The design was checked against these public projects, specifications, and papers
 - [Global UTAN](https://doi.org/10.1109/TIM.2026.3716492): appearance
   retrieval, geometric verification, and persistent cohort reasoning used as
   an architectural reference for whole-map recovery.
+- [MBARI Terrain Relative Navigation](https://www.mbari.org/project/terrain-relative-navigation/)
+  and [MB-System libtrnav](https://github.com/dwcaress/MB-System/tree/master/src/mbtrnav): operational
+  multibeam-to-prior-map navigation and the PMF/PF architecture used as the
+  mature terrain-navigation reference. OceanSim does not copy the GPL-3.0
+  implementation.
 - [SC-Match](https://arxiv.org/abs/2607.25937): multi-scale side-scan context
   consistency used as a design reference, not copied reference code.
 

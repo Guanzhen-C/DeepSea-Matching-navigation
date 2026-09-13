@@ -664,7 +664,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "filter ordinary bathymetry/side-scan absolute matches through a "
-            "persistent SE(2) cohort particle filter before GTSAM insertion"
+            "joint point-mass/cohort terrain-navigation filter before GTSAM "
+            "insertion"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-particle-online-output",
+        choices=("graph", "multimodal-map", "always-map"),
+        default="multimodal-map",
+        help=(
+            "published online map-pose source when the ordinary terrain "
+            "particle backend is enabled: graph only, particle MAP only "
+            "while multiple ordinary modes or active whole-map recovery "
+            "modes exist, or ordinary particle MAP whenever a spatial "
+            "hypothesis beats the explicit null state"
         ),
     )
     parser.add_argument(
@@ -1360,8 +1373,6 @@ from isaacsim.oceansim.slam import (
     ESIKFConfig,
     FastSonarSLAM,
     FastSonarSLAMConfig,
-    GlobalCohortTracker,
-    GlobalCohortTrackerConfig,
     GlobalPoseEvidence,
     GlobalTerrainRelocalizer,
     GlobalTerrainRelocalizerConfig,
@@ -1372,12 +1383,15 @@ from isaacsim.oceansim.slam import (
     TerrainEmergencyRecoveryController,
     TerrainRecoveryController,
     TerrainMatcherConfig,
+    TerrainNavigationFilter,
+    TerrainNavigationFilterConfig,
     TerrainParticleLikelihoodConfig,
     covariance_intersection_pose2,
     fixed_lag_fused_deskew_states,
     gauge_anchored_initial_covariance,
     initialize_from_imu_dvl_depth,
     information_with_covariance_floor,
+    reporting_covariance_from_information,
     map_to_odom_change_metrics,
     make_terrain_recovery_config,
     motion_compensate_to_body,
@@ -2748,8 +2762,8 @@ def main() -> int:
         ),
     )
     global_cohort_tracker = (
-        GlobalCohortTracker(
-            GlobalCohortTrackerConfig(
+        TerrainNavigationFilter(
+            TerrainNavigationFilterConfig(
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -2779,8 +2793,8 @@ def main() -> int:
         else None
     )
     terrain_backend_particle_tracker = (
-        GlobalCohortTracker(
-            GlobalCohortTrackerConfig(
+        TerrainNavigationFilter(
+            TerrainNavigationFilterConfig(
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -2906,6 +2920,15 @@ def main() -> int:
     }
     terrain_backend_particle_records: list[dict] = []
     terrain_backend_particle_last_patch_end_observation_id = -1
+    terrain_navigation_output_stats = {
+        "policy": ARGS.terrain_particle_online_output,
+        "particle_map_updates": 0,
+        "ordinary_particle_map_updates": 0,
+        "global_particle_map_updates": 0,
+        "pose_graph_fallback_updates": 0,
+        "last_source": "pose_graph",
+        "last_particle_map_pose2": None,
+    }
     global_relocalization_stats = {
         "invocations": 0,
         "accepted_proposals": 0,
@@ -4259,9 +4282,17 @@ def main() -> int:
             # would be over-confident.  Treat the mode disagreement as a
             # correlated systematic uncertainty; this continuously weakens
             # the affected directions instead of introducing an error gate.
-            refined_covariance = (
-                evidence.covariance
-                + np.outer(source_disagreement, source_disagreement)
+            refined_information = information_with_covariance_floor(
+                evidence.information,
+                np.outer(source_disagreement, source_disagreement),
+            )
+            refined_covariance = reporting_covariance_from_information(
+                refined_information,
+                yaw_scale_m=terrain_particle_likelihood_config.yaw_rank_scale_m,
+                unobservable_variance_scaled_m2=(
+                    terrain_particle_likelihood_config
+                    .unobservable_variance_scaled_m2
+                ),
             )
             refined_position_std_m = float(
                 np.sqrt(
@@ -4282,7 +4313,7 @@ def main() -> int:
                     yaw_std_deg=refined_yaw_std_deg,
                     covariance_matrix=refined_covariance,
                     target_cohort_id=cohort_id,
-                    information_matrix=np.linalg.inv(refined_covariance),
+                    information_matrix=refined_information,
                 )
             )
             refinement_records.append(
@@ -4614,6 +4645,29 @@ def main() -> int:
                 "best_probability": float(decision.best_probability),
                 "odds_over_second": float(decision.odds_over_second),
                 "cohort_count": len(decision.cohorts),
+                "cohorts": [
+                    {
+                        "cohort_id": int(cohort.cohort_id),
+                        "probability": float(cohort.probability),
+                        "map_pose2": cohort.map_pose2.tolist(),
+                        "independent_evidence": int(
+                            cohort.independent_evidence
+                        ),
+                        "effective_sample_size": float(
+                            cohort.effective_sample_size
+                        ),
+                        "last_observation_log_likelihood_ratio": float(
+                            cohort.last_observation_log_likelihood_ratio
+                        ),
+                        "last_measurement_observable_rank": int(
+                            cohort.last_measurement_observable_rank
+                        ),
+                        "last_measurement_is_graph_ready": bool(
+                            cohort.last_measurement_is_graph_ready
+                        ),
+                    }
+                    for cohort in decision.cohorts
+                ],
                 "best_particle_count": (
                     0 if leading is None else int(leading.particle_count)
                 ),
@@ -4669,6 +4723,11 @@ def main() -> int:
                         )
                     )
                 ),
+                "best_last_measurement_observable_rank": (
+                    None
+                    if leading is None
+                    else int(leading.last_measurement_observable_rank)
+                ),
                 "best_last_observation_log_likelihood_ratio": (
                     None
                     if leading is None
@@ -4721,6 +4780,84 @@ def main() -> int:
             }
         )
         return decision
+
+    def published_online_global_pose():
+        """Publish TRN MAP when valid, otherwise retain the graph output.
+
+        The particle posterior remains separate from GTSAM. Whole-map
+        relocalization hypotheses take priority while that recovery tracker is
+        active; otherwise the ordinary filter's leading mode may drive the
+        output-only map->odom transform during multimodal tracking. Only an
+        independently confirmed, observable current sonar measurement can
+        become a graph factor.
+        """
+
+        particle_map_pose2 = None
+        particle_map_source = None
+        use_global_particle_map = bool(
+            global_cohort_tracker is not None
+            and ARGS.terrain_particle_online_output != "graph"
+            and global_cohort_tracker.active_cohort_count > 0
+        )
+        if use_global_particle_map:
+            local_pose2 = np.array(
+                [
+                    slam.state.position[0],
+                    slam.state.position[1],
+                    rpy_from_rotation(slam.state.rotation)[2],
+                ],
+                dtype=np.float64,
+            )
+            particle_map_pose2 = (
+                global_cohort_tracker.maximum_a_posteriori_pose(local_pose2)
+            )
+            if particle_map_pose2 is not None:
+                particle_map_source = "global_terrain_particle_map"
+        use_ordinary_particle_map = bool(
+            particle_map_pose2 is None
+            and not use_global_particle_map
+            and terrain_backend_particle_tracker is not None
+            and ARGS.terrain_particle_online_output != "graph"
+            and (
+                ARGS.terrain_particle_online_output == "always-map"
+                or terrain_backend_particle_tracker.active_cohort_count > 1
+            )
+        )
+        if use_ordinary_particle_map:
+            local_pose2 = np.array(
+                [
+                    slam.state.position[0],
+                    slam.state.position[1],
+                    rpy_from_rotation(slam.state.rotation)[2],
+                ],
+                dtype=np.float64,
+            )
+            particle_map_pose2 = (
+                terrain_backend_particle_tracker
+                .maximum_a_posteriori_pose(local_pose2)
+            )
+            if particle_map_pose2 is not None:
+                particle_map_source = "ordinary_terrain_particle_map"
+        if particle_map_pose2 is None:
+            terrain_navigation_output_stats[
+                "pose_graph_fallback_updates"
+            ] += 1
+            terrain_navigation_output_stats["last_source"] = "pose_graph"
+            return slam.global_pose()
+        terrain_navigation_output_stats["particle_map_updates"] += 1
+        if particle_map_source == "global_terrain_particle_map":
+            terrain_navigation_output_stats[
+                "global_particle_map_updates"
+            ] += 1
+        else:
+            terrain_navigation_output_stats[
+                "ordinary_particle_map_updates"
+            ] += 1
+        terrain_navigation_output_stats["last_source"] = particle_map_source
+        terrain_navigation_output_stats["last_particle_map_pose2"] = (
+            particle_map_pose2.tolist()
+        )
+        return slam.global_pose(map_pose2_target=particle_map_pose2)
 
     def try_add_terrain_prior_result(
         result,
@@ -4779,8 +4916,13 @@ def main() -> int:
                     not information_override_includes_model_floors
                 ),
             )
-            measurement_covariance = np.linalg.pinv(
-                measurement_information, rcond=1.0e-12, hermitian=True
+            measurement_covariance = reporting_covariance_from_information(
+                measurement_information,
+                yaw_scale_m=terrain_particle_likelihood_config.yaw_rank_scale_m,
+                unobservable_variance_scaled_m2=(
+                    terrain_particle_likelihood_config
+                    .unobservable_variance_scaled_m2
+                ),
             )
             position_std_m = math.sqrt(
                 max(
@@ -5321,12 +5463,13 @@ def main() -> int:
             )
             if terrain_backend_particle_tracker is not None:
                 print(
-                    "[OceanSim] ordinary terrain cohort PF enabled: "
+                    "[OceanSim] joint point-mass/cohort TRN enabled: "
                     f"{terrain_backend_particle_tracker.config.particles_per_cohort} "
                     "SE(2) particles/cohort, explicit null hypothesis, "
                     f"{terrain_backend_particle_tracker.config.minimum_independent_evidence} "
                     "nonoverlapping observations before GTSAM authorization; "
-                    "single matches cannot create absolute graph factors.",
+                    f"online output policy {ARGS.terrain_particle_online_output}; "
+                    "particle output never authorizes a graph factor by itself.",
                     flush=True,
                 )
             if backscatter_matcher is not None:
@@ -6638,12 +6781,18 @@ def main() -> int:
                                                     "candidate_verification_accepts"
                                                 ] += 1
                                                 verification_covariance = (
-                                                    np.linalg.pinv(
+                                                    reporting_covariance_from_information(
                                                         verification[
                                                             "information"
                                                         ],
-                                                        rcond=1.0e-12,
-                                                        hermitian=True,
+                                                        yaw_scale_m=(
+                                                            terrain_particle_likelihood_config
+                                                            .yaw_rank_scale_m
+                                                        ),
+                                                        unobservable_variance_scaled_m2=(
+                                                            terrain_particle_likelihood_config
+                                                            .unobservable_variance_scaled_m2
+                                                        ),
                                                     )
                                                 )
                                                 position_variance = max(
@@ -7825,7 +7974,9 @@ def main() -> int:
                             )
                     ping_count += 1
                     next_ping = ping_count * ping_period
-                    global_rotation, global_position = slam.global_pose()
+                    global_rotation, global_position = (
+                        published_online_global_pose()
+                    )
                     ping_samples = (
                         truth.position.copy(),
                         dead_reckoning.state.position.copy(),
@@ -8178,7 +8329,7 @@ def main() -> int:
         # consumes every accepted geometry, intensity, and loop factor.
         slam.pose_graph.optimize()
         diagnostics = slam.diagnostics()
-        _, global_position = slam.global_pose()
+        _, global_position = published_online_global_pose()
         truth = survey_state(sim_time)
         sample_times = np.asarray(evaluation_timestamps, dtype=np.float64)
         truth_samples = np.asarray(truth_track, dtype=np.float64)
@@ -8505,8 +8656,9 @@ def main() -> int:
             "completed_requested_route": completed_requested_route,
             "full_map_completed": full_map_completed,
             "algorithm": (
-                "OceanSim acoustic FAST-LIVO2 adaptation with absolute "
-                "bathymetric terrain-map factors"
+                "OceanSim acoustic FAST-LIVO2 adaptation with joint "
+                "point-mass/cohort particle terrain navigation and "
+                "rank-aware absolute bathymetry/backscatter factors"
                 if terrain_matcher is not None
                 else "OceanSim acoustic FAST-LIVO2 adaptation"
             ),
@@ -8524,6 +8676,16 @@ def main() -> int:
                         "estimate; marginalized poses retain their last "
                         "online value, while confirmed cross-window factors "
                         "supply a rigid global map anchor"
+                        + (
+                            "; while multiple spatial modes exist, the "
+                            "terrain-particle MAP drives the provisional "
+                            "online target, while single-mode output uses "
+                            "the graph and independent confirmation still "
+                            "protects factor insertion; active whole-map "
+                            "relocalization cohorts take output priority"
+                            if terrain_backend_particle_tracker is not None
+                            else ""
+                        )
                         + (
                             "; the published map->odom transform follows "
                             "that target continuously with bounded rates"
@@ -9252,6 +9414,7 @@ def main() -> int:
             },
             "terrain_cohort_particle_backend": {
                 "enabled": terrain_backend_particle_tracker is not None,
+                "filter": "joint_point_mass_cohort_particle_trn",
                 "role": (
                     "persistent_multimodal_data_association_and_current_"
                     "window_rank_aware_factor_authorization_before_gtsam"
@@ -9262,8 +9425,17 @@ def main() -> int:
                 "graph_measurement_source": (
                     "current_independent_raw_sonar_likelihood_local_laplace"
                 ),
+                "online_output_source": (
+                    "policy_selected_propagated_MAP_cohort_or_pose_graph"
+                ),
+                "online_output_is_factor_authorization": False,
+                "online_output_statistics": dict(
+                    terrain_navigation_output_stats
+                ),
                 "recursive_particle_posterior_used_as_graph_measurement": False,
                 "unobservable_directions_preserve_zero_information": True,
+                "all_cohorts_share_one_raw_likelihood_normalization": True,
+                "candidate_birth_mass_drawn_from_complete_prior": True,
                 "particles_per_cohort": (
                     None
                     if terrain_backend_particle_tracker is None
@@ -9341,9 +9513,11 @@ def main() -> int:
                     "enabled": global_cohort_tracker is not None,
                     "state": "map-frame vehicle pose",
                     "motion_source": "imu_dvl_depth_dead_reckoning_se2_increment",
-                    "filter": "cohort_particle_filter",
+                    "filter": "joint_point_mass_cohort_particle_trn",
                     "explicit_null_hypothesis": True,
                     "all_spatially_separated_candidates_retained": True,
+                    "all_cohorts_share_one_raw_likelihood_normalization": True,
+                    "candidate_birth_mass_drawn_from_complete_prior": True,
                     "same_observation_refined_basin_nms": True,
                     "overlapping_window_evidence_discounted": True,
                     "same_observation_nms_position_m": (

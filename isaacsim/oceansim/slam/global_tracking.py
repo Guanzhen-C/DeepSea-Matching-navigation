@@ -7,13 +7,20 @@ but false terrain alias then looks like a precise absolute fix.  This module
 keeps the alternatives as persistent ``cohorts`` and accumulates evidence
 over time, following the cohort-filtering idea used by Global UTAN.
 
+The operational update follows the established PMF/PF terrain-navigation
+pattern used by systems such as MBARI TRN: odometry propagates a map-frame
+posterior and raw multibeam residuals update it against a prior bathymetric
+map.  The implementation is independent OceanSim code; no GPL MB-System
+source is included.
+
 This is deliberately a policy and probability layer, not another matcher.
 Each :class:`GlobalPoseEvidence` is an absolute map pose proposed by MBES and
-side-scan processing.  Every cohort contains a small, independently weighted
-SE(2) particle set.  Those particles are propagated by the relative motion of
-the local acoustic/inertial odometry and updated without simulator truth.  A
-separate null hypothesis represents the scientifically important outcome
-"none of the proposals is a valid absolute fix".
+side-scan processing. Every cohort contains a small SE(2) particle subset,
+but all subsets share one raw-likelihood normalization and therefore form one
+multimodal point-mass posterior. Those particles are propagated by the
+relative motion of the local acoustic/inertial odometry and updated without
+simulator truth. A separate null hypothesis represents the scientifically
+important outcome "none of the proposals is a valid absolute fix".
 
 Only acquisition windows that do not reuse pings count as independent
 evidence.  Overlapping rolling windows may refine a cohort, but their
@@ -57,6 +64,23 @@ def _logsumexp(values: np.ndarray) -> float:
         raise ValueError("logsumexp requires at least one value")
     maximum = float(np.max(values))
     return maximum + math.log(float(np.exp(values - maximum).sum()))
+
+
+def _observable_information_rank(information: np.ndarray) -> int:
+    """Return the numerical rank of a positive-semidefinite 3-D factor."""
+
+    matrix = np.asarray(information, dtype=np.float64).reshape(3, 3)
+    matrix = 0.5 * (matrix + matrix.T)
+    if not np.isfinite(matrix).all():
+        return 0
+    try:
+        eigenvalues = np.linalg.eigvalsh(matrix)
+    except np.linalg.LinAlgError:
+        return 0
+    scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+    if float(eigenvalues[0]) < -1.0e-10 * scale:
+        return 0
+    return int(np.count_nonzero(eigenvalues > 1.0e-10 * scale))
 
 
 def _weighted_pose_statistics(
@@ -406,6 +430,9 @@ class GlobalCohortTrackerConfig:
     # monotonically collapse to one.
     cohort_survival_probability: float = 0.97
     null_survival_probability: float = 0.98
+    # Per-observation Bayesian change-point mass. With a raw particle update
+    # it is drawn from the complete prior (augmented-MCL recovery), not only
+    # from p(null), so a previously confident terrain alias is not immortal.
     birth_probability: float = 0.08
     missed_detection_likelihood: float = 0.35
     overlapping_evidence_scale: float = 0.15
@@ -541,6 +568,7 @@ class GlobalCohortSnapshot:
     last_measurement_pose2: np.ndarray
     last_measurement_covariance: np.ndarray
     last_measurement_information: np.ndarray
+    last_measurement_observable_rank: int
     last_observation_log_likelihood_ratio: float
     last_update_was_independent: bool
     last_measurement_is_graph_ready: bool
@@ -567,6 +595,12 @@ class GlobalCohortSnapshot:
             "last_measurement_information",
             _readonly(self.last_measurement_information, (3, 3)),
         )
+        rank = int(self.last_measurement_observable_rank)
+        if not 0 <= rank <= 3:
+            raise ValueError(
+                "last_measurement_observable_rank must lie in [0, 3]"
+            )
+        object.__setattr__(self, "last_measurement_observable_rank", rank)
 
 
 @dataclass(frozen=True)
@@ -615,6 +649,7 @@ class _Cohort:
     last_measurement_pose2: np.ndarray
     last_measurement_covariance: np.ndarray
     last_measurement_information: np.ndarray
+    last_measurement_observable_rank: int
     last_observation_log_likelihood_ratio: float
     last_update_was_independent: bool
     last_measurement_is_graph_ready: bool
@@ -639,6 +674,9 @@ class GlobalCohortTracker:
     particle_measurement_updates: int = field(default=0, init=False)
     particle_resampling_events: int = field(default=0, init=False)
     direct_map_likelihood_updates: int = field(default=0, init=False)
+    joint_particle_likelihood_updates: int = field(default=0, init=False)
+    candidate_birth_mass_allocations: int = field(default=0, init=False)
+    posterior_mode_switches: int = field(default=0, init=False)
     hypothesis_transition_updates: int = field(default=0, init=False)
 
     _cohorts: list[_Cohort] = field(default_factory=list, init=False, repr=False)
@@ -647,6 +685,15 @@ class GlobalCohortTracker:
     _previous_raw_pose2: np.ndarray | None = field(default=None, init=False, repr=False)
     _current_raw_pose2: np.ndarray | None = field(default=None, init=False, repr=False)
     _next_cohort_id: int = field(default=1, init=False, repr=False)
+    _last_leading_cohort_id: int | None = field(
+        default=None, init=False, repr=False
+    )
+    _last_joint_log_likelihood_span: float = field(
+        default=0.0, init=False, repr=False
+    )
+    _last_joint_log_likelihood_std: float = field(
+        default=0.0, init=False, repr=False
+    )
     _rng: np.random.Generator = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -657,6 +704,12 @@ class GlobalCohortTracker:
     @property
     def null_probability(self) -> float:
         return float(math.exp(self._null_log_probability))
+
+    @property
+    def active_cohort_count(self) -> int:
+        """Number of currently retained spatial posterior modes."""
+
+        return len(self._cohorts)
 
     def prediction_seeds(
         self, raw_pose2: np.ndarray
@@ -693,6 +746,39 @@ class GlobalCohortTracker:
             prediction.setflags(write=False)
             predictions.append((int(cohort.cohort_id), prediction))
         return tuple(predictions)
+
+    def maximum_a_posteriori_pose(
+        self, raw_pose2: np.ndarray
+    ) -> np.ndarray | None:
+        """Return the current terrain-navigation MAP pose without mutation.
+
+        The recursive particle posterior is a legitimate online navigation
+        output even while competing spatial modes have not yet accumulated
+        enough independent evidence to authorize a factor-graph prior.  This
+        method therefore returns the propagated leading cohort whenever it is
+        more probable than the explicit invalid/null hypothesis.  It does not
+        imply graph confirmation and it never writes into the local odometry
+        state.
+
+        ``None`` means that the invalid/null hypothesis is at least as likely
+        as every spatial hypothesis, so a caller should retain its previous
+        map-frame source (normally the pose graph).
+        """
+
+        if not self._cohorts:
+            return None
+        leading = self._cohorts[0]
+        if leading.log_probability <= self._null_log_probability:
+            return None
+        predictions = self.prediction_seeds(raw_pose2)
+        if not predictions:
+            return None
+        cohort_id, pose = predictions[0]
+        if cohort_id != leading.cohort_id:
+            raise RuntimeError("leading terrain cohort order is inconsistent")
+        result = np.asarray(pose, dtype=np.float64).reshape(3).copy()
+        result.setflags(write=False)
+        return result
 
     @staticmethod
     def _residual(reference: np.ndarray, measurement: np.ndarray) -> np.ndarray:
@@ -1128,11 +1214,16 @@ class GlobalCohortTracker:
         cohort.last_measurement_pose2 = evidence.map_pose2.copy()
         cohort.last_measurement_covariance = measurement_covariance.copy()
         cohort.last_measurement_information = evidence.information
+        cohort.last_measurement_observable_rank = (
+            _observable_information_rank(evidence.information)
+        )
         cohort.last_observation_log_likelihood_ratio = float(
             observation_log_likelihood_ratio
         )
         cohort.last_update_was_independent = bool(independent)
-        cohort.last_measurement_is_graph_ready = bool(independent)
+        cohort.last_measurement_is_graph_ready = bool(
+            independent and cohort.last_measurement_observable_rank >= 2
+        )
         cohort.last_observation_novel_fraction = float(scale)
         cohort.last_processed_patch_end_timestamp_s = max(
             cohort.last_processed_patch_end_timestamp_s,
@@ -1150,6 +1241,7 @@ class GlobalCohortTracker:
         observation: ParticleLikelihoodObservation,
         *,
         associated_evidence: GlobalPoseEvidence | None,
+        precomputed_log_likelihood_ratio: np.ndarray | None = None,
     ) -> bool:
         """Apply one raw sonar-map likelihood without a Gaussian pose proxy."""
 
@@ -1169,7 +1261,21 @@ class GlobalCohortTracker:
                 observation.patch_end_observation_id
             ),
         )
-        log_likelihood_ratio = scale * observation.evaluate(cohort.particles)
+        if precomputed_log_likelihood_ratio is None:
+            raw_log_likelihood_ratio = observation.evaluate(cohort.particles)
+        else:
+            raw_log_likelihood_ratio = np.asarray(
+                precomputed_log_likelihood_ratio, dtype=np.float64
+            ).reshape(-1)
+            if raw_log_likelihood_ratio.size != cohort.particles.shape[0]:
+                raise ValueError(
+                    "precomputed particle likelihood count must match cohort"
+                )
+            if not np.isfinite(raw_log_likelihood_ratio).all():
+                raise ValueError(
+                    "precomputed particle likelihoods must be finite"
+                )
+        log_likelihood_ratio = scale * raw_log_likelihood_ratio
 
         # This distribution contains only the *current* observation.  It is
         # retained separately from the recursive posterior so a downstream
@@ -1237,12 +1343,19 @@ class GlobalCohortTracker:
             cohort.last_measurement_information = np.linalg.pinv(
                 measurement_covariance, rcond=1.0e-12, hermitian=True
             )
+        cohort.last_measurement_observable_rank = (
+            _observable_information_rank(
+                cohort.last_measurement_information
+            )
+        )
         cohort.last_observation_log_likelihood_ratio = float(
             predictive_log_likelihood_ratio
         )
         cohort.last_update_was_independent = bool(independent)
         cohort.last_measurement_is_graph_ready = bool(
-            independent and associated_evidence is not None
+            independent
+            and associated_evidence is not None
+            and cohort.last_measurement_observable_rank >= 2
         )
         cohort.last_observation_novel_fraction = float(scale)
         cohort.last_processed_patch_end_timestamp_s = max(
@@ -1263,11 +1376,15 @@ class GlobalCohortTracker:
         *,
         count_evidence: bool = True,
         include_evidence_quality: bool = True,
+        initial_log_probability: float | None = None,
     ) -> None:
         birth_share = self.config.birth_probability / max(1, candidate_count)
         log_probability = (
-            prior_null_log_probability
-            + math.log(birth_share)
+            (
+                prior_null_log_probability + math.log(birth_share)
+                if initial_log_probability is None
+                else float(initial_log_probability)
+            )
             + (
                 self._evidence_log_likelihood_ratio(evidence)
                 if include_evidence_quality
@@ -1312,13 +1429,20 @@ class GlobalCohortTracker:
                 last_measurement_pose2=evidence.map_pose2.copy(),
                 last_measurement_covariance=evidence.covariance.copy(),
                 last_measurement_information=evidence.information,
+                last_measurement_observable_rank=(
+                    _observable_information_rank(evidence.information)
+                ),
                 last_observation_log_likelihood_ratio=(
                     self._evidence_log_likelihood_ratio(evidence)
                     if include_evidence_quality
                     else 0.0
                 ),
                 last_update_was_independent=bool(count_evidence),
-                last_measurement_is_graph_ready=bool(count_evidence),
+                last_measurement_is_graph_ready=bool(
+                    count_evidence
+                    and _observable_information_rank(evidence.information)
+                    >= 2
+                ),
                 last_observation_novel_fraction=(
                     1.0 if count_evidence else 0.0
                 ),
@@ -1401,6 +1525,9 @@ class GlobalCohortTracker:
             ),
             last_measurement_information=(
                 cohort.last_measurement_information
+            ),
+            last_measurement_observable_rank=int(
+                cohort.last_measurement_observable_rank
             ),
             last_observation_log_likelihood_ratio=float(
                 cohort.last_observation_log_likelihood_ratio
@@ -1583,6 +1710,26 @@ class GlobalCohortTracker:
                 and evidence.target_cohort_id is None
             )
         ]
+        particle_birth_log_probability: float | None = None
+        if particle_observation is not None and unmatched:
+            # Augmented-MCL-style recovery mass is taken from the complete
+            # prior, not only from the null hypothesis.  Restricting births to
+            # ``p(null)`` made an old, once-confident alias effectively
+            # immortal: a correct whole-map proposal could start hundreds of
+            # times less likely before either candidate had seen the current
+            # raw sonar window.  This is the Bayesian change-point branch of
+            # the motion model.  The raw observation below still decides which
+            # branch survives; proposal scores are not counted a second time.
+            retained_log_mass = math.log(
+                1.0 - self.config.birth_probability
+            )
+            self._null_log_probability += retained_log_mass
+            for cohort in self._cohorts:
+                cohort.log_probability += retained_log_mass
+            particle_birth_log_probability = math.log(
+                self.config.birth_probability / float(len(unmatched))
+            )
+            self.candidate_birth_mass_allocations += 1
         for evidence in unmatched:
             self._create_cohort(
                 evidence,
@@ -1590,6 +1737,7 @@ class GlobalCohortTracker:
                 prior_null_log_probability=prior_null_log_probability,
                 count_evidence=particle_observation is None,
                 include_evidence_quality=particle_observation is None,
+                initial_log_probability=particle_birth_log_probability,
             )
             new_cohort_ids.add(self._cohorts[-1].cohort_id)
             if particle_observation is None:
@@ -1612,18 +1760,65 @@ class GlobalCohortTracker:
                 cohort.log_probability += missed_log_likelihood
                 cohort.consecutive_misses += 1
         else:
-            for cohort in self._cohorts:
+            # Evaluate every spatially separated hypothesis in one callback.
+            # The acoustic likelihood normalizes its within-window residuals
+            # against the best particle supplied to that callback.  Calling it
+            # once per cohort therefore erased the scientifically essential
+            # likelihood ratio *between* an old track and a newly injected
+            # whole-map candidate.  A joint point-mass update retains that
+            # ratio and is equivalent to one multimodal particle population.
+            particle_counts = [
+                cohort.particles.shape[0] for cohort in self._cohorts
+            ]
+            joint_log_likelihood_ratio = np.empty(0, dtype=np.float64)
+            if self._cohorts:
+                joint_particles = np.concatenate(
+                    [cohort.particles for cohort in self._cohorts], axis=0
+                )
+                joint_log_likelihood_ratio = particle_observation.evaluate(
+                    joint_particles
+                )
+                self._last_joint_log_likelihood_span = float(
+                    np.ptp(joint_log_likelihood_ratio)
+                )
+                self._last_joint_log_likelihood_std = float(
+                    np.std(joint_log_likelihood_ratio)
+                )
+                self.joint_particle_likelihood_updates += 1
+            offset = 0
+            for cohort, particle_count in zip(
+                self._cohorts, particle_counts, strict=True
+            ):
+                cohort_log_likelihood_ratio = (
+                    joint_log_likelihood_ratio[
+                        offset : offset + particle_count
+                    ]
+                )
+                offset += particle_count
                 independent = self._update_cohort_from_particle_likelihood(
                     cohort,
                     particle_observation,
                     associated_evidence=associated_evidences.get(
                         cohort.cohort_id
                     ),
+                    precomputed_log_likelihood_ratio=(
+                        cohort_log_likelihood_ratio
+                    ),
                 )
                 if independent:
                     independently_updated_cohort_ids.add(cohort.cohort_id)
 
         self._normalize_and_prune()
+        leading_cohort_id = (
+            None if not self._cohorts else self._cohorts[0].cohort_id
+        )
+        if (
+            self._last_leading_cohort_id is not None
+            and leading_cohort_id is not None
+            and leading_cohort_id != self._last_leading_cohort_id
+        ):
+            self.posterior_mode_switches += 1
+        self._last_leading_cohort_id = leading_cohort_id
         self.updates += 1
         self._previous_timestamp_s = timestamp
         self._previous_raw_pose2 = raw.copy()
@@ -1637,6 +1832,9 @@ class GlobalCohortTracker:
         self._previous_timestamp_s = None
         self._previous_raw_pose2 = None
         self._current_raw_pose2 = None
+        self._last_leading_cohort_id = None
+        self._last_joint_log_likelihood_span = 0.0
+        self._last_joint_log_likelihood_std = 0.0
         self._rng = np.random.default_rng(self.config.random_seed)
 
     def diagnostics(self) -> dict[str, float | int]:
@@ -1645,6 +1843,19 @@ class GlobalCohortTracker:
         probabilities = sorted(
             (math.exp(item.log_probability) for item in self._cohorts),
             reverse=True,
+        )
+        posterior_probabilities = np.asarray(
+            [self.null_probability, *probabilities], dtype=np.float64
+        )
+        positive = posterior_probabilities > 0.0
+        hypothesis_entropy = -float(
+            np.sum(
+                posterior_probabilities[positive]
+                * np.log(posterior_probabilities[positive])
+            )
+        )
+        hypothesis_effective_count = 1.0 / float(
+            np.sum(posterior_probabilities**2)
         )
         return {
             "updates": int(self.updates),
@@ -1666,6 +1877,23 @@ class GlobalCohortTracker:
             "direct_map_likelihood_updates": int(
                 self.direct_map_likelihood_updates
             ),
+            "joint_particle_likelihood_updates": int(
+                self.joint_particle_likelihood_updates
+            ),
+            "candidate_birth_mass_allocations": int(
+                self.candidate_birth_mass_allocations
+            ),
+            "posterior_mode_switches": int(self.posterior_mode_switches),
+            "last_joint_log_likelihood_span": float(
+                self._last_joint_log_likelihood_span
+            ),
+            "last_joint_log_likelihood_std": float(
+                self._last_joint_log_likelihood_std
+            ),
+            "hypothesis_entropy_nats": float(hypothesis_entropy),
+            "hypothesis_effective_count": float(
+                hypothesis_effective_count
+            ),
             "hypothesis_transition_updates": int(
                 self.hypothesis_transition_updates
             ),
@@ -1685,3 +1913,19 @@ class GlobalCohortTracker:
             "best_probability": float(probabilities[0]) if probabilities else 0.0,
             "second_probability": float(probabilities[1]) if len(probabilities) > 1 else 0.0,
         }
+
+
+class TerrainNavigationFilter(GlobalCohortTracker):
+    """Operational bathymetric TRN policy used behind the local front end.
+
+    The implementation is an independent OceanSim adaptation of established
+    point-mass/particle terrain-navigation practice: local odometry supplies
+    motion, raw beams are scored against a prior map, all modes share one
+    joint likelihood normalization, low ESS triggers regularized resampling,
+    and an explicit change-point branch admits global reinitialization
+    candidates.  ``GlobalCohortTracker`` remains as a compatibility name for
+    existing experiments built around the earlier Global-UTAN terminology.
+    """
+
+
+TerrainNavigationFilterConfig = GlobalCohortTrackerConfig

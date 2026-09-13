@@ -51,6 +51,8 @@ from .global_tracking import (
     GlobalPoseEvidence,
     GlobalTrackingDecision,
     ParticleLikelihoodObservation,
+    TerrainNavigationFilter,
+    TerrainNavigationFilterConfig,
 )
 from .terrain_particle_likelihood import (
     AcousticTerrainParticleLikelihood,
@@ -96,6 +98,7 @@ from .terrain_matching import (
     apply_terrain_match,
     covariance_intersection_pose2,
     information_with_covariance_floor,
+    reporting_covariance_from_information,
     fixed_lag_fused_deskew_states,
     make_terrain_recovery_config,
     match_bathymetric_terrain,
@@ -132,6 +135,8 @@ __all__ = [
     "GlobalTerrainSearchResult",
     "GlobalTrackingDecision",
     "ParticleLikelihoodObservation",
+    "TerrainNavigationFilter",
+    "TerrainNavigationFilterConfig",
     "InertialState",
     "IntensityMapSample",
     "IntensityUpdateResult",
@@ -166,6 +171,7 @@ __all__ = [
     "apply_terrain_match",
     "covariance_intersection_pose2",
     "information_with_covariance_floor",
+    "reporting_covariance_from_information",
     "apply_map_to_odom_pose",
     "apply_map_to_odom_pose2",
     "fixed_lag_fused_deskew_states",
