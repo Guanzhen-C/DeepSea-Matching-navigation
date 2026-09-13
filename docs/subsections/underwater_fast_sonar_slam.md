@@ -25,14 +25,25 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    velocity, and pressure initializes depth. Absolute yaw and horizontal
    translation are explicitly fixed as local-frame gauge freedoms, not
    treated as measurements.
-4. One geometry update per integrated V2 ping. Its eight simultaneous
-   along-track rows already form a 1.2 m (standard) or 0.6 m (high-resolution)
-   surface patch. Optional multi-ping motion compensation remains available
-   for genuinely single-row instruments, but is not applied a second time to
-   V2 data.
+4. One output-rate geometry update per integrated V2 ping. Each physical ping
+   retains its eight simultaneous along-track rows; these rows are not treated
+   as eight temporal pings. The full-map preset uses an eight-physical-ping,
+   causal sliding source window at 5 Hz. At 1.5 m/s this combines the 1.2 m
+   within-ping footprint with seven 0.30 m inter-ping baselines for an
+   approximately 3.3 m motion-compensated aperture. After startup, every new
+   ping produces an update and only the oldest aligned ping is committed to
+   the frozen reference map, so a measurement never matches itself. Because
+   adjacent source windows reuse seven of eight acquisitions, the geometric
+   likelihood is continuously tempered by 1/8 rather than counting reused
+   returns as independent evidence.
 5. An incremental voxel-surfel bathymetry map and iterated point-to-plane
-   update.  Each return uses polar range/angular uncertainty, surfel normal
-   variance, Huber weighting, and eigenvalue-based degeneracy attenuation.
+   update. Each return uses polar range/angular uncertainty, surfel normal
+   variance, and Huber weighting. Rotational and translational information
+   eigendirections are weighted independently with a continuous spectral
+   response: true null directions contribute zero, weak directions fade
+   smoothly, and observable terrain-normal directions are not suppressed by
+   the weakest tangent. Hard-subspace and former whole-frame scalar modes
+   remain available only for controlled ablation.
    The complete historical voxel map is retained for revisits, while a
    coarse spatial block index packs only the current sensor-reach window for
    the exact Warp 27-neighbour association. The small double-precision
@@ -43,7 +54,13 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    one physical ping are processed as the real 2-D strip; consecutive pings are
    not bundled merely to manufacture that aperture. Because every simulated
    acquisition is normalized independently, it gets one gain and offset
-   nuisance pair that is projected out of the pose information. Raw returns from one acoustic
+   nuisance pair that is projected out of the pose information. The intensity
+   map retains the simultaneous bathymetric elevation and fits appearance and
+   seafloor planes from the same support. Disagreement between a candidate
+   return and that fitted surface continuously inflates its photometric
+   variance, preventing an appearance look-alike on the wrong relief surface
+   from receiving full weight without adding another accept/reject threshold.
+   Raw returns from one acoustic
    footprint are correlated, so their aggregate local-filter weight is capped
    at 96 independent-equivalent samples. A configurable causal separation
    (one ping in the V2 live launcher), 45% map coverage, normalized-correlation, inlier-ratio,
@@ -54,7 +71,15 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    overlap, side-scan contributes to mapping and place recognition but not
    pose. This is an acoustic map-matching residual, not a camera photometric
    residual.
-7. Conservative innovation/correction limits and recoverable DVL weighting so
+7. Fixed IMU-to-sonar and IMU-to-DVL calibration interfaces. DVL prediction
+   includes the rotational lever-arm velocity at the DVL phase centre. Each
+   co-registered echo can also carry a pose-sampling time offset and is
+   deskewed with the current angular rate, translation velocity, and sonar
+   lever arm. The current ray-cast simulator is a synchronous snapshot and
+   therefore supplies zero offsets. Two-way acoustic travel time is not
+   silently reinterpreted as a pose timestamp; a real driver must provide the
+   instrument's actual transmit/receive timing convention.
+8. Conservative innovation/correction limits and recoverable DVL weighting so
    an acoustic correction cannot permanently lock out velocity observations.
 
 The global back end adds:
@@ -256,20 +281,27 @@ Close Isaac Sim to stop it.  Use `--camera-mode overview` for a fixed view of
 the complete survey instead of the default vehicle-following view.
 
 The complete V2 full-map launcher uses a 20x render time scale and limits only
-the operator sonar-window upload to 2 simulated Hz.  Every 10 Hz integrated
+the operator sonar-window upload to 2 simulated Hz. Every 5 Hz integrated
 sonar ping still updates the raw waterfall and enters the unchanged sensor and
-SLAM event clocks. The local direct-intensity update uses an eight-ping causal
-reference separation, 32 independent-equivalent samples, and a 120 s stable
-local intensity-map anchor. No additional acceptance threshold is introduced.
-This keeps the UI responsive without decimating estimator measurements:
+SLAM event clocks. At 1.5 m/s, adjacent acquisitions advance 0.30 m and their
+1.2 m footprints overlap by 0.90 m. Two distinguishable coded/interleaved
+pings in water are an explicit scheduling assumption for the 250 m range and
+0.333 s two-way travel time; waveform separation itself is not synthesized.
+The local geometry update uses the eight-ping causal sliding window described
+above. The direct-intensity update uses a four-ping causal reference
+separation (0.8 s / about 1.2 m), 32 independent-equivalent samples, and a
+120 s stable local intensity-map anchor. The 150-ping ordinary and 600-ping
+whole-map terrain windows preserve their prior 30 s / 120 s durations. No
+estimator measurement is decimated to accelerate the UI:
 
 ```bash
 standalone/run_v2_full_map_slam_isaac.sh
 ```
 
 The status panel and shutdown metrics report the ray-casting and SLAM
-association providers separately. The full-map V2 launcher uses at most 384
-co-registered returns from each physical ping in its ESIKF update. Its Warp
+association providers separately. The full-map V2 launcher uniformly caps
+each complete motion-compensated registration window at 384 co-registered
+returns; this avoids biasing the cap toward the earliest ping. Its Warp
 kernel performs the same lexicographically ordered 27-voxel search, distance
 gates, and score as the reference Python implementation. Only compact match
 indices cross back to NumPy. The residual/Jacobian construction, 15-state
@@ -439,6 +471,8 @@ are recorded in
 [`demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md`](../../demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md).
 The joint-likelihood, rank-safe 3.3 km critical regression is recorded in
 [`demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md`](../../demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md).
+The matched-seed 5 Hz causal acoustic front-end regression is recorded in
+[`demo/large_scale_slam/fast_sonar_frontend_5hz_regression_20260913.md`](../../demo/large_scale_slam/fast_sonar_frontend_5hz_regression_20260913.md).
 
 ## Python sensor interface
 
@@ -480,8 +514,13 @@ points_global = slam.optimized_map_points()
 
 Inputs must be synchronized and use metres, seconds, radians, a local
 `+X forward, +Y port, +Z up` vehicle/sensor convention, and a Z-up navigation
-frame. Calibrate IMU-to-DVL and IMU-to-sonar extrinsics, timestamps, DVL
-scale, pressure offset, and sound speed before real-data use. Since the
+frame. Fixed IMU-to-sonar and IMU-to-DVL rotation/translation calibrations can
+be passed to the `FastSonarSLAM` constructor. The estimator state remains the
+15 components `rotation, position, velocity, gyro bias, accelerometer bias`;
+gravity is a fixed navigation-frame constant, and DVL scale is a fixed
+externally calibrated quantity rather than an online state. Calibrate those
+extrinsics, echo pose epochs, DVL scale, pressure offset, and sound speed before
+real-data use. Since the
 allowed sensors provide no absolute heading or horizontal position, compare
 real trajectories only after fixing or aligning that gauge.
 
@@ -525,7 +564,8 @@ The design was checked against these public projects, specifications, and papers
 This is a research and simulation implementation, not a claim of
 hydrographic-grade navigation.  The current global graph assumes a
 roll/pitch-stabilised survey AUV and optimizes x/y/yaw.  A platform performing
-large 6-DoF maneuvers needs a full SE(3) graph.  Sound-speed refraction,
+large 6-DoF maneuvers needs a full SE(3) graph. The timestamp/deskew interface
+does not itself simulate propagation physics. Sound-speed refraction,
 multipath, magnetic disturbances, time-varying DVL scale, pressure bias,
 clock offset, and online extrinsic calibration are not yet modeled.  Validate
 all noise, latency, calibration, and observability settings on the target

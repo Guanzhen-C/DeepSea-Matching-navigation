@@ -1,5 +1,29 @@
 # Changelog
 
+- Changed both V2 Isaac Sim presets to one physically shared 5 Hz MBES +
+  side-scan acquisition clock. At 1.5 m/s, adjacent 1.2 m footprints advance
+  0.30 m and overlap by 0.90 m. The 250 m full-map preset explicitly allows
+  two distinguishable pings in water. Its ping-count parameters were rescaled
+  to preserve physical support: an eight-ping geometry window spans about
+  3.3 m, four pings preserve the 0.8 s direct-intensity reference delay, and
+  150/600 pings preserve the 30/120 s terrain-matching windows.
+- Added a causal sliding acoustic submap to the FAST-LIVO2-inspired front end.
+  After an independent startup map, every physical ping produces an ESIKF
+  update and only the oldest aligned ping is committed. Uniform point capping
+  covers the complete window, and the likelihood is scaled by the reciprocal
+  window length so overlapping windows do not manufacture information.
+- Replaced whole-frame acoustic degeneracy scaling with continuous,
+  direction-wise spectral observability weighting. Added co-registered
+  intensity/surface fitting and continuous relief-consistency covariance,
+  fixed DVL rotation/lever-arm support, and per-echo pose-time deskew inputs.
+  The filter deliberately remains a 15-state rotation/position/velocity/bias
+  ESIKF with fixed gravity and no online DVL-scale state.
+- Vectorized point-to-plane residual/Jacobian/noise construction and exact
+  batch insertion for surfel and co-registered intensity maps. Reused one
+  factorization for simultaneous intensity/surface plane fitting and limited
+  Warp map uploads to the populated staging prefix. These changes reduce
+  Python and host/device overhead without lowering any sensor or estimator
+  update rate.
 - Tuned the one-ping V2 acoustic FAST-LIVO2 front end without adding acceptance
   thresholds. The 10 Hz geometry and direct-intensity updates remain per
   physical ping, while the intensity reference excludes the latest eight pings

@@ -17,6 +17,7 @@ from oceansim.slam import (
     PoseGraphConfig,
     MeasuredBathymetryGrid,
     PoseGraphEdge,
+    SonarUpdateResult,
     SurfelVoxelMap,
     TerrainFollowingSurvey,
     gauge_anchored_initial_covariance,
@@ -28,7 +29,7 @@ from oceansim.slam.large_scale_sim import (
     LargeScaleSensorSimulator,
     LargeUnderwaterWorld,
 )
-from oceansim.slam.math3d import so3_exp, so3_log
+from oceansim.slam.math3d import skew, so3_exp, so3_log, transform_points
 
 
 def test_so3_round_trip() -> None:
@@ -86,6 +87,31 @@ def test_robust_dvl_update_recovers_after_acoustic_attitude_change() -> None:
     assert after < before
 
 
+def test_dvl_extrinsic_lever_arm_does_not_create_false_velocity() -> None:
+    estimator = AcousticESIKF(
+        ESIKFConfig(dvl_velocity_std=0.01),
+        dvl_translation_body=np.array([1.2, 0.0, 0.0]),
+    )
+    estimator.initialize(0.0)
+    estimator.propagate(
+        0.02,
+        np.array([0.0, 0.0, 0.5]),
+        np.array([0.0, 0.0, 9.80665]),
+    )
+    state_before = estimator.state.copy()
+    expected_dvl_velocity = np.cross(
+        np.array([0.0, 0.0, 0.5]), np.array([1.2, 0.0, 0.0])
+    )
+
+    assert estimator.update_dvl(expected_dvl_velocity)
+    np.testing.assert_allclose(
+        estimator.state.velocity, state_before.velocity, atol=1.0e-12
+    )
+    np.testing.assert_allclose(
+        estimator.state.gyro_bias, state_before.gyro_bias, atol=1.0e-12
+    )
+
+
 def test_point_to_surfel_update_corrects_vertical_pose_error() -> None:
     surfels = SurfelVoxelMap(
         voxel_size=1.5,
@@ -113,6 +139,44 @@ def test_point_to_surfel_update_corrects_vertical_pose_error() -> None:
     assert result.accepted
     assert result.rmse_after < result.rmse_before
     assert abs(estimator.state.position[2]) < 0.08
+
+
+def test_sonar_information_scale_tempers_overlapping_window_likelihood() -> None:
+    surfels = SurfelVoxelMap(
+        voxel_size=1.5,
+        min_points=4,
+        max_planarity=0.2,
+        max_plane_distance=1.0,
+    )
+    grid_x, grid_y = np.meshgrid(
+        np.linspace(-8.0, 8.0, 40), np.linspace(-8.0, 8.0, 40)
+    )
+    map_points = np.column_stack(
+        (grid_x.ravel(), grid_y.ravel(), np.full(grid_x.size, -10.0))
+    )
+    surfels.add_points(map_points)
+    config = ESIKFConfig(
+        sonar_noise_floor=0.05,
+        sonar_max_translation_step=0.5,
+        sonar_max_rotation_step_deg=2.0,
+        degeneracy_eigenvalue=1.0,
+    )
+    full = AcousticESIKF(config)
+    tempered = AcousticESIKF(config)
+    for estimator in (full, tempered):
+        estimator.initialize(0.0, position=np.array([0.0, 0.0, 0.2]))
+
+    full_result = full.update_sonar(
+        map_points[::8], surfels, information_scale=1.0
+    )
+    tempered_result = tempered.update_sonar(
+        map_points[::8], surfels, information_scale=0.25
+    )
+
+    assert full_result.accepted and tempered_result.accepted
+    assert tempered_result.information_scale == 0.25
+    assert abs(full.state.position[2]) < abs(tempered.state.position[2]) < 0.2
+    assert tempered.state.covariance[5, 5] > full.state.covariance[5, 5]
 
 
 def test_surfel_map_slides_without_leaving_stale_point_counts() -> None:
@@ -160,6 +224,43 @@ def test_surfel_association_box_preserves_revisitable_history() -> None:
     assert len(surfels) == 2
 
 
+def test_batched_surfel_insert_matches_pointwise_sufficient_statistics() -> None:
+    rng = np.random.default_rng(91)
+    points = np.column_stack(
+        (
+            rng.uniform(-4.0, 4.0, 600),
+            rng.uniform(-3.0, 3.0, 600),
+            -9.0 + rng.normal(0.0, 0.03, 600),
+        )
+    )
+    intensities = rng.uniform(0.05, 0.95, points.shape[0])
+    batched = SurfelVoxelMap(voxel_size=1.5, min_points=4)
+    pointwise = SurfelVoxelMap(voxel_size=1.5, min_points=4)
+
+    batched.add_points(points, intensities)
+    for point, intensity in zip(points, intensities):
+        pointwise.add_points(point[None, :], np.array([intensity]))
+
+    assert batched.point_count == pointwise.point_count
+    assert len(batched) == len(pointwise)
+    assert batched.mature_voxel_count == pointwise.mature_voxel_count
+    for key, batched_stats in batched._voxels.items():
+        pointwise_stats = pointwise._voxels[key]
+        assert batched_stats.count == pointwise_stats.count
+        np.testing.assert_allclose(
+            batched_stats.mean, pointwise_stats.mean, rtol=1.0e-13, atol=1.0e-13
+        )
+        np.testing.assert_allclose(
+            batched_stats.scatter,
+            pointwise_stats.scatter,
+            rtol=1.0e-12,
+            atol=1.0e-12,
+        )
+        assert batched_stats.intensity_sum == pytest.approx(
+            pointwise_stats.intensity_sum, rel=1.0e-13, abs=1.0e-13
+        )
+
+
 def test_observable_subspace_update_keeps_only_supported_plane_directions() -> None:
     surfels = SurfelVoxelMap(
         voxel_size=1.5,
@@ -193,6 +294,108 @@ def test_observable_subspace_update_keeps_only_supported_plane_directions() -> N
     assert result.translation_observable_rank == 1
     assert result.rotation_observable_rank == 2
     assert abs(estimator.state.position[2]) < 0.01
+
+
+def test_continuous_observability_shaping_preserves_strong_and_removes_null() -> None:
+    jacobian = np.diag([100.0, 10.0, 0.0])
+    weights = np.ones(3)
+
+    transform, eigenvalues, response = (
+        AcousticESIKF._continuous_observability_transform(
+            jacobian,
+            weights,
+            absolute_knee=100.0,
+            relative_knee=0.0,
+        )
+    )
+    shaped = jacobian @ transform
+    shaped_information = shaped.T @ shaped
+
+    np.testing.assert_allclose(eigenvalues, [0.0, 100.0, 10_000.0])
+    np.testing.assert_allclose(response, [0.0, 0.5, 100.0 / 101.0])
+    np.testing.assert_allclose(
+        np.linalg.eigvalsh(shaped_information),
+        eigenvalues * response,
+        rtol=1.0e-12,
+        atol=1.0e-12,
+    )
+    assert np.linalg.norm(transform[:, 0]) > 0.99
+    assert 0.70 < np.linalg.norm(transform[:, 1]) < 0.71
+    assert np.linalg.norm(transform[:, 2]) == pytest.approx(0.0)
+
+
+def test_vectorized_sonar_linearization_matches_pointwise_model() -> None:
+    surfels = SurfelVoxelMap(
+        voxel_size=2.0,
+        min_points=4,
+        max_planarity=0.2,
+        max_plane_distance=1.5,
+    )
+    x, y = np.meshgrid(np.linspace(-7.0, 7.0, 29), np.linspace(-7.0, 7.0, 29))
+    map_points = np.column_stack(
+        (x.ravel(), y.ravel(), -10.0 + 0.08 * x.ravel() - 0.04 * y.ravel())
+    )
+    surfels.add_points(map_points)
+    estimator = AcousticESIKF(
+        ESIKFConfig(sonar_range_std=0.04, sonar_angle_std_deg=0.3),
+        sensor_translation_body=np.array([0.2, -0.1, 0.05]),
+    )
+    estimator.initialize(
+        0.0,
+        rotation=so3_exp(np.deg2rad([2.0, -1.0, 3.0])),
+        position=np.array([0.1, -0.2, 0.15]),
+    )
+    points_sensor = map_points[::11]
+    residual, jacobian, variance = estimator._sonar_linearization(
+        estimator.state, points_sensor, surfels
+    )
+
+    points_body = transform_points(
+        estimator.sensor_rotation_body,
+        estimator.sensor_translation_body,
+        points_sensor,
+    )
+    points_world = transform_points(
+        estimator.state.rotation, estimator.state.position, points_body
+    )
+    associations = surfels.associate_points(points_world)
+    expected_residual = []
+    expected_jacobian = []
+    expected_variance = []
+    rotation_ws = estimator.state.rotation @ estimator.sensor_rotation_body
+    angle_std = np.deg2rad(estimator.config.sonar_angle_std_deg)
+    for index, (point_sensor, point_body, point_world) in enumerate(
+        zip(points_sensor, points_body, points_world)
+    ):
+        if not associations.valid_mask[index]:
+            continue
+        normal = associations.normals[index]
+        sonar_range = float(np.linalg.norm(point_sensor))
+        if sonar_range < 1.0e-6:
+            continue
+        direction = point_sensor / sonar_range
+        radial = np.outer(direction, direction)
+        covariance_sensor = (
+            estimator.config.sonar_range_std**2 * radial
+            + (angle_std * sonar_range) ** 2 * (np.eye(3) - radial)
+        )
+        covariance_world = rotation_ws @ covariance_sensor @ rotation_ws.T
+        row = np.zeros(15)
+        row[0:3] = normal @ (-estimator.state.rotation @ skew(point_body))
+        row[3:6] = normal
+        expected_residual.append(
+            normal @ (point_world - associations.centroids[index])
+        )
+        expected_jacobian.append(row)
+        expected_variance.append(
+            normal @ covariance_world @ normal
+            + max(0.0, associations.normal_variances[index])
+            + estimator.config.sonar_noise_floor**2
+        )
+
+    np.testing.assert_allclose(residual, expected_residual, rtol=1.0e-12, atol=1.0e-12)
+    np.testing.assert_allclose(jacobian, expected_jacobian, rtol=1.0e-12, atol=1.0e-12)
+    np.testing.assert_allclose(variance, expected_variance, rtol=1.0e-12, atol=1.0e-12)
 
 
 def test_direct_sidescan_intensity_update_reduces_yaw_error() -> None:
@@ -267,6 +470,85 @@ def test_direct_sidescan_intensity_update_reduces_yaw_error() -> None:
     assert np.all(np.linalg.eigvalsh(result.information_pose2) >= -1.0e-9)
     corrected_yaw = so3_log(estimator.state.rotation)[2]
     assert abs(corrected_yaw) < abs(yaw_error)
+
+
+def test_coregistered_intensity_continuously_downweights_wrong_surface() -> None:
+    intensity_map = AcousticIntensityMap(
+        voxel_size=1.0,
+        min_cell_points=1,
+        min_neighbours=5,
+        min_gradient=1.0e-6,
+    )
+    x, y = np.meshgrid(
+        np.arange(-3.0, 4.0) + 0.25,
+        np.arange(-3.0, 4.0) + 0.25,
+    )
+    z = -10.0 + 0.08 * x - 0.04 * y
+    values = 0.45 + 0.03 * x - 0.02 * y
+    intensity_map.add_points(
+        np.column_stack((x.ravel(), y.ravel(), z.ravel())),
+        values.ravel(),
+        heading_rad=0.0,
+        observation_id=1,
+        anchor_id=0,
+    )
+    matched = np.column_stack(
+        (
+            x.ravel(),
+            y.ravel(),
+            z.ravel(),
+        )
+    )
+    displaced = matched.copy()
+    displaced[:, 2] += 3.0
+    measured = values.ravel()
+    estimator = AcousticESIKF(
+        ESIKFConfig(intensity_surface_consistency_std=0.5)
+    )
+    estimator.initialize(0.0)
+
+    matched_variance = estimator._intensity_linearization(
+        estimator.state,
+        matched,
+        measured,
+        intensity_map,
+        anchor_id=0,
+    )[4]
+    displaced_variance = estimator._intensity_linearization(
+        estimator.state,
+        displaced,
+        measured,
+        intensity_map,
+        anchor_id=0,
+    )[4]
+
+    assert matched_variance.size > 10
+    assert displaced_variance.size == matched_variance.size
+    assert np.median(displaced_variance) > 20.0 * np.median(matched_variance)
+
+
+def test_acoustic_sample_deskew_includes_translation_rotation_and_lever_arm() -> None:
+    estimator = AcousticESIKF(
+        sensor_translation_body=np.array([0.4, -0.1, 0.0])
+    )
+    estimator.initialize(
+        0.0,
+        rotation=np.eye(3),
+        velocity=np.array([2.0, 0.0, 0.0]),
+    )
+    estimator._last_gyro = np.array([0.0, 0.0, 0.5])
+    points = np.array([[1.0, 0.0, -3.0], [1.0, 0.0, -3.0]])
+    offsets = np.array([0.0, 0.2])
+
+    deskewed = estimator.deskew_sensor_points(points, offsets)
+
+    np.testing.assert_allclose(deskewed[0], points[0], atol=1.0e-15)
+    point_body = points[1] + np.array([0.4, -0.1, 0.0])
+    expected_body = so3_exp([0.0, 0.0, 0.1]) @ point_body
+    expected_body += np.array([0.4, 0.0, 0.0])
+    np.testing.assert_allclose(
+        deskewed[1], expected_body - np.array([0.4, -0.1, 0.0])
+    )
 
 
 def test_direct_intensity_update_rejects_anti_correlated_strip() -> None:
@@ -607,6 +889,67 @@ def test_sidescan_reference_delay_and_motion_compensated_strip() -> None:
     assert diagnostics.pending_intensity_points == 3 * points.shape[0]
 
 
+def test_causal_sliding_mbes_window_updates_each_ping_without_self_insertion(
+    monkeypatch,
+) -> None:
+    point_count = 96
+    cross_track = np.linspace(-24.0, 24.0, point_count)
+    points = np.column_stack(
+        (
+            0.15 * np.sin(0.2 * cross_track),
+            cross_track,
+            -10.0 - 0.03 * cross_track,
+        )
+    )
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            filter=ESIKFConfig(sonar_max_points=64),
+            bootstrap_pings=3,
+            mbes_group_pings=3,
+            mbes_sliding_window_enabled=True,
+            map_insert_stride=1,
+            intensity_updates_enabled=False,
+        )
+    )
+    slam.initialize(0.0)
+    update_sizes: list[int] = []
+
+    def accepted_update(grouped_points, surfel_map, *, information_scale=1.0):
+        assert surfel_map.point_count == 3 * point_count + len(update_sizes) * point_count
+        assert information_scale == pytest.approx(1.0 / 3.0)
+        update_sizes.append(int(grouped_points.shape[0]))
+        return SonarUpdateResult(
+            accepted=True,
+            correspondences=grouped_points.shape[0],
+            inliers=grouped_points.shape[0],
+            iterations=1,
+            rmse_before=0.2,
+            rmse_after=0.1,
+            minimum_translation_eigenvalue=1.0,
+            information_condition=2.0,
+            adaptive_weight=1.0,
+            rotation_observable_rank=3,
+            translation_observable_rank=3,
+            rotation_correction_deg=0.0,
+            translation_correction=0.0,
+        )
+
+    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
+    for ping_index in range(1, 8):
+        slam.filter.state.timestamp = float(ping_index)
+        slam.filter.state.position[0] = float(ping_index - 1)
+        slam.process_mbes(points)
+
+    diagnostics = slam.diagnostics()
+    # Three seed pings form the immutable reference. Pings four and five are
+    # withheld; ping six aligns the 4/5/6 window and only then commits ping 4.
+    assert update_sizes == [64, 64]
+    assert diagnostics.accepted_sonar_updates == 2
+    assert diagnostics.committed_geometry_groups == 5
+    assert diagnostics.map_points == 5 * point_count
+    assert len(slam._mbes_group) == 2
+
+
 def test_single_v2_ping_uses_its_simultaneous_row_aperture() -> None:
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
@@ -669,6 +1012,9 @@ def test_process_integrated_ping_uses_one_decimated_xyzi_array() -> None:
     ping = sensors.bathymetric_sidescan_ping(truth)
     ping.along_track_coverage_m = 1.2
     acoustic_points, _, _ = ping.valid_acoustic_samples()
+    sample_time_offsets = ping.valid_acoustic_sample_time_offsets()
+    assert sample_time_offsets.shape == (acoustic_points.shape[0],)
+    np.testing.assert_array_equal(sample_time_offsets, 0.0)
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
             mbes_group_pings=1,

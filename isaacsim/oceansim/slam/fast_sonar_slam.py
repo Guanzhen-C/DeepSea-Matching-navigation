@@ -40,6 +40,13 @@ class FastSonarSLAMConfig:
     surfel_max_plane_distance: float = 1.25
     bootstrap_pings: int = 14
     mbes_group_pings: int = 5
+    # Interpret ``mbes_group_pings`` as a causal sliding registration window.
+    # The first window seeds a frozen reference map; subsequent physical pings
+    # update at the native ping rate and only the oldest aligned ping is then
+    # committed.  This preserves the V2 instrument's one-ping/eight-
+    # simultaneous-row semantics while preventing a scan from matching data
+    # that it already inserted into its own reference map.
+    mbes_sliding_window_enabled: bool = False
     map_insert_stride: int = 1
     # Keep the full incremental map, but pack only the current sensor-reach
     # neighbourhood for accelerated association. This is the non-destructive
@@ -157,6 +164,8 @@ class FastSonarSLAM:
         *,
         sensor_rotation_body: np.ndarray | None = None,
         sensor_translation_body: np.ndarray | None = None,
+        dvl_rotation_body: np.ndarray | None = None,
+        dvl_translation_body: np.ndarray | None = None,
         surfel_associator=None,
     ) -> None:
         self.config = config or FastSonarSLAMConfig()
@@ -179,6 +188,8 @@ class FastSonarSLAM:
             self.config.filter,
             sensor_rotation_body=sensor_rotation_body,
             sensor_translation_body=sensor_translation_body,
+            dvl_rotation_body=dvl_rotation_body,
+            dvl_translation_body=dvl_translation_body,
             surfel_associator=surfel_associator,
         )
         self.map = SurfelVoxelMap(
@@ -268,9 +279,9 @@ class FastSonarSLAM:
         self._intensity_submap_anchor_timestamp = -np.inf
         self._trajectory: list[np.ndarray] = []
         self._trajectory_timestamps: list[float] = []
-        self._mbes_group: list[
+        self._mbes_group: deque[
             tuple[InertialState, np.ndarray, np.ndarray | None]
-        ] = []
+        ] = deque()
 
     @property
     def state(self) -> InertialState:
@@ -420,8 +431,13 @@ class FastSonarSLAM:
         if stride < 1:
             raise ValueError("sample_stride must be at least one")
         points, values, _ = ping.valid_acoustic_samples(frame="sensor")
+        sample_time_offsets = ping.valid_acoustic_sample_time_offsets()
         points = points[::stride]
         values = values[::stride]
+        sample_time_offsets = sample_time_offsets[::stride]
+        points = self.filter.deskew_sensor_points(
+            points, sample_time_offsets
+        )
         return self.process_bathymetric_sidescan(
             points,
             values,
@@ -564,18 +580,75 @@ class FastSonarSLAM:
 
         current_points = points.copy()
         self._ping_count += 1
-        self._mbes_group.append((self.state.copy(), points, values))
+        current_entry = (self.state.copy(), points, values)
         group_size = max(1, int(self.config.mbes_group_pings))
+        stride = max(1, int(self.config.map_insert_stride))
         update: SonarUpdateResult | None = None
         geometry_to_commit: tuple[
             np.ndarray, np.ndarray | None, int, bool
         ] | None = None
-        if len(self._mbes_group) >= group_size:
-            grouped_points, grouped_values = self._motion_compensated_group()
-            self._mbes_group.clear()
+        registration_points: np.ndarray | None = None
+        registration_values: np.ndarray | None = None
+        update_window_ready = False
+
+        if self.config.mbes_sliding_window_enabled:
+            seed_pings = max(int(self.config.bootstrap_pings), group_size)
+            if self._ping_count <= seed_pings:
+                # Build one immutable-enough reference strip before the first
+                # sliding match.  These seed pings never enter the current
+                # registration window, so a measurement cannot match itself.
+                registration_points = current_points
+                registration_values = values
+                geometry_to_commit = (
+                    current_points,
+                    values,
+                    stride,
+                    True,
+                )
+                self._geometry_pose_trusted = True
+            else:
+                self._mbes_group.append(current_entry)
+                if len(self._mbes_group) >= group_size:
+                    registration_points, registration_values = (
+                        self._motion_compensated_group(
+                            maximum_points=self.filter.config.sonar_max_points
+                        )
+                    )
+                    # Freeze the oldest ping in the pre-update current frame.
+                    # Applying the final sequential ESIKF pose below transfers
+                    # the same geometry/intensity correction to that ping.
+                    oldest_entry = self._mbes_group[0]
+                    oldest_points, oldest_values = (
+                        self._motion_compensated_group((oldest_entry,))
+                    )
+                    self._mbes_group.popleft()
+                    geometry_to_commit = (
+                        oldest_points,
+                        oldest_values,
+                        stride,
+                        True,
+                    )
+                    update_window_ready = True
+        else:
+            self._mbes_group.append(current_entry)
+            if len(self._mbes_group) >= group_size:
+                registration_points, registration_values = (
+                    self._motion_compensated_group()
+                )
+                self._mbes_group.clear()
+                geometry_to_commit = (
+                    registration_points,
+                    registration_values,
+                    stride,
+                    True,
+                )
+                update_window_ready = True
+
+        if registration_points is not None:
             update_attempted = False
             if (
-                self._ping_count > self.config.bootstrap_pings
+                update_window_ready
+                and self._ping_count > self.config.bootstrap_pings
                 and self.map.mature_voxel_count > 0
             ):
                 update_attempted = True
@@ -583,7 +656,15 @@ class FastSonarSLAM:
                     self.state.position,
                     self.config.association_map_half_extent_m,
                 )
-                update = self.filter.update_sonar(grouped_points, self.map)
+                update = self.filter.update_sonar(
+                    registration_points,
+                    self.map,
+                    information_scale=(
+                        1.0 / float(group_size)
+                        if self.config.mbes_sliding_window_enabled
+                        else 1.0
+                    ),
+                )
                 rank_key = (
                     f"r{update.rotation_observable_rank}_"
                     f"t{update.translation_observable_rank}"
@@ -597,7 +678,6 @@ class FastSonarSLAM:
                         update.rejection_reason or "unspecified"
                     ] += 1
 
-            stride = max(1, int(self.config.map_insert_stride))
             self._geometry_pose_trusted = (
                 not update_attempted or bool(update and update.accepted)
             )
@@ -608,7 +688,7 @@ class FastSonarSLAM:
             loop_points_body = transform_points(
                 self.filter.sensor_rotation_body,
                 self.filter.sensor_translation_body,
-                grouped_points,
+                registration_points,
             )
             appearance_descriptor = None
             if (
@@ -623,17 +703,19 @@ class FastSonarSLAM:
                     self.state.rotation,
                     self.state.position,
                     loop_points_body,
-                    grouped_values,
+                    registration_values,
                     appearance_descriptor,
                     observation_id=self._ping_count,
                 )
-            geometry_to_commit = (
-                grouped_points,
-                grouped_values,
-                stride,
-                commit_geometry,
-            )
-            self._last_sonar_update = update
+            if geometry_to_commit is not None:
+                geometry_to_commit = (
+                    geometry_to_commit[0],
+                    geometry_to_commit[1],
+                    geometry_to_commit[2],
+                    commit_geometry,
+                )
+            if update_window_ready:
+                self._last_sonar_update = update
 
         self._process_sidescan_intensity(
             direct_points if direct_values is not None else current_points,
@@ -1315,6 +1397,12 @@ class FastSonarSLAM:
 
     def _motion_compensated_group(
         self,
+        entries: tuple[
+            tuple[InertialState, np.ndarray, np.ndarray | None], ...
+        ]
+        | None = None,
+        *,
+        maximum_points: int | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         """Deskew a short MBES group into the current sensor frame.
 
@@ -1324,6 +1412,9 @@ class FastSonarSLAM:
         update, analogous to deskewing a spinning LiDAR scan.
         """
 
+        group = tuple(self._mbes_group) if entries is None else tuple(entries)
+        if not group:
+            return np.empty((0, 3), dtype=np.float64), None
         current = self.state
         rotation_bs = self.filter.sensor_rotation_body
         translation_bs = self.filter.sensor_translation_body
@@ -1333,14 +1424,42 @@ class FastSonarSLAM:
         )
         grouped_points: list[np.ndarray] = []
         grouped_intensities: list[np.ndarray] = []
-        has_intensity = all(item[2] is not None for item in self._mbes_group)
-        for historical, points_sensor, intensities in self._mbes_group:
+        has_intensity = all(item[2] is not None for item in group)
+        lengths = np.asarray(
+            [item[1].shape[0] for item in group], dtype=np.int64
+        )
+        total_points = int(np.sum(lengths))
+        selected_global: np.ndarray | None = None
+        if maximum_points is not None and total_points > int(maximum_points):
+            selected_global = np.linspace(
+                0,
+                total_points - 1,
+                int(maximum_points),
+                dtype=np.int64,
+            )
+        group_offset = 0
+        for historical, points_sensor, intensities in group:
+            if selected_global is None:
+                selected_points = points_sensor
+                selected_intensities = intensities
+            else:
+                stop = group_offset + points_sensor.shape[0]
+                in_entry = selected_global[
+                    (selected_global >= group_offset) & (selected_global < stop)
+                ] - group_offset
+                group_offset = stop
+                if in_entry.size == 0:
+                    continue
+                selected_points = points_sensor[in_entry]
+                selected_intensities = (
+                    None if intensities is None else intensities[in_entry]
+                )
             rotation_ws_historical = historical.rotation @ rotation_bs
             translation_ws_historical = (
                 historical.position + historical.rotation @ translation_bs
             )
             points_world = (
-                points_sensor @ rotation_ws_historical.T
+                selected_points @ rotation_ws_historical.T
                 + translation_ws_historical
             )
             points_current_sensor = (
@@ -1348,7 +1467,8 @@ class FastSonarSLAM:
             ) @ rotation_ws_current
             grouped_points.append(points_current_sensor)
             if has_intensity:
-                grouped_intensities.append(intensities)
+                assert selected_intensities is not None
+                grouped_intensities.append(selected_intensities)
         points = np.ascontiguousarray(np.concatenate(grouped_points), dtype=np.float64)
         values = (
             np.ascontiguousarray(np.concatenate(grouped_intensities), dtype=np.float64)

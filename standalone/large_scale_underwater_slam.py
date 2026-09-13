@@ -41,8 +41,20 @@ def parse_args() -> argparse.Namespace:
         )
     )
     parser.add_argument("--duration", type=float, default=360.0)
+    parser.add_argument("--survey-period-s", type=float, default=180.0)
     parser.add_argument("--seed", type=int, default=31)
     parser.add_argument("--imu-hz", type=float, default=50.0)
+    parser.add_argument("--acoustic-hz", type=float, default=5.0)
+    parser.add_argument("--slam-max-points", type=int, default=128)
+    parser.add_argument("--mbes-group-pings", type=int, default=5)
+    parser.add_argument(
+        "--enable-mbes-sliding-window", action="store_true"
+    )
+    parser.add_argument(
+        "--local-observability-mode",
+        choices=("continuous", "hard", "legacy"),
+        default="continuous",
+    )
     parser.add_argument("--output", type=Path, default=ROOT / "demo/large_scale_slam")
     parser.add_argument("--no-plot", action="store_true")
     parser.add_argument(
@@ -58,8 +70,16 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.duration <= 0.0:
         parser.error("--duration must be > 0")
+    if args.survey_period_s <= 0.0:
+        parser.error("--survey-period-s must be > 0")
     if args.imu_hz < 20.0:
         parser.error("--imu-hz must be >= 20")
+    if args.acoustic_hz <= 0.0 or args.acoustic_hz > args.imu_hz:
+        parser.error("--acoustic-hz must be in (0, --imu-hz]")
+    if args.slam_max_points < 32:
+        parser.error("--slam-max-points must be >= 32")
+    if args.mbes_group_pings < 1:
+        parser.error("--mbes-group-pings must be >= 1")
     return args
 
 
@@ -75,7 +95,7 @@ def _error_metrics(error: np.ndarray) -> dict[str, float]:
 
 def run(args: argparse.Namespace) -> tuple[dict, dict[str, np.ndarray]]:
     world = LargeUnderwaterWorld(width=300.0, length=220.0)
-    survey = FigureEightSurvey(period=180.0)
+    survey = FigureEightSurvey(period=args.survey_period_s)
     sensors = LargeScaleSensorSimulator(
         world,
         survey,
@@ -110,7 +130,20 @@ def run(args: argparse.Namespace) -> tuple[dict, dict[str, np.ndarray]]:
     )
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
-            filter=ESIKFConfig(gyro_bias_max_norm=imu_bias_limit),
+            filter=ESIKFConfig(
+                gyro_bias_max_norm=imu_bias_limit,
+                sonar_max_points=args.slam_max_points,
+                sonar_continuous_observability_weighting=(
+                    args.local_observability_mode == "continuous"
+                ),
+                sonar_observable_subspace_projection=(
+                    args.local_observability_mode == "hard"
+                ),
+            ),
+            mbes_group_pings=args.mbes_group_pings,
+            mbes_sliding_window_enabled=(
+                args.enable_mbes_sliding_window
+            ),
             map_max_range=sensors.max_range,
             sidescan_min_range=sensors.min_range,
             sidescan_max_range=sensors.max_range,
@@ -139,7 +172,9 @@ def run(args: argparse.Namespace) -> tuple[dict, dict[str, np.ndarray]]:
     sample_count = int(round(args.duration / dt))
     dvl_stride = max(1, int(round(args.imu_hz / 5.0)))
     depth_stride = max(1, int(round(args.imu_hz / 10.0)))
-    acoustic_stride = max(1, int(round(args.imu_hz / 5.0)))
+    acoustic_stride = max(
+        1, int(round(args.imu_hz / args.acoustic_hz))
+    )
     timestamps = np.arange(sample_count + 1, dtype=np.float64) * dt
     truth_positions = np.empty((sample_count + 1, 3), dtype=np.float64)
     dead_positions = np.empty_like(truth_positions)
@@ -219,7 +254,15 @@ def run(args: argparse.Namespace) -> tuple[dict, dict[str, np.ndarray]]:
         ),
         "seed": args.seed,
         "duration_s": args.duration,
+        "survey_period_s": args.survey_period_s,
         "intensity_updates_enabled": not args.disable_intensity_updates,
+        "acoustic_rate_hz": args.acoustic_hz,
+        "slam_max_points": args.slam_max_points,
+        "mbes_group_pings": args.mbes_group_pings,
+        "mbes_sliding_window_enabled": (
+            args.enable_mbes_sliding_window
+        ),
+        "local_observability_mode": args.local_observability_mode,
         "runtime_s": float(time.monotonic() - started),
         "environment_m": {"width": world.width, "length": world.length},
         "trajectory": {

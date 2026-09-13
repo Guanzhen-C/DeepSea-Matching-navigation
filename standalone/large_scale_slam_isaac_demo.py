@@ -211,12 +211,41 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--local-intensity-surface-consistency-std-m",
+        type=float,
+        default=0.75,
+        help=(
+            "Cauchy scale for disagreement between a direct side-scan "
+            "sample and its co-registered local bathymetric surface; this "
+            "continuously changes covariance and is not a rejection gate"
+        ),
+    )
+    parser.add_argument(
+        "--local-observability-mode",
+        choices=("continuous", "hard", "legacy"),
+        default="continuous",
+        help=(
+            "weak-direction handling for the local MBES ESIKF: continuous "
+            "spectral weighting is the production mode; hard projection and "
+            "the former whole-frame scalar weighting are reproducible ablations"
+        ),
+    )
+    parser.add_argument(
         "--mbes-group-pings",
         type=int,
         default=1,
         help=(
             "integrated acquisitions per FAST-LIVO2-style geometry update; "
             "V2 already supplies eight simultaneous rows, so one is physical"
+        ),
+    )
+    parser.add_argument(
+        "--enable-mbes-sliding-window",
+        action="store_true",
+        help=(
+            "treat --mbes-group-pings as a causal sliding local submap; "
+            "after seeding, every physical ping produces one update while "
+            "only the oldest aligned ping enters the frozen reference map"
         ),
     )
     parser.add_argument(
@@ -986,6 +1015,10 @@ def parse_args() -> argparse.Namespace:
         or args.local_sonar_noise_floor_m <= 0.0
         or not math.isfinite(args.local_intensity_noise_std)
         or args.local_intensity_noise_std <= 0.0
+        or not math.isfinite(
+            args.local_intensity_surface_consistency_std_m
+        )
+        or args.local_intensity_surface_consistency_std_m <= 0.0
         or args.mbes_group_pings < 1
         or args.association_map_half_extent_m < 0.0
         or 0.0 < args.association_map_half_extent_m < 150.0
@@ -2453,11 +2486,20 @@ def main() -> int:
                 sonar_max_points=ARGS.slam_max_points,
                 sonar_noise_floor=ARGS.local_sonar_noise_floor_m,
                 intensity_noise_std=ARGS.local_intensity_noise_std,
+                intensity_surface_consistency_std=(
+                    ARGS.local_intensity_surface_consistency_std_m
+                ),
                 intensity_effective_independent_samples=(
                     ARGS.intensity_effective_independent_samples
                 ),
                 intensity_min_singular_ratio=(
                     ARGS.intensity_min_singular_ratio
+                ),
+                sonar_continuous_observability_weighting=(
+                    ARGS.local_observability_mode == "continuous"
+                ),
+                sonar_observable_subspace_projection=(
+                    ARGS.local_observability_mode == "hard"
                 ),
             ),
             voxel_size=ARGS.slam_voxel_size_m,
@@ -2468,6 +2510,7 @@ def main() -> int:
                 ARGS.association_map_half_extent_m
             ),
             mbes_group_pings=ARGS.mbes_group_pings,
+            mbes_sliding_window_enabled=ARGS.enable_mbes_sliding_window,
             sidescan_min_range=0.0,
             sidescan_max_range=sonar_profile.maximum_range_m,
             intensity_min_separation_pings=(
@@ -5427,14 +5470,25 @@ def main() -> int:
             * sonar_profile.rows_per_side_per_ping
             * ARGS.sidescan_imaging_rays_per_side
         )
+        geometry_update_description = (
+            f"{ARGS.mbes_group_pings}-ping causal sliding geometry "
+            "window updates at the native ping rate; "
+            if ARGS.enable_mbes_sliding_window
+            else (
+                f"{ARGS.mbes_group_pings} acquisition(s) per geometry "
+                "update; "
+            )
+        )
         print(
-            "[OceanSim SLAM] one-ping co-registered acoustic update: "
+            "[OceanSim SLAM] co-registered acoustic front end: "
             f"{raw_returns_per_ping} raw XYZ+intensity samples produce both "
             f"bathymetry and the 16-row side-scan image; "
+            f"{geometry_update_description}"
             f"{ARGS.intensity_group_pings} acquisition(s) per update at "
             f"{ARGS.ping_hz / ARGS.intensity_group_pings:g} Hz; "
             f"causal reference separation {ARGS.intensity_reference_delay_pings} "
-            f"ping, registration cells {ARGS.intensity_voxel_size_m:g} m.",
+            f"ping, registration cells {ARGS.intensity_voxel_size_m:g} m; "
+            f"local weak directions use {ARGS.local_observability_mode} weighting.",
             flush=True,
         )
         print(
@@ -8181,6 +8235,9 @@ def main() -> int:
 
                     if status_label is not None and sonar_visualization_due:
                         diagnostics = slam.diagnostics()
+                        dead_reckoning_error = np.linalg.norm(
+                            dead_reckoning.state.position - truth.position
+                        )
                         local_error = np.linalg.norm(
                             slam.state.position - truth.position
                         )
@@ -8203,7 +8260,9 @@ def main() -> int:
                             f"ping {ping_count:05d}  "
                             f"travel {sim_time * ARGS.survey_speed_mps / 1000.0:5.2f}/"
                             f"{route_report.path_length_m / 1000.0:5.2f} km\n"
-                            f"local {local_error:6.2f} m   global {global_error:6.2f} m   "
+                            f"DR {dead_reckoning_error:6.2f} m   "
+                            f"local {local_error:6.2f} m   "
+                            f"global {global_error:6.2f} m   "
                             f"depth {-truth.position[2]:5.1f} m   altitude {altitude:4.1f} m\n"
                             f"V2 {profile_mode.upper()} | "
                             f"INTEGRATED {ARGS.ping_hz:g} Hz | "
@@ -9179,6 +9238,11 @@ def main() -> int:
             "local_intensity_noise_std": (
                 ARGS.local_intensity_noise_std
             ),
+            "local_intensity_surface_consistency_std_m": (
+                ARGS.local_intensity_surface_consistency_std_m
+            ),
+            "local_observability_mode": ARGS.local_observability_mode,
+            "local_intensity_map_coregisters_surface_elevation": True,
             "intensity_min_singular_ratio": (
                 ARGS.intensity_min_singular_ratio
             ),
@@ -10102,6 +10166,14 @@ def main() -> int:
                 display_sample_spacing_m if not ARGS.headless else None
             ),
             "mbes_group_pings": ARGS.mbes_group_pings,
+            "mbes_sliding_window_enabled": (
+                ARGS.enable_mbes_sliding_window
+            ),
+            "mbes_sliding_window_information_scale": (
+                1.0 / ARGS.mbes_group_pings
+                if ARGS.enable_mbes_sliding_window
+                else 1.0
+            ),
             "association_map_half_extent_m": (
                 ARGS.association_map_half_extent_m
             ),

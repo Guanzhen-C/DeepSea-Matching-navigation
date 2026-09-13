@@ -740,6 +740,12 @@ class RegisteredSideScanReturns:
     ray_origins_sensor: np.ndarray | None = None
     ray_origins_world: np.ndarray | None = None
     along_track_row_indices: np.ndarray | None = None
+    # Pose-sampling time of each registered echo relative to ``timestamp``.
+    # This is deliberately distinct from two-way acoustic travel time: a
+    # hardware driver should publish the epoch at which its beam geometry was
+    # evaluated.  The snapshot raycaster supplies zeros because all rows are
+    # simultaneous in the simulated acquisition.
+    sample_time_offsets_s: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         self.timestamp = float(self.timestamp)
@@ -796,6 +802,14 @@ class RegisteredSideScanReturns:
             ).reshape(count)
         if np.any(self.along_track_row_indices < 0):
             raise ValueError("along-track row indices must be non-negative")
+        if self.sample_time_offsets_s is None:
+            self.sample_time_offsets_s = np.zeros(count, dtype=np.float64)
+        else:
+            self.sample_time_offsets_s = np.asarray(
+                self.sample_time_offsets_s, dtype=np.float64
+            ).reshape(count)
+        if not np.isfinite(self.sample_time_offsets_s).all():
+            raise ValueError("sample time offsets must be finite")
 
     def valid_samples(
         self, frame: str = "sensor"
@@ -831,6 +845,18 @@ class RegisteredSideScanReturns:
         )
         return np.ascontiguousarray(
             self.along_track_row_indices[valid], dtype=np.int64
+        )
+
+    def valid_sample_time_offsets(self) -> np.ndarray:
+        """Return each valid echo's pose epoch relative to ping time."""
+
+        valid = (
+            self.hit_mask
+            & np.isfinite(self.points_sensor).all(axis=1)
+            & np.isfinite(self.intensities)
+        )
+        return np.ascontiguousarray(
+            self.sample_time_offsets_s[valid], dtype=np.float64
         )
 
 
@@ -1197,6 +1223,22 @@ class BathymetricSideScanPing:
                 self.valid_registered_samples()[0].shape[0], dtype=np.int64
             )
         return self.imaging.valid_row_indices()
+
+    def valid_acoustic_sample_time_offsets(self) -> np.ndarray:
+        """Return pose-time offsets paired with valid acoustic samples.
+
+        Older pings and the current snapshot simulator contain one synchronous
+        acquisition and therefore return zeros.  A real driver may populate
+        per-echo offsets for rolling transmit/receive schedules; callers must
+        not substitute two-way range travel time for this pose timestamp.
+        """
+
+        if self.imaging is None:
+            return np.zeros(
+                self.valid_registered_samples()[0].shape[0],
+                dtype=np.float64,
+            )
+        return self.imaging.valid_sample_time_offsets()
 
 
 def compute_backscatter_intensity(

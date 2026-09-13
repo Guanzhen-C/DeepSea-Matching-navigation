@@ -80,6 +80,11 @@ class ESIKFConfig:
     # statistically independent. Cap their aggregate weight at this many
     # independent-equivalent samples in the local filter.
     intensity_effective_independent_samples: int = 96
+    # The intensity and depth samples are emitted by the same integrated
+    # acoustic ping.  A photometric match that disagrees with the locally
+    # fitted seabed elevation is therefore continuously down-weighted with a
+    # Cauchy response.  This is a scale, not an accept/reject threshold.
+    intensity_surface_consistency_std: float = 0.75
     # With backscatter measured on the same bottom detections as bathymetry,
     # the reliable direct observables are horizontal position and yaw. Roll,
     # pitch, and depth remain constrained by IMU/MBES/pressure respectively.
@@ -88,6 +93,15 @@ class ESIKFConfig:
     degeneracy_rotation_eigenvalue: float = 500.0
     degeneracy_min_eigen_ratio: float = 0.003
     degeneracy_min_weight: float = 0.15
+    # Shape each rotational/translational information eigendirection
+    # independently instead of multiplying the complete acoustic update by
+    # the weakest translation direction.  For eigenvalue lambda and the
+    # configured information knee k, the retained information amplitude is
+    # lambda / (lambda + k).  This response is continuous, has no arbitrary
+    # accept/reject boundary, and tends exactly to zero in a true null space.
+    # ``degeneracy_min_weight`` remains only for reproducible legacy runs when
+    # both this option and hard subspace projection are disabled.
+    sonar_continuous_observability_weighting: bool = True
     # A scalar weight cannot distinguish the well-constrained surface-normal
     # direction from the unconstrained tangent directions of an MBES strip.
     # FAST-LIVO2's direct update is retained, but weak eigendirections are
@@ -155,6 +169,7 @@ class SonarUpdateResult:
     rotation_correction_deg: float
     translation_correction: float
     rejection_reason: str | None = None
+    information_scale: float = 1.0
 
     @property
     def degenerate(self) -> bool:
@@ -213,6 +228,8 @@ class AcousticESIKF:
         *,
         sensor_rotation_body: np.ndarray | None = None,
         sensor_translation_body: np.ndarray | None = None,
+        dvl_rotation_body: np.ndarray | None = None,
+        dvl_translation_body: np.ndarray | None = None,
         surfel_associator=None,
     ) -> None:
         self.config = config or ESIKFConfig()
@@ -226,6 +243,22 @@ class AcousticESIKF:
             if sensor_translation_body is None
             else np.asarray(sensor_translation_body, dtype=np.float64).reshape(3)
         )
+        # Extrinsics map DVL-frame vectors/points into the IMU body frame.
+        # They are fixed calibration inputs rather than weakly observable
+        # online states.  Identity/zero retains the historical body-origin
+        # measurement contract exactly.
+        self.dvl_rotation_body = (
+            np.eye(3, dtype=np.float64)
+            if dvl_rotation_body is None
+            else project_to_so3(dvl_rotation_body)
+        )
+        self.dvl_translation_body = (
+            np.zeros(3, dtype=np.float64)
+            if dvl_translation_body is None
+            else np.asarray(dvl_translation_body, dtype=np.float64).reshape(3)
+        )
+        if not np.isfinite(self.dvl_translation_body).all():
+            raise ValueError("DVL translation must be finite")
         self.state = InertialState()
         self.initialized = False
         self._last_gyro = np.zeros(3, dtype=np.float64)
@@ -378,6 +411,54 @@ class AcousticESIKF:
             projector = basis @ basis.T
         return projector, eigenvalues, rank
 
+    @staticmethod
+    def _continuous_observability_transform(
+        jacobian_block: np.ndarray,
+        weights: np.ndarray,
+        *,
+        absolute_knee: float,
+        relative_knee: float,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return a smooth square-root information transform for 3 DoF.
+
+        A hard rank decision is useful for diagnostics, but applying it to a
+        live filter makes the posterior discontinuous as terrain changes.  A
+        scalar frame weight has the opposite defect: one weak tangent can
+        suppress a well-observed surface-normal direction while still
+        leaking numerical information into the tangent.  This spectral
+        response preserves strong eigenvectors and continuously removes weak
+        ones.  Right-multiplying a Jacobian block by the returned transform
+        applies the response once to its normal matrix.
+        """
+
+        block = np.asarray(jacobian_block, dtype=np.float64).reshape(-1, 3)
+        weights = np.asarray(weights, dtype=np.float64).reshape(-1)
+        if block.shape[0] != weights.size:
+            raise ValueError("Jacobian rows and weights must match")
+        information = block.T @ (weights[:, None] * block)
+        information = 0.5 * (information + information.T)
+        try:
+            eigenvalues, eigenvectors = np.linalg.eigh(information)
+        except np.linalg.LinAlgError:
+            return (
+                np.zeros((3, 3), dtype=np.float64),
+                np.zeros(3, dtype=np.float64),
+                np.zeros(3, dtype=np.float64),
+            )
+        eigenvalues = np.maximum(eigenvalues, 0.0)
+        largest = float(max(eigenvalues[-1], 0.0))
+        knee = max(
+            0.0,
+            float(absolute_knee),
+            float(relative_knee) * largest,
+        )
+        if knee <= 0.0:
+            response = np.ones(3, dtype=np.float64)
+        else:
+            response = eigenvalues / (eigenvalues + knee)
+        transform = (eigenvectors * np.sqrt(response)) @ eigenvectors.T
+        return transform, eigenvalues, response
+
     def propagate(
         self,
         timestamp: float,
@@ -445,6 +526,52 @@ class AcousticESIKF:
         self._last_gyro = gyro
         self._last_accel = accel
         return True
+
+    def deskew_sensor_points(
+        self,
+        points_sensor: np.ndarray,
+        sample_time_offsets_s: np.ndarray,
+    ) -> np.ndarray:
+        """Express asynchronously sampled acoustic points at the state epoch.
+
+        ``sample_time_offsets_s[i]`` is the pose-sampling time of point ``i``
+        relative to ``state.timestamp``.  A constant body angular rate and
+        constant world velocity are used across the short ping.  Fixed sonar
+        lever-arm motion is included.  The operation is exact identity for a
+        synchronous ping, which is the current simulator contract.
+
+        Acoustic two-way travel time is not a pose timestamp and must not be
+        passed here without an instrument-specific transmit/receive model.
+        """
+
+        points = np.asarray(points_sensor, dtype=np.float64).reshape(-1, 3)
+        offsets = np.asarray(
+            sample_time_offsets_s, dtype=np.float64
+        ).reshape(-1)
+        if offsets.size != points.shape[0]:
+            raise ValueError("sample time offsets must match sensor points")
+        if not np.isfinite(offsets).all():
+            raise ValueError("sample time offsets must be finite")
+        if points.shape[0] == 0 or not np.any(offsets):
+            return points.copy()
+
+        omega_body = self._last_gyro - self.state.gyro_bias
+        body_velocity_reference = self.state.rotation.T @ self.state.velocity
+        rotation_bs = self.sensor_rotation_body
+        translation_bs = self.sensor_translation_body
+        points_body_sample = points @ rotation_bs.T + translation_bs
+        deskewed_body = np.empty_like(points_body_sample)
+        unique_offsets, inverse = np.unique(offsets, return_inverse=True)
+        for offset_index, offset in enumerate(unique_offsets):
+            relative_rotation = so3_exp(omega_body * float(offset))
+            selected = inverse == offset_index
+            deskewed_body[selected] = (
+                points_body_sample[selected] @ relative_rotation.T
+                + body_velocity_reference * float(offset)
+            )
+        return (
+            deskewed_body - translation_bs
+        ) @ rotation_bs
 
     def _state_with_error(
         self, base: InertialState, error: np.ndarray
@@ -523,7 +650,12 @@ class AcousticESIKF:
         velocity_body_mps: np.ndarray,
         covariance: np.ndarray | None = None,
     ) -> bool:
-        """Fuse a bottom-track DVL body-frame velocity measurement.
+        """Fuse a bottom-track DVL velocity at its calibrated phase centre.
+
+        The historical argument name is retained for API compatibility.  With
+        identity DVL rotation and zero translation it is a body-origin vector.
+        Otherwise the measurement is expressed in DVL axes, and the predicted
+        velocity includes the rigid-body lever-arm term ``omega x t_bd``.
 
         Bottom-track velocity is the estimator's most dependable short-term
         motion constraint.  A hard statistical gate is brittle after an
@@ -538,10 +670,19 @@ class AcousticESIKF:
         measurement = np.asarray(
             velocity_body_mps, dtype=np.float64
         ).reshape(3)
-        predicted = self.state.rotation.T @ self.state.velocity
+        velocity_body_origin = self.state.rotation.T @ self.state.velocity
+        angular_velocity_body = self._last_gyro - self.state.gyro_bias
+        velocity_body_dvl_origin = velocity_body_origin + np.cross(
+            angular_velocity_body, self.dvl_translation_body
+        )
+        rotation_db = self.dvl_rotation_body.T
+        predicted = rotation_db @ velocity_body_dvl_origin
         jacobian = np.zeros((3, 15), dtype=np.float64)
-        jacobian[:, 0:3] = skew(predicted)
-        jacobian[:, 6:9] = self.state.rotation.T
+        jacobian[:, 0:3] = rotation_db @ skew(velocity_body_origin)
+        jacobian[:, 6:9] = rotation_db @ self.state.rotation.T
+        jacobian[:, 9:12] = rotation_db @ skew(
+            self.dvl_translation_body
+        )
         if covariance is None:
             covariance = np.eye(3) * self.config.dvl_velocity_std**2
         covariance = np.asarray(covariance, dtype=np.float64).reshape(3, 3)
@@ -616,9 +757,6 @@ class AcousticESIKF:
             state.rotation, state.position, points_body
         )
         world_sensor_rotation = state.rotation @ self.sensor_rotation_body
-        residuals: list[float] = []
-        jacobians: list[np.ndarray] = []
-        variances: list[float] = []
         angle_std = np.deg2rad(self.config.sonar_angle_std_deg)
 
         association_started = time.perf_counter()
@@ -638,61 +776,76 @@ class AcousticESIKF:
             association_ms - self._mean_association_ms
         ) / float(self._association_calls)
 
-        for index, (point_sensor, point_body, point_world) in enumerate(
-            zip(points_sensor, points_body, points_world)
-        ):
-            if not associations.valid_mask[index]:
-                continue
-            normal = associations.normals[index]
-            residual = float(
-                normal @ (point_world - associations.centroids[index])
-            )
-            point_jacobian = np.zeros(15, dtype=np.float64)
-            point_jacobian[0:3] = normal @ (
-                -state.rotation @ skew(point_body)
-            )
-            point_jacobian[3:6] = normal
-
-            sonar_range = float(np.linalg.norm(point_sensor))
-            if sonar_range < 1.0e-6:
-                continue
-            direction = point_sensor / sonar_range
-            radial = np.outer(direction, direction)
-            covariance_sensor = (
-                self.config.sonar_range_std**2 * radial
-                + (angle_std * sonar_range) ** 2
-                * (np.eye(3) - radial)
-            )
-            covariance_world = (
-                world_sensor_rotation
-                @ covariance_sensor
-                @ world_sensor_rotation.T
-            )
-            variance = float(normal @ covariance_world @ normal)
-            variance += max(0.0, associations.normal_variances[index])
-            variance += self.config.sonar_noise_floor**2
-            residuals.append(residual)
-            jacobians.append(point_jacobian)
-            variances.append(max(variance, 1.0e-8))
-
-        if not residuals:
+        ranges = np.linalg.norm(points_sensor, axis=1)
+        valid = np.asarray(associations.valid_mask, dtype=bool) & (
+            ranges >= 1.0e-6
+        )
+        if not np.any(valid):
             return (
                 np.empty(0, dtype=np.float64),
                 np.empty((0, 15), dtype=np.float64),
                 np.empty(0, dtype=np.float64),
             )
+
+        selected_sensor = points_sensor[valid]
+        selected_body = points_body[valid]
+        selected_world = points_world[valid]
+        centroids = associations.centroids[valid]
+        normals_world = associations.normals[valid]
+        selected_ranges = ranges[valid]
+
+        residuals = np.einsum(
+            "ij,ij->i", normals_world, selected_world - centroids
+        )
+        jacobians = np.zeros((residuals.size, 15), dtype=np.float64)
+        # n^T(-R[p]_x) == (p x R^T n)^T for the right/body-frame
+        # attitude perturbation used by this filter.
+        normals_body = normals_world @ state.rotation
+        jacobians[:, 0:3] = np.cross(selected_body, normals_body)
+        jacobians[:, 3:6] = normals_world
+
+        directions_sensor = selected_sensor / selected_ranges[:, None]
+        normals_sensor = normals_world @ world_sensor_rotation
+        radial_projection = np.einsum(
+            "ij,ij->i", normals_sensor, directions_sensor
+        )
+        normal_norm_squared = np.einsum(
+            "ij,ij->i", normals_sensor, normals_sensor
+        )
+        tangential_projection_squared = np.maximum(
+            0.0, normal_norm_squared - radial_projection**2
+        )
+        variances = (
+            self.config.sonar_range_std**2 * radial_projection**2
+            + (angle_std * selected_ranges) ** 2
+            * tangential_projection_squared
+            + np.maximum(0.0, associations.normal_variances[valid])
+            + self.config.sonar_noise_floor**2
+        )
         return (
-            np.asarray(residuals, dtype=np.float64),
-            np.asarray(jacobians, dtype=np.float64),
-            np.asarray(variances, dtype=np.float64),
+            np.ascontiguousarray(residuals, dtype=np.float64),
+            np.ascontiguousarray(jacobians, dtype=np.float64),
+            np.ascontiguousarray(np.maximum(variances, 1.0e-8)),
         )
 
     def update_sonar(
         self,
         points_sensor: np.ndarray,
         surfel_map: SurfelVoxelMap,
+        *,
+        information_scale: float = 1.0,
     ) -> SonarUpdateResult:
-        """Perform a robust iterated point-to-surfel acoustic update."""
+        """Perform a robust iterated point-to-surfel acoustic update.
+
+        ``information_scale`` tempers a likelihood whose source samples are
+        intentionally reused by overlapping sliding windows.  It scales the
+        complete acoustic information continuously; it is not a residual or
+        acceptance gate.
+        """
+
+        information_scale = float(information_scale)
+        if not np.isfinite(information_scale) or information_scale <= 0.0:
+            raise ValueError("sonar information scale must be finite and positive")
 
         points = np.asarray(points_sensor, dtype=np.float64).reshape(-1, 3)
         points = points[np.isfinite(points).all(axis=1)]
@@ -741,6 +894,7 @@ class AcousticESIKF:
                     np.linalg.norm(correction_value[3:6])
                 ),
                 rejection_reason=reason,
+                information_scale=information_scale,
             )
         if points.shape[0] < self.config.sonar_min_correspondences:
             return rejected_result("insufficient_input_points")
@@ -836,6 +990,38 @@ class AcousticESIKF:
                     jacobian[:, 3:6] @ translation_projector
                 )
                 adaptive_weight = 1.0
+            elif self.config.sonar_continuous_observability_weighting:
+                rotation_transform, _, rotation_response = (
+                    self._continuous_observability_transform(
+                        jacobian[:, 0:3],
+                        weights,
+                        absolute_knee=(
+                            self.config.degeneracy_rotation_eigenvalue
+                        ),
+                        relative_knee=self.config.degeneracy_min_eigen_ratio,
+                    )
+                )
+                translation_transform, _, translation_response = (
+                    self._continuous_observability_transform(
+                        jacobian[:, 3:6],
+                        weights,
+                        absolute_knee=self.config.degeneracy_eigenvalue,
+                        relative_knee=self.config.degeneracy_min_eigen_ratio,
+                    )
+                )
+                jacobian = jacobian.copy()
+                jacobian[:, 0:3] = (
+                    jacobian[:, 0:3] @ rotation_transform
+                )
+                jacobian[:, 3:6] = (
+                    jacobian[:, 3:6] @ translation_transform
+                )
+                adaptive_weight = float(
+                    min(
+                        np.min(rotation_response),
+                        np.min(translation_response),
+                    )
+                )
             else:
                 absolute_observability = (
                     minimum_translation_eigenvalue
@@ -854,6 +1040,12 @@ class AcousticESIKF:
                     )
                 )
                 weights *= adaptive_weight
+
+            # Observability is a property of the complete spatial patch.  The
+            # overlap correction belongs to the likelihood strength after
+            # that geometry has been analysed; applying it before the smooth
+            # spectral response would attenuate the same evidence twice.
+            weights *= information_scale
 
             acoustic_information = (
                 jacobian.T @ (weights[:, None] * jacobian)
@@ -984,8 +1176,41 @@ class AcousticESIKF:
             final_jacobian[:, 3:6] = (
                 final_jacobian[:, 3:6] @ translation_projector
             )
+        elif self.config.sonar_continuous_observability_weighting:
+            rotation_transform, _, rotation_response = (
+                self._continuous_observability_transform(
+                    final_jacobian[:, 0:3],
+                    final_weights,
+                    absolute_knee=(
+                        self.config.degeneracy_rotation_eigenvalue
+                    ),
+                    relative_knee=self.config.degeneracy_min_eigen_ratio,
+                )
+            )
+            translation_transform, _, translation_response = (
+                self._continuous_observability_transform(
+                    final_jacobian[:, 3:6],
+                    final_weights,
+                    absolute_knee=self.config.degeneracy_eigenvalue,
+                    relative_knee=self.config.degeneracy_min_eigen_ratio,
+                )
+            )
+            final_jacobian = final_jacobian.copy()
+            final_jacobian[:, 0:3] = (
+                final_jacobian[:, 0:3] @ rotation_transform
+            )
+            final_jacobian[:, 3:6] = (
+                final_jacobian[:, 3:6] @ translation_transform
+            )
+            adaptive_weight = float(
+                min(
+                    np.min(rotation_response),
+                    np.min(translation_response),
+                )
+            )
         else:
             final_weights *= adaptive_weight
+        final_weights *= information_scale
         final_information = prior_information + final_jacobian.T @ (
             final_weights[:, None] * final_jacobian
         )
@@ -1018,6 +1243,7 @@ class AcousticESIKF:
             ),
             translation_correction=float(np.linalg.norm(correction[3:6])),
             rejection_reason=None,
+            information_scale=information_scale,
         )
 
     def _intensity_linearization(
@@ -1091,8 +1317,9 @@ class AcousticESIKF:
                 anchor_id=anchor_id,
                 _candidate_cache=candidate_cache,
             )
-        for point_body, measured, group_id, sample in zip(
+        for point_body, point_world, measured, group_id, sample in zip(
             points_body,
+            points_world,
             measured_intensity,
             input_group_ids,
             intensity_samples,
@@ -1127,9 +1354,20 @@ class AcousticESIKF:
                     dtype=np.float64,
                 )
             )
-            variances.append(
+            photometric_variance = (
                 self.config.intensity_noise_std**2 + sample.variance
             )
+            if np.isfinite(sample.surface_z):
+                surface_scale_squared = (
+                    self.config.intensity_surface_consistency_std**2
+                    + max(0.0, float(sample.surface_variance))
+                )
+                elevation_residual = float(point_world[2] - sample.surface_z)
+                surface_weight = surface_scale_squared / (
+                    surface_scale_squared + elevation_residual**2
+                )
+                photometric_variance /= max(surface_weight, 1.0e-12)
+            variances.append(photometric_variance)
             reference_observation_ids.append(
                 int(sample.reference_observation_id)
             )

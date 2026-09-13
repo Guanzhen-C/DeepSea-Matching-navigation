@@ -8,7 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 2.42 x 1.81 km envelope and follows roughly 7.94 km per lap.
 exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --sonar-profile v2-standard \
-    --ping-hz 2.5 \
+    --ping-hz 5 \
+    --sonar-pings-in-water 2 \
     --survey-speed-mps 1.5 \
     --survey-center-x-m -3500 \
     --survey-center-y-m -1500 \

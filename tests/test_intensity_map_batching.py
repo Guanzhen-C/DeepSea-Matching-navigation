@@ -48,6 +48,10 @@ def test_batched_intensity_cell_statistics_match_pointwise_updates() -> None:
         np.testing.assert_allclose(
             actual.intensity_m2, expected.intensity_m2, rtol=1.0e-12, atol=1.0e-12
         )
+        np.testing.assert_allclose(actual.mean_z, expected.mean_z, atol=1.0e-12)
+        np.testing.assert_allclose(
+            actual.z_m2, expected.z_m2, rtol=1.0e-12, atol=1.0e-12
+        )
 
 
 def test_batched_intensity_insert_retains_valid_sample_accounting() -> None:
@@ -63,6 +67,8 @@ def test_batched_intensity_insert_retains_valid_sample_accounting() -> None:
     cell = next(iter(intensity_map._cells.values()))
     assert cell.count == 2
     np.testing.assert_allclose(cell.mean_xy, [0.4, 0.5])
+    assert cell.mean_z == -1.0
+    assert cell.z_m2 == 0.0
     assert cell.mean_intensity == 0.4
     assert cell.first_observation_id == 5
     assert cell.last_observation_id == 5

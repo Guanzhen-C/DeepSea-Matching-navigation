@@ -106,12 +106,16 @@ def test_unknown_v2_profile_is_rejected() -> None:
         get_v2_profile("ultra")
 
 
-def test_ten_hz_full_range_schedule_requires_four_distinguishable_pings() -> None:
+def test_full_range_schedule_requires_explicit_distinguishable_pings() -> None:
     travel_time = acoustic_two_way_travel_time_s(250.0, 1500.0)
 
     assert travel_time == pytest.approx(1.0 / 3.0)
     assert required_distinguishable_pings_in_water(3.0, 250.0, 1500.0) == 1
+    assert required_distinguishable_pings_in_water(5.0, 250.0, 1500.0) == 2
     assert required_distinguishable_pings_in_water(10.0, 250.0, 1500.0) == 4
+    assert maximum_supported_ping_rate_hz(250.0, 1500.0, 2) == pytest.approx(
+        6.0
+    )
     assert maximum_supported_ping_rate_hz(250.0, 1500.0, 4) == pytest.approx(
         12.0
     )

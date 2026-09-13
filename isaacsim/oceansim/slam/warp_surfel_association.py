@@ -281,9 +281,14 @@ class WarpSurfelAssociator:
             self._key_staging[:count] = snapshot.voxel_keys
             self._centroid_staging[:count] = snapshot.centroids
             self._normal_staging[:count] = snapshot.normals
-            self._voxel_keys.assign(self._key_staging)
-            self._centroids.assign(self._centroid_staging)
-            self._normals.assign(self._normal_staging)
+            # Capacity grows geometrically, but only the valid prefix belongs
+            # to this map revision.  Passing the whole staging allocation made
+            # every incremental ping copy up to almost twice as many rows to
+            # the device.  Warp accepts a shorter source and retains the
+            # destination allocation, so this is an exact transfer reduction.
+            self._voxel_keys.assign(self._key_staging[:count])
+            self._centroids.assign(self._centroid_staging[:count])
+            self._normals.assign(self._normal_staging[:count])
             wp.synchronize_device(self._device)
         self._snapshot = snapshot
         self._surfel_count = count

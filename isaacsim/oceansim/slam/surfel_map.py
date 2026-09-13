@@ -73,6 +73,36 @@ class _VoxelStats:
         self.intensity_sum += float(intensity)
         self.version += 1
 
+    def merge(
+        self,
+        count: int,
+        mean: np.ndarray,
+        scatter: np.ndarray,
+        intensity_sum: float,
+    ) -> None:
+        """Merge one voxel batch without changing its sufficient statistics."""
+
+        batch_count = int(count)
+        if batch_count <= 0:
+            return
+        batch_mean = np.asarray(mean, dtype=np.float64).reshape(3)
+        batch_scatter = np.asarray(scatter, dtype=np.float64).reshape(3, 3)
+        if self.count == 0:
+            self.count = batch_count
+            self.mean = batch_mean.copy()
+            self.scatter = batch_scatter.copy()
+        else:
+            previous_count = self.count
+            combined_count = previous_count + batch_count
+            delta = batch_mean - self.mean
+            self.mean += delta * (batch_count / float(combined_count))
+            self.scatter += batch_scatter + np.outer(delta, delta) * (
+                previous_count * batch_count / float(combined_count)
+            )
+            self.count = combined_count
+        self.intensity_sum += float(intensity_sum)
+        self.version += 1
+
 
 class SurfelVoxelMap:
     """Maintain acoustic surface statistics in an incremental voxel hash.
@@ -325,20 +355,43 @@ class SurfelVoxelMap:
                 intensity_values, nan=0.0, posinf=0.0, neginf=0.0
             )
 
-        for point, intensity in zip(points, intensity_values):
-            key = self.voxel_key(point)
+        if points.shape[0] == 0:
+            return 0
+
+        # Most acoustic pings contribute many neighbouring returns to the
+        # same coarse seabed voxel.  Group them in NumPy and merge Chan/Welford
+        # sufficient statistics once per occupied voxel instead of executing
+        # one Python hash lookup and allocation per return.
+        voxel_keys = np.floor(points / self.voxel_size).astype(np.int64)
+        unique_keys, inverse = np.unique(
+            voxel_keys, axis=0, return_inverse=True
+        )
+        order = np.argsort(inverse, kind="stable")
+        counts = np.bincount(inverse, minlength=unique_keys.shape[0])
+        starts = np.concatenate(([0], np.cumsum(counts)))
+        for index, key_array in enumerate(unique_keys):
+            selected = order[starts[index] : starts[index + 1]]
+            batch_points = points[selected]
+            batch_mean = np.mean(batch_points, axis=0)
+            centered = batch_points - batch_mean
+            batch_scatter = centered.T @ centered
+            key = tuple(int(value) for value in key_array)
             stats = self._voxels.get(key)
             if stats is None:
                 stats = _VoxelStats()
                 self._voxels[key] = stats
                 self._blocks.setdefault(self._block_key(key), set()).add(key)
             previous_count = stats.count
-            stats.add(point, float(intensity))
+            stats.merge(
+                int(selected.size),
+                batch_mean,
+                batch_scatter,
+                float(np.sum(intensity_values[selected])),
+            )
             if previous_count < self.min_points <= stats.count:
                 self._mature_voxel_count += 1
         self._point_count += int(points.shape[0])
-        if points.shape[0] > 0:
-            self._revision += 1
+        self._revision += 1
         return int(points.shape[0])
 
     def _surfel_for(

@@ -10,7 +10,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class IntensityMapSample:
-    """Locally fitted intensity and horizontal gradient at one map point."""
+    """Co-registered appearance and seabed surface at one map point."""
 
     intensity: float
     gradient_xy: np.ndarray
@@ -24,6 +24,15 @@ class IntensityMapSample:
     # Keyframe/submap whose coordinate frame owns all cells used by this
     # sample.  A fitted plane is never assembled from multiple anchors.
     anchor_id: int = -1
+    # The side-scan intensity belongs to the simultaneous bathymetric return,
+    # so retain the locally fitted seabed surface from those very same cells.
+    # The ESIKF uses it as a continuous association-consistency weight instead
+    # of treating the appearance map as an unrelated 2-D image.
+    surface_z: float = float("nan")
+    surface_gradient_xy: np.ndarray = field(
+        default_factory=lambda: np.zeros(2, dtype=np.float64)
+    )
+    surface_variance: float = float("inf")
 
 
 @dataclass(slots=True)
@@ -34,11 +43,18 @@ class _IntensityCell:
     )
     mean_intensity: float = 0.0
     intensity_m2: float = 0.0
+    mean_z: float = 0.0
+    z_m2: float = 0.0
     first_observation_id: int = -(2**31)
     last_observation_id: int = -(2**31)
 
     def add(
-        self, xy: np.ndarray, intensity: float, observation_id: int | None
+        self,
+        xy: np.ndarray,
+        intensity: float,
+        observation_id: int | None,
+        *,
+        elevation: float = 0.0,
     ) -> None:
         if observation_id is not None:
             identifier = int(observation_id)
@@ -57,6 +73,9 @@ class _IntensityCell:
         delta = float(intensity - self.mean_intensity)
         self.mean_intensity += delta / float(self.count)
         self.intensity_m2 += delta * float(intensity - self.mean_intensity)
+        delta_z = float(elevation - self.mean_z)
+        self.mean_z += delta_z / float(self.count)
+        self.z_m2 += delta_z * float(elevation - self.mean_z)
 
     def merge(
         self,
@@ -65,6 +84,9 @@ class _IntensityCell:
         mean_intensity: float,
         intensity_m2: float,
         observation_id: int | None,
+        *,
+        mean_z: float,
+        z_m2: float,
     ) -> None:
         """Merge exact sufficient statistics for one acquisition batch.
 
@@ -81,6 +103,8 @@ class _IntensityCell:
         batch_mean_xy = np.asarray(mean_xy, dtype=np.float64).reshape(2)
         batch_mean_intensity = float(mean_intensity)
         batch_m2 = max(0.0, float(intensity_m2))
+        batch_mean_z = float(mean_z)
+        batch_z_m2 = max(0.0, float(z_m2))
         if observation_id is not None:
             identifier = int(observation_id)
             if self.count == 0:
@@ -97,18 +121,29 @@ class _IntensityCell:
             self.mean_xy = batch_mean_xy.copy()
             self.mean_intensity = batch_mean_intensity
             self.intensity_m2 = batch_m2
+            self.mean_z = batch_mean_z
+            self.z_m2 = batch_z_m2
             return
 
         previous_count = self.count
         combined_count = previous_count + batch_count
         xy_delta = batch_mean_xy - self.mean_xy
         intensity_delta = batch_mean_intensity - self.mean_intensity
+        z_delta = batch_mean_z - self.mean_z
         batch_weight = batch_count / float(combined_count)
         self.mean_xy += xy_delta * batch_weight
         self.mean_intensity += intensity_delta * batch_weight
+        self.mean_z += z_delta * batch_weight
         self.intensity_m2 += batch_m2 + (
             intensity_delta
             * intensity_delta
+            * previous_count
+            * batch_count
+            / float(combined_count)
+        )
+        self.z_m2 += batch_z_m2 + (
+            z_delta
+            * z_delta
             * previous_count
             * batch_count
             / float(combined_count)
@@ -119,9 +154,13 @@ class _IntensityCell:
     def variance(self) -> float:
         return self.intensity_m2 / max(1, self.count - 1)
 
+    @property
+    def z_variance(self) -> float:
+        return self.z_m2 / max(1, self.count - 1)
+
 
 class AcousticIntensityMap:
-    """Sparse 2-D side-scan intensity map with local plane interpolation.
+    """Sparse co-registered bathymetry/intensity map for direct alignment.
 
     Integrated-sonar backscatter is already registered to the simultaneous
     bathymetric bottom detections. A weighted affine plane fitted to
@@ -240,6 +279,10 @@ class AcousticIntensityMap:
         )
         sum_x = np.bincount(inverse, weights=valid_points[:, 0])
         sum_y = np.bincount(inverse, weights=valid_points[:, 1])
+        sum_z = np.bincount(inverse, weights=valid_points[:, 2])
+        sum_z_squared = np.bincount(
+            inverse, weights=valid_points[:, 2] * valid_points[:, 2]
+        )
         sum_intensity = np.bincount(inverse, weights=valid_values)
         sum_intensity_squared = np.bincount(
             inverse, weights=valid_values * valid_values
@@ -250,10 +293,17 @@ class AcousticIntensityMap:
                 [sum_x[cell_index], sum_y[cell_index]], dtype=np.float64
             ) / float(cell_count)
             mean_intensity = sum_intensity[cell_index] / float(cell_count)
+            mean_z = sum_z[cell_index] / float(cell_count)
             cell_m2 = (
                 sum_intensity_squared[cell_index]
                 - sum_intensity[cell_index]
                 * sum_intensity[cell_index]
+                / float(cell_count)
+            )
+            cell_z_m2 = (
+                sum_z_squared[cell_index]
+                - sum_z[cell_index]
+                * sum_z[cell_index]
                 / float(cell_count)
             )
             spatial_key = int(key_values[0]), int(key_values[1])
@@ -286,6 +336,8 @@ class AcousticIntensityMap:
                 mean_intensity,
                 cell_m2,
                 observation_id,
+                mean_z=mean_z,
+                z_m2=cell_z_m2,
             )
         count = int(np.count_nonzero(valid))
         self._point_count += count
@@ -651,6 +703,8 @@ class AcousticIntensityMap:
             (points.shape[0], maximum_cells), dtype=np.float64
         )
         variances = np.zeros_like(intensities)
+        elevations = np.zeros_like(intensities)
+        elevation_variances = np.zeros_like(intensities)
         counts = np.zeros_like(intensities)
         observation_ids = np.full(
             (points.shape[0], maximum_cells),
@@ -694,6 +748,8 @@ class AcousticIntensityMap:
                 positions[point_index, slot] = cell.mean_xy
                 intensities[point_index, slot] = cell.mean_intensity
                 variances[point_index, slot] = cell.variance
+                elevations[point_index, slot] = cell.mean_z
+                elevation_variances[point_index, slot] = cell.z_variance
                 counts[point_index, slot] = cell.count
                 observation_ids[point_index, slot] = (
                     cell.last_observation_id
@@ -712,6 +768,8 @@ class AcousticIntensityMap:
         packed_positions = positions[eligible]
         packed_intensities = intensities[eligible]
         packed_variances = variances[eligible]
+        packed_elevations = elevations[eligible]
+        packed_elevation_variances = elevation_variances[eligible]
         packed_counts = counts[eligible]
         packed_observation_ids = observation_ids[eligible]
         delta = packed_positions - points[eligible, None, :2]
@@ -766,11 +824,21 @@ class AcousticIntensityMap:
         normal[:, 0, 0] += 1.0e-6
         normal[:, 1, 1] += 2.0e-3
         normal[:, 2, 2] += 2.0e-3
-        right = np.swapaxes(design, 1, 2) @ (
+        intensity_right = np.swapaxes(design, 1, 2) @ (
             weights * packed_intensities
         )[:, :, None]
-        coefficients = np.linalg.solve(normal, right)[:, :, 0]
+        surface_right = np.swapaxes(design, 1, 2) @ (
+            weights * packed_elevations
+        )[:, :, None]
+        # Solve both co-registered fields with one factorization of the shared
+        # spatial normal matrix.
+        joint_coefficients = np.linalg.solve(
+            normal, np.concatenate((intensity_right, surface_right), axis=2)
+        )
+        coefficients = joint_coefficients[:, :, 0]
+        surface_coefficients = joint_coefficients[:, :, 1]
         gradients = coefficients[:, 1:3]
+        surface_gradients = surface_coefficients[:, 1:3]
         fitted = np.sum(design * coefficients[:, None, :], axis=2)
         weight_sum = np.sum(weights, axis=1)
         residual_variance = np.sum(
@@ -779,6 +847,16 @@ class AcousticIntensityMap:
         cell_variance = np.sum(
             weights * packed_variances, axis=1
         ) / weight_sum
+        fitted_surface = np.sum(
+            design * surface_coefficients[:, None, :], axis=2
+        )
+        surface_residual_variance = np.sum(
+            weights * (packed_elevations - fitted_surface) ** 2,
+            axis=1,
+        ) / weight_sum
+        surface_cell_variance = np.sum(
+            weights * packed_elevation_variances, axis=1
+        ) / weight_sum
         latest_observation_ids = np.max(
             packed_observation_ids, axis=1
         )
@@ -786,6 +864,7 @@ class AcousticIntensityMap:
             covariance_supported
             & surrounded
             & np.isfinite(coefficients).all(axis=1)
+            & np.isfinite(surface_coefficients).all(axis=1)
             & (
                 np.linalg.norm(gradients, axis=1)
                 >= self.min_gradient
@@ -811,6 +890,17 @@ class AcousticIntensityMap:
                     latest_observation_ids[packed_index]
                 ),
                 anchor_id=fixed_anchor_id,
+                surface_z=float(surface_coefficients[packed_index, 0]),
+                surface_gradient_xy=np.asarray(
+                    surface_gradients[packed_index], dtype=np.float64
+                ).copy(),
+                surface_variance=max(
+                    float(
+                        surface_residual_variance[packed_index]
+                        + surface_cell_variance[packed_index]
+                    ),
+                    1.0e-4,
+                ),
             )
         return samples
 
@@ -837,6 +927,16 @@ class AcousticIntensityMap:
         )
         variances = np.fromiter(
             (cell.variance for cell in cells),
+            dtype=np.float64,
+            count=len(cells),
+        )
+        elevations = np.fromiter(
+            (cell.mean_z for cell in cells),
+            dtype=np.float64,
+            count=len(cells),
+        )
+        elevation_variances = np.fromiter(
+            (cell.z_variance for cell in cells),
             dtype=np.float64,
             count=len(cells),
         )
@@ -880,14 +980,22 @@ class AcousticIntensityMap:
         normal[0, 0] += 1.0e-6
         normal[1, 1] += 2.0e-3
         normal[2, 2] += 2.0e-3
-        right = design.T @ (weights * intensities)
+        right = np.column_stack(
+            (
+                design.T @ (weights * intensities),
+                design.T @ (weights * elevations),
+            )
+        )
         try:
-            coefficients = np.linalg.solve(normal, right)
+            joint_coefficients = np.linalg.solve(normal, right)
         except np.linalg.LinAlgError:
             return None
+        coefficients = joint_coefficients[:, 0]
+        surface_coefficients = joint_coefficients[:, 1]
         gradient = coefficients[1:3]
         if (
             not np.isfinite(coefficients).all()
+            or not np.isfinite(surface_coefficients).all()
             or np.linalg.norm(gradient) < self.min_gradient
         ):
             return None
@@ -896,6 +1004,15 @@ class AcousticIntensityMap:
             np.average((intensities - fitted) ** 2, weights=weights)
         )
         cell_variance = float(np.average(variances, weights=weights))
+        fitted_surface = design @ surface_coefficients
+        surface_residual_variance = float(
+            np.average(
+                (elevations - fitted_surface) ** 2, weights=weights
+            )
+        )
+        surface_cell_variance = float(
+            np.average(elevation_variances, weights=weights)
+        )
         return IntensityMapSample(
             intensity=float(coefficients[0]),
             gradient_xy=np.asarray(gradient, dtype=np.float64),
@@ -903,4 +1020,12 @@ class AcousticIntensityMap:
             neighbours=len(positions),
             reference_observation_id=latest_observation_id,
             anchor_id=int(anchor_id),
+            surface_z=float(surface_coefficients[0]),
+            surface_gradient_xy=np.asarray(
+                surface_coefficients[1:3], dtype=np.float64
+            ),
+            surface_variance=max(
+                surface_residual_variance + surface_cell_variance,
+                1.0e-4,
+            ),
         )

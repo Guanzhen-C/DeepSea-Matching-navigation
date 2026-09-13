@@ -6,21 +6,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # This is a closed, approximately 72.35 km 3-D traversal of the largest connected
 # Monterey Canyon region having both measured bathymetry and backscatter.  It
 # spans about 22.75 x 16.38 km, but is not exhaustive lawnmower sonar coverage.
-# At 1.5 m/s and 10 pings/s, consecutive integrated bathymetry/side-scan
-# acquisitions advance 0.15 m.  The documented 1.2 m standard-mode footprint
-# therefore overlaps by 1.05 m (87.5%); seven of its eight 0.15 m image rows
-# coincide spatially with the next ping.  Four distinguishable pings in water
-# are an explicit scheduling assumption required for 10 Hz at 250 m range.
+# At 1.5 m/s and 5 pings/s, consecutive integrated bathymetry/side-scan
+# acquisitions advance 0.30 m.  The documented 1.2 m standard-mode footprint
+# therefore overlaps by 0.90 m (75%); six of its eight 0.15 m image rows
+# coincide spatially with the next ping.  Two distinguishable pings in water
+# are an explicit scheduling assumption required for 5 Hz at 250 m range.
 #
 # Defaults preserve every sensor and estimator event while accelerating only
 # presentation.  The event loop remains at IMU/DVL/depth/sonar timestamps;
 # operator images are capped at 2 simulated Hz and only the latest ping before
 # a rendered frame is uploaded.  The raw waterfall still accumulates every
 # ping, while each presented image advances by at most 0.75 m at 1.5 m/s.
-# Each ping already contains eight simultaneous along-track rows. Geometry and
-# direct intensity therefore update once per physical acquisition; temporal
-# ping grouping would repeat the same 87.5%-overlapped footprint.  The direct
-# intensity residual excludes the latest eight pings from its reference map:
+# Each ping already contains eight simultaneous along-track rows, but its
+# 1.2 m aperture is still narrow compared with the 5 m terrain cells.  A
+# causal eight-ping sliding source window spans about 3.3 m along track and is
+# motion-compensated before every physical-ping update.  Only the oldest ping
+# is committed after an update, so the current measurement never matches
+# itself. Consecutive windows share 7/8 acquisitions; their ESIKF likelihood
+# is therefore tempered by 1/8 so reusing a return across the window does not
+# manufacture independent information. Sensor acquisition and estimator
+# output both remain at 5 Hz.  The direct intensity residual excludes the
+# latest four pings from its reference map:
 # at 1.5 m/s this supplies a 1.2 m causal baseline, exactly one documented
 # standard-mode strip, so duplicated along-track rows cannot be reused as
 # independent evidence. Every current ping still updates against the complete
@@ -31,7 +37,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # anchor mirrors FAST-LIVO2's persistent local map instead of fragmenting it
 # at every 30 s global keyframe.  These are continuous baseline/covariance/map
 # parameters; no extra acceptance threshold is introduced. One 30 s
-# pose-graph interval contains 300 pings at 10 Hz. Retaining the
+# pose-graph interval contains 150 pings at 5 Hz. Retaining the
 # complete interval supplies about 45 m of along-track terrain-match aperture;
 # voxel centroids keep the numerical matcher budget fixed at 3072 points. The
 # co-registered side-scan strip independently refines accepted bathymetric
@@ -57,17 +63,20 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --initial-position-offset-y-m -4 \
     --initial-yaw-offset-deg 1.5 \
     --sonar-profile v2-standard \
-    --ping-hz 10 \
-    --sonar-pings-in-water 4 \
+    --ping-hz 5 \
+    --sonar-pings-in-water 2 \
     --sidescan-imaging-rays-per-side 256 \
     --sidescan-slam-stride 8 \
     --slam-voxel-size-m 5.0 \
     --intensity-voxel-size-m 3.0 \
     --map-insert-stride 2 \
-    --mbes-group-pings 1 \
+    --mbes-group-pings 8 \
+    --enable-mbes-sliding-window \
+    --local-observability-mode continuous \
+    --local-intensity-surface-consistency-std-m 0.75 \
     --intensity-group-pings 1 \
     --intensity-min-group-span-m 1.0 \
-    --intensity-reference-delay-pings 8 \
+    --intensity-reference-delay-pings 4 \
     --intensity-effective-independent-samples 32 \
     --intensity-submap-anchor-interval-s 120 \
     --intensity-factor-min-interval-s 300 \
@@ -86,7 +95,7 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --terrain-gauge-minimum-baseline-m 40 \
     --terrain-gauge-maximum-position-residual-m 5 \
     --terrain-gauge-maximum-yaw-residual-deg 3 \
-    --terrain-match-window-pings 300 \
+    --terrain-match-window-pings 150 \
     --terrain-patch-motion-source acoustic-predictive \
     --terrain-match-maximum-points 3072 \
     --terrain-prior-surface low-pass \
@@ -96,7 +105,7 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --terrain-recovery-after-rejections 3 \
     --terrain-emergency-recovery-translation-window-m 150 \
     --enable-global-terrain-relocalization \
-    --terrain-global-window-pings 1200 \
+    --terrain-global-window-pings 600 \
     --terrain-global-pyramid-stride 4 \
     --terrain-global-yaw-window-deg 90 \
     --terrain-global-yaw-step-deg 5 \

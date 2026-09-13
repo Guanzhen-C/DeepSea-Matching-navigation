@@ -198,6 +198,17 @@ def test_fixed_anchor_batch_matches_scalar_query() -> None:
             actual.gradient_xy, expected.gradient_xy, atol=1.0e-14
         )
         np.testing.assert_allclose(actual.variance, expected.variance, atol=1.0e-14)
+        np.testing.assert_allclose(actual.surface_z, expected.surface_z, atol=1.0e-14)
+        np.testing.assert_allclose(
+            actual.surface_gradient_xy,
+            expected.surface_gradient_xy,
+            atol=1.0e-14,
+        )
+        np.testing.assert_allclose(
+            actual.surface_variance,
+            expected.surface_variance,
+            atol=1.0e-14,
+        )
 
 
 def test_unrestricted_batch_matches_scalar_anchor_selection() -> None:
