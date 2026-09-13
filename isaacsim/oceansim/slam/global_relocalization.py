@@ -6,11 +6,13 @@ but it cannot recover after the navigation error has grown beyond the bounded
 search window.  This module supplies a coarse, whole-map place-recognition
 stage for that exceptional case.
 
-The search is intentionally only a proposal generator.  A returned candidate
-must still be refined by :class:`BathymetricTerrainMatcher`, checked against the
-co-registered backscatter observation, and confirmed by a later disjoint sonar
-strip before it can become a pose-graph factor.  Simulator truth is never an
-input.
+The search is intentionally only a proposal generator.  Every spatially
+separated candidate must still pass bounded three-dimensional occupancy
+verification, metric :class:`BathymetricTerrainMatcher` refinement, and the
+co-registered backscatter check.  A persistent multi-hypothesis tracker then
+propagates all surviving basins with local odometry and requires repeated,
+non-overlapping acquisition windows before one candidate can become a
+pose-graph factor.  Simulator truth is never an input.
 """
 
 from __future__ import annotations
@@ -175,6 +177,10 @@ class GlobalTerrainSearchResult:
     evaluated_yaws: int
     finite_lattice_candidates: int
     state_timestamp: float
+    bathymetry_observation_std_m: float = 0.0
+    backscatter_observation_log_std: float = 0.0
+    bathymetry_observability: float = 0.0
+    backscatter_observability: float = 0.0
 
     def __post_init__(self) -> None:
         if not isinstance(self.accepted, (bool, np.bool_)):
@@ -196,6 +202,18 @@ class GlobalTerrainSearchResult:
                 raise ValueError(f"{name} must be a non-negative integer")
         if not np.isfinite(float(self.state_timestamp)):
             raise ValueError("state_timestamp must be finite")
+        for name in (
+            "bathymetry_observation_std_m",
+            "backscatter_observation_log_std",
+            "bathymetry_observability",
+            "backscatter_observability",
+        ):
+            value = float(getattr(self, name))
+            if not np.isfinite(value) or value < 0.0:
+                raise ValueError(f"{name} must be finite and non-negative")
+            if name.endswith("observability") and value > 1.0:
+                raise ValueError(f"{name} must not exceed one")
+            object.__setattr__(self, name, value)
 
 
 @dataclass(frozen=True)
@@ -479,6 +497,10 @@ class GlobalTerrainRelocalizer:
         gap: float = float("nan"),
         evaluated_yaws: int = 0,
         lattice_candidates: int = 0,
+        bathymetry_observation_std_m: float = 0.0,
+        backscatter_observation_log_std: float = 0.0,
+        bathymetry_observability: float = 0.0,
+        backscatter_observability: float = 0.0,
     ) -> GlobalTerrainSearchResult:
         return GlobalTerrainSearchResult(
             accepted=False,
@@ -490,6 +512,10 @@ class GlobalTerrainRelocalizer:
             evaluated_yaws=evaluated_yaws,
             finite_lattice_candidates=lattice_candidates,
             state_timestamp=float(state.timestamp),
+            bathymetry_observation_std_m=bathymetry_observation_std_m,
+            backscatter_observation_log_std=backscatter_observation_log_std,
+            bathymetry_observability=bathymetry_observability,
+            backscatter_observability=backscatter_observability,
         )
 
     def search(
@@ -538,6 +564,35 @@ class GlobalTerrainRelocalizer:
             backscatter_points.shape[0] < self.config.minimum_backscatter_bins
         ):
             return self._reject("insufficient_backscatter_points", state)
+
+        # These are observation-side information indicators, not acceptance
+        # gates.  They let the persistent multi-hypothesis tracker reduce the
+        # influence of a flat MBES strip or low-texture side-scan strip instead
+        # of applying one fixed bathymetry/backscatter weight everywhere.
+        bathymetry_observation_std_m = float(
+            np.std(bathymetry[:, 2], dtype=np.float64)
+        )
+        backscatter_observation_log_std = (
+            float(np.std(backscatter_texture, dtype=np.float64))
+            if backscatter_texture.size
+            else 0.0
+        )
+        bathymetry_observability = float(
+            np.clip(
+                bathymetry_observation_std_m
+                / max(10.0 * self.config.minimum_bathymetry_std_m, 1.0e-12),
+                0.0,
+                1.0,
+            )
+        )
+        backscatter_observability = float(
+            np.clip(
+                backscatter_observation_log_std
+                / max(10.0 * self.config.minimum_backscatter_log_std, 1.0e-12),
+                0.0,
+                1.0,
+            )
+        )
 
         roll, pitch, state_yaw = rpy_from_rotation(state.rotation)
         yaw_center = state_yaw if yaw_center_rad is None else float(yaw_center_rad)
@@ -709,6 +764,12 @@ class GlobalTerrainRelocalizer:
                 state,
                 evaluated_yaws=evaluated_yaws,
                 lattice_candidates=lattice_candidates,
+                bathymetry_observation_std_m=bathymetry_observation_std_m,
+                backscatter_observation_log_std=(
+                    backscatter_observation_log_std
+                ),
+                bathymetry_observability=bathymetry_observability,
+                backscatter_observability=backscatter_observability,
             )
         raw_candidates.sort(key=lambda candidate: candidate.score, reverse=True)
         separated: list[_RawCandidate] = []
@@ -758,6 +819,12 @@ class GlobalTerrainRelocalizer:
                 gap=gap,
                 evaluated_yaws=evaluated_yaws,
                 lattice_candidates=lattice_candidates,
+                bathymetry_observation_std_m=bathymetry_observation_std_m,
+                backscatter_observation_log_std=(
+                    backscatter_observation_log_std
+                ),
+                bathymetry_observability=bathymetry_observability,
+                backscatter_observability=backscatter_observability,
             )
         if gap < self.config.minimum_basin_score_gap:
             return self._reject(
@@ -769,6 +836,12 @@ class GlobalTerrainRelocalizer:
                 gap=gap,
                 evaluated_yaws=evaluated_yaws,
                 lattice_candidates=lattice_candidates,
+                bathymetry_observation_std_m=bathymetry_observation_std_m,
+                backscatter_observation_log_std=(
+                    backscatter_observation_log_std
+                ),
+                bathymetry_observability=bathymetry_observability,
+                backscatter_observability=backscatter_observability,
             )
         return GlobalTerrainSearchResult(
             accepted=True,
@@ -780,4 +853,8 @@ class GlobalTerrainRelocalizer:
             evaluated_yaws=evaluated_yaws,
             finite_lattice_candidates=lattice_candidates,
             state_timestamp=float(state.timestamp),
+            bathymetry_observation_std_m=bathymetry_observation_std_m,
+            backscatter_observation_log_std=backscatter_observation_log_std,
+            bathymetry_observability=bathymetry_observability,
+            backscatter_observability=backscatter_observability,
         )

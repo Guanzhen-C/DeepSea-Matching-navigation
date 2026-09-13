@@ -35,6 +35,174 @@ from .math3d import project_to_so3, so3_exp, so3_log
 from .real_bathymetry import MeasuredBathymetryGrid
 
 
+def information_with_covariance_floor(
+    information: np.ndarray,
+    floor_covariance: np.ndarray,
+) -> np.ndarray:
+    """Add model uncertainty without inventing unobservable information.
+
+    A pseudoinverse represents an exactly unobservable direction with zero
+    covariance.  Adding a diagonal floor to that matrix and inverting it
+    would therefore turn the null direction into a precise measurement.  This
+    routine instead performs the covariance addition only in the observable
+    eigenspace of the supplied information matrix and lifts the result back
+    with the original nullspace unchanged.
+    """
+
+    source = np.asarray(information, dtype=np.float64)
+    floor = np.asarray(floor_covariance, dtype=np.float64)
+    if source.ndim != 2 or source.shape[0] != source.shape[1]:
+        raise ValueError("information must be a square matrix")
+    if floor.shape != source.shape:
+        raise ValueError("floor_covariance must match information shape")
+    source = 0.5 * (source + source.T)
+    floor = 0.5 * (floor + floor.T)
+    if not np.isfinite(source).all() or not np.isfinite(floor).all():
+        raise ValueError("information and floor covariance must be finite")
+    try:
+        eigenvalues, eigenvectors = np.linalg.eigh(source)
+        floor_eigenvalues = np.linalg.eigvalsh(floor)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("covariance-floor eigendecomposition failed") from exc
+    scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+    tolerance = 1.0e-10 * scale
+    if float(eigenvalues[0]) < -tolerance:
+        raise ValueError("information must be positive semidefinite")
+    floor_scale = max(float(np.max(np.abs(floor_eigenvalues))), 1.0)
+    if float(floor_eigenvalues[0]) < -1.0e-10 * floor_scale:
+        raise ValueError("floor_covariance must be positive semidefinite")
+    observable = eigenvalues > tolerance
+    if not np.any(observable):
+        return np.zeros_like(source)
+    basis = eigenvectors[:, observable]
+    observable_covariance = np.diag(1.0 / eigenvalues[observable])
+    observable_covariance += basis.T @ floor @ basis
+    reduced_information = np.linalg.pinv(
+        observable_covariance, rcond=1.0e-12, hermitian=True
+    )
+    result = basis @ reduced_information @ basis.T
+    return 0.5 * (result + result.T)
+
+
+def covariance_intersection_pose2(
+    first_pose2: np.ndarray,
+    first_information: np.ndarray,
+    second_pose2: np.ndarray,
+    second_information: np.ndarray,
+    *,
+    first_weight: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    """Fuse correlated planar estimates with covariance intersection.
+
+    When ``first_weight`` is omitted, the scalar CI weight is selected by
+    minimizing the log-determinant of the fused covariance.  The derivative
+    of ``log(det(w I1 + (1-w) I2))`` is monotone, so a deterministic bisection
+    finds the global optimum without assuming that MBES and side-scan errors
+    are independent.
+    """
+
+    first_pose = np.asarray(first_pose2, dtype=np.float64).reshape(3)
+    second_pose = np.asarray(second_pose2, dtype=np.float64).reshape(3)
+    first_info = np.asarray(
+        first_information, dtype=np.float64
+    ).reshape(3, 3)
+    second_info = np.asarray(
+        second_information, dtype=np.float64
+    ).reshape(3, 3)
+    first_info = 0.5 * (first_info + first_info.T)
+    second_info = 0.5 * (second_info + second_info.T)
+    if not (
+        np.isfinite(first_pose).all()
+        and np.isfinite(second_pose).all()
+        and np.isfinite(first_info).all()
+        and np.isfinite(second_info).all()
+    ):
+        raise ValueError("CI poses and information matrices must be finite")
+    try:
+        first_eigenvalues, first_eigenvectors = np.linalg.eigh(first_info)
+        second_eigenvalues, second_eigenvectors = np.linalg.eigh(second_info)
+        scale = max(
+            float(np.max(np.abs(first_eigenvalues))),
+            float(np.max(np.abs(second_eigenvalues))),
+            1.0,
+        )
+        tolerance = 1.0e-10 * scale
+        if (
+            float(first_eigenvalues[0]) < -tolerance
+            or float(second_eigenvalues[0]) < -tolerance
+        ):
+            raise ValueError(
+                "CI information matrices must be positive semidefinite"
+            )
+        first_info = (
+            first_eigenvectors
+            @ np.diag(np.maximum(first_eigenvalues, 0.0))
+            @ first_eigenvectors.T
+        )
+        second_info = (
+            second_eigenvectors
+            @ np.diag(np.maximum(second_eigenvalues, 0.0))
+            @ second_eigenvectors.T
+        )
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("CI information eigendecomposition failed") from exc
+
+    if first_weight is None:
+        difference = first_info - second_info
+        # This tiny term is used only while selecting the scalar weight.  The
+        # returned information remains unregularized, so an actually
+        # unobservable direction stays unobservable.
+        numerical_regularizer = 1.0e-12 * scale * np.eye(3)
+
+        def derivative(weight: float) -> float:
+            combined = (
+                second_info + weight * difference + numerical_regularizer
+            )
+            return float(np.trace(np.linalg.solve(combined, difference)))
+
+        derivative_at_zero = derivative(0.0)
+        derivative_at_one = derivative(1.0)
+        if derivative_at_zero <= 0.0:
+            weight = 0.0
+        elif derivative_at_one >= 0.0:
+            weight = 1.0
+        else:
+            lower = 0.0
+            upper = 1.0
+            for _ in range(60):
+                midpoint = 0.5 * (lower + upper)
+                if derivative(midpoint) > 0.0:
+                    lower = midpoint
+                else:
+                    upper = midpoint
+            weight = 0.5 * (lower + upper)
+    else:
+        weight = float(first_weight)
+        if not np.isfinite(weight) or not 0.0 <= weight <= 1.0:
+            raise ValueError("first_weight must lie in [0, 1] or be None")
+
+    second_weight = 1.0 - weight
+    combined_information = (
+        weight * first_info + second_weight * second_info
+    )
+    delta = second_pose - first_pose
+    delta[2] = math.atan2(math.sin(delta[2]), math.cos(delta[2]))
+    right_hand_side = second_weight * second_info @ delta
+    try:
+        fused_delta = np.linalg.solve(
+            combined_information, right_hand_side
+        )
+    except np.linalg.LinAlgError:
+        fused_delta = np.linalg.pinv(
+            combined_information, rcond=1.0e-12, hermitian=True
+        ) @ right_hand_side
+    fused_pose = first_pose + fused_delta
+    fused_pose[2] = math.atan2(
+        math.sin(fused_pose[2]), math.cos(fused_pose[2])
+    )
+    return fused_pose, combined_information, float(weight)
+
+
 @dataclass(frozen=True)
 class TerrainMatcherConfig:
     """Numerical and statistical gates for bathymetric terrain matching.
@@ -952,12 +1120,18 @@ class TerrainEmergencyRecoveryController:
         confirmation_position_tolerance_m: float | None = None,
         confirmation_yaw_tolerance_deg: float | None = None,
         confirmation_source: str = "emergency",
+        externally_confirmed_independent_evidence: int | None = None,
     ) -> TerrainEmergencyRecoveryConfirmation:
         """Validate one requested strict result and possibly confirm fusion.
 
         The optional per-match tolerances support a longer, independently
         configured whole-map strip.  Omitting them preserves the controller's
-        ordinary bounded-recovery policy.
+        ordinary bounded-recovery policy.  A separate persistent
+        multi-hypothesis policy may supply
+        ``externally_confirmed_independent_evidence``.  Two or more genuinely
+        disjoint windows then replace this controller's older two-strip hold;
+        the strict rank-three checks still apply and the graph insertion must
+        still report its outcome.
         """
 
         if self._requested_observation != self.observation_index:
@@ -992,6 +1166,19 @@ class TerrainEmergencyRecoveryController:
         matched = self._pose2(matched_pose2, "matched_pose2")
         if not isinstance(confirmation_source, str) or not confirmation_source:
             raise ValueError("confirmation_source must be a nonempty string")
+        external_evidence = None
+        if externally_confirmed_independent_evidence is not None:
+            value = externally_confirmed_independent_evidence
+            if (
+                isinstance(value, (bool, np.bool_))
+                or int(value) != value
+                or int(value) < 2
+            ):
+                raise ValueError(
+                    "externally confirmed evidence must contain at least two "
+                    "independent windows"
+                )
+            external_evidence = int(value)
         position_tolerance_m = (
             self.confirmation_position_tolerance_m
             if confirmation_position_tolerance_m is None
@@ -1026,6 +1213,21 @@ class TerrainEmergencyRecoveryController:
             return self._confirmation(False, "recovery_rejected")
         if rank != 3 or translation_rank != 2 or not yaw_is_observable:
             return self._confirmation(False, "strict_rank_three_required")
+
+        if external_evidence is not None:
+            # The external cohort filter has already propagated and compared
+            # each disjoint window and evaluated the explicit null state.  Do
+            # not demand a fourth strip through the legacy pending-hypothesis
+            # mechanism.  Mark an outcome as outstanding so a rejected graph
+            # insertion still enters the ordinary cooldown path.
+            self._pending = None
+            self.confirmed_recoveries += 1
+            self._confirmed_factor_awaiting_outcome = True
+            return self._confirmation(
+                True,
+                "confirmed_by_persistent_cohort",
+                acquisition_windows_disjoint=True,
+            )
 
         if self._pending is None:
             self._pending = _PendingTerrainEmergencyMatch(
@@ -1251,9 +1453,25 @@ class BackscatterMatcherConfig:
     radiometric_log_floor: float = 0.01
     horizontal_std_m: float = 2.5
     yaw_std_deg: float = 1.5
+    # Optional scale-space/context scoring for long global strips.  Empty
+    # scales preserve the original pointwise matcher exactly.  This adapts the
+    # reliability principles of SC-Match to our different input contract
+    # (geocoded reflectivity samples against a prior mosaic), rather than
+    # claiming to reproduce its image-feature pipeline.
+    scale_space_cell_sizes_m: tuple[float, ...] = ()
+    scale_space_weight: float = 0.0
+    context_consistency_weight: float = 0.0
+    context_length_m: float = 40.0
+    minimum_scale_cells: int = 12
+    minimum_context_points: int = 24
 
     def __post_init__(self) -> None:
-        for name in ("maximum_points", "minimum_points"):
+        for name in (
+            "maximum_points",
+            "minimum_points",
+            "minimum_scale_cells",
+            "minimum_context_points",
+        ):
             value = getattr(self, name)
             if (
                 isinstance(value, (bool, np.bool_))
@@ -1276,6 +1494,7 @@ class BackscatterMatcherConfig:
             "radiometric_log_floor",
             "horizontal_std_m",
             "yaw_std_deg",
+            "context_length_m",
         )
         for name in positive:
             value = float(getattr(self, name))
@@ -1294,6 +1513,32 @@ class BackscatterMatcherConfig:
             raise ValueError("coarse translation step exceeds search window")
         if self.coarse_yaw_step_deg > self.maximum_yaw_deg:
             raise ValueError("coarse yaw step exceeds search window")
+        try:
+            scales = tuple(float(value) for value in self.scale_space_cell_sizes_m)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "scale_space_cell_sizes_m must contain finite positive values"
+            ) from exc
+        if any(not np.isfinite(value) or value <= 0.0 for value in scales):
+            raise ValueError(
+                "scale_space_cell_sizes_m must contain finite positive values"
+            )
+        if tuple(sorted(set(scales))) != scales:
+            raise ValueError(
+                "scale_space_cell_sizes_m must be unique and increasing"
+            )
+        object.__setattr__(self, "scale_space_cell_sizes_m", scales)
+        for name in ("scale_space_weight", "context_consistency_weight"):
+            value = float(getattr(self, name))
+            if not np.isfinite(value) or not 0.0 <= value < 1.0:
+                raise ValueError(f"{name} must lie in [0, 1)")
+            object.__setattr__(self, name, value)
+        if self.scale_space_weight > 0.0 and not scales:
+            raise ValueError("positive scale_space_weight requires scale sizes")
+        if self.scale_space_weight + self.context_consistency_weight >= 1.0:
+            raise ValueError(
+                "scale-space and context weights must sum to less than one"
+            )
 
 
 @dataclass(frozen=True)
@@ -1314,6 +1559,10 @@ class BackscatterMatchResult:
     observation_texture_std: float
     map_texture_std: float
     evaluated_candidates: int
+    fine_correlation_after: float = float("nan")
+    scale_space_correlation_after: float = float("nan")
+    context_consistency_after: float = float("nan")
+    valid_contexts_after: int = 0
     rejection_reason: str | None = None
 
     def __post_init__(self) -> None:
@@ -1377,6 +1626,108 @@ class BackscatterMapMatcher:
             coefficients[0] = float(np.mean(values))
         return values - design @ coefficients
 
+    @staticmethod
+    def _spatial_group_ids(
+        points_body: np.ndarray, cell_size_m: float
+    ) -> np.ndarray:
+        cells = np.floor(points_body[:, :2] / float(cell_size_m)).astype(
+            np.int64
+        )
+        return np.unique(cells, axis=0, return_inverse=True)[1]
+
+    @staticmethod
+    def _context_group_ids(
+        points_body: np.ndarray, context_length_m: float
+    ) -> np.ndarray:
+        along_track = points_body[:, 0]
+        start = float(np.min(along_track))
+        segment = np.floor(
+            (along_track - start) / float(context_length_m)
+        ).astype(np.int64)
+        side = (points_body[:, 1] >= 0.0).astype(np.int64)
+        pairs = np.column_stack((segment, side))
+        return np.unique(pairs, axis=0, return_inverse=True)[1]
+
+    @staticmethod
+    def _normalized_correlation(first: np.ndarray, second: np.ndarray) -> float:
+        first_centered = first - float(np.mean(first))
+        second_centered = second - float(np.mean(second))
+        denominator = float(
+            np.linalg.norm(first_centered) * np.linalg.norm(second_centered)
+        )
+        if denominator <= 1.0e-12:
+            return float("nan")
+        return float(np.dot(first_centered, second_centered) / denominator)
+
+    def _scale_space_correlation(
+        self,
+        observation_texture: np.ndarray,
+        map_texture: np.ndarray,
+        scale_group_ids: tuple[np.ndarray, ...],
+        valid: np.ndarray,
+    ) -> float:
+        if self.config.scale_space_weight <= 0.0:
+            return float("nan")
+        correlations: list[float] = []
+        for all_group_ids in scale_group_ids:
+            group_ids = all_group_ids[valid]
+            group_count = int(np.max(group_ids)) + 1 if group_ids.size else 0
+            if group_count < self.config.minimum_scale_cells:
+                continue
+            counts = np.bincount(group_ids, minlength=group_count)
+            usable = counts >= 2
+            if np.count_nonzero(usable) < self.config.minimum_scale_cells:
+                continue
+            observation_means = np.bincount(
+                group_ids,
+                weights=observation_texture,
+                minlength=group_count,
+            ) / np.maximum(counts, 1)
+            map_means = np.bincount(
+                group_ids,
+                weights=map_texture,
+                minlength=group_count,
+            ) / np.maximum(counts, 1)
+            correlation = self._normalized_correlation(
+                observation_means[usable], map_means[usable]
+            )
+            if np.isfinite(correlation):
+                correlations.append(correlation)
+        if not correlations:
+            return float("nan")
+        # A median prevents one resolution from dominating simply because a
+        # repeated texture happens to correlate at that cell size.
+        return float(np.median(correlations))
+
+    def _context_consistency(
+        self,
+        observation_texture: np.ndarray,
+        map_texture: np.ndarray,
+        all_context_ids: np.ndarray,
+        valid: np.ndarray,
+    ) -> tuple[float, int]:
+        if self.config.context_consistency_weight <= 0.0:
+            return float("nan"), 0
+        context_ids = all_context_ids[valid]
+        correlations: list[float] = []
+        for context_id in np.unique(context_ids):
+            selected = context_ids == context_id
+            if np.count_nonzero(selected) < self.config.minimum_context_points:
+                continue
+            correlation = self._normalized_correlation(
+                observation_texture[selected], map_texture[selected]
+            )
+            if np.isfinite(correlation):
+                correlations.append(correlation)
+        if not correlations:
+            return float("nan"), 0
+        values = np.asarray(correlations, dtype=np.float64)
+        positive_fraction = float(np.mean(values > 0.0))
+        consistency = 0.5 * float(np.median(values)) + 0.5 * (
+            2.0 * positive_fraction - 1.0
+        )
+        return float(np.clip(consistency, -1.0, 1.0)), int(values.size)
+
     def _score(
         self,
         correction: np.ndarray,
@@ -1384,7 +1735,9 @@ class BackscatterMapMatcher:
         offsets_world: np.ndarray,
         observed: np.ndarray,
         design: np.ndarray,
-    ) -> tuple[float, int, float, float, float]:
+        scale_group_ids: tuple[np.ndarray, ...],
+        context_group_ids: np.ndarray,
+    ) -> tuple[float, int, float, float, float, float, float, float, int]:
         yaw = float(correction[2])
         cosine = math.cos(yaw)
         sine = math.sin(yaw)
@@ -1402,7 +1755,10 @@ class BackscatterMapMatcher:
             count < self.config.minimum_points
             or valid_fraction < self.config.minimum_valid_fraction
         ):
-            return float("-inf"), count, valid_fraction, 0.0, 0.0
+            return (
+                float("-inf"), count, valid_fraction, 0.0, 0.0,
+                float("nan"), float("nan"), float("nan"), 0,
+            )
         selected_design = design[valid]
         # The fast sonar model is multiplicative: reflectivity is multiplied
         # by incidence, spreading, absorption and a per-ping normalization.
@@ -1441,6 +1797,10 @@ class BackscatterMapMatcher:
                 valid_fraction,
                 observation_std,
                 map_std,
+                float("nan"),
+                float("nan"),
+                float("nan"),
+                0,
             )
         denominator = max(
             float(
@@ -1449,10 +1809,48 @@ class BackscatterMapMatcher:
             ),
             1.0e-12,
         )
-        correlation = float(
+        fine_correlation = float(
             np.dot(observation_texture, map_texture) / denominator
         )
-        return correlation, count, valid_fraction, observation_std, map_std
+        scale_correlation = self._scale_space_correlation(
+            observation_texture,
+            map_texture,
+            scale_group_ids,
+            valid,
+        )
+        context_consistency, valid_contexts = self._context_consistency(
+            observation_texture,
+            map_texture,
+            context_group_ids,
+            valid,
+        )
+        scale_weight = (
+            self.config.scale_space_weight
+            if np.isfinite(scale_correlation)
+            else 0.0
+        )
+        context_weight = (
+            self.config.context_consistency_weight
+            if np.isfinite(context_consistency)
+            else 0.0
+        )
+        fine_weight = 1.0 - scale_weight - context_weight
+        correlation = fine_weight * fine_correlation
+        if scale_weight:
+            correlation += scale_weight * scale_correlation
+        if context_weight:
+            correlation += context_weight * context_consistency
+        return (
+            float(np.clip(correlation, -1.0, 1.0)),
+            count,
+            valid_fraction,
+            observation_std,
+            map_std,
+            fine_correlation,
+            scale_correlation,
+            context_consistency,
+            valid_contexts,
+        )
 
     def _rejected(
         self,
@@ -1469,6 +1867,10 @@ class BackscatterMapMatcher:
         observation_texture_std: float = 0.0,
         map_texture_std: float = 0.0,
         evaluated_candidates: int = 0,
+        fine_correlation_after: float = float("nan"),
+        scale_space_correlation_after: float = float("nan"),
+        context_consistency_after: float = float("nan"),
+        valid_contexts_after: int = 0,
     ) -> BackscatterMatchResult:
         rejected_correction = (
             np.zeros(3, dtype=np.float64)
@@ -1502,6 +1904,10 @@ class BackscatterMapMatcher:
             observation_texture_std=observation_texture_std,
             map_texture_std=map_texture_std,
             evaluated_candidates=evaluated_candidates,
+            fine_correlation_after=fine_correlation_after,
+            scale_space_correlation_after=scale_space_correlation_after,
+            context_consistency_after=context_consistency_after,
+            valid_contexts_after=valid_contexts_after,
             rejection_reason=reason,
         )
 
@@ -1543,10 +1949,23 @@ class BackscatterMapMatcher:
             values = values[selected]
 
         design = self._radiometric_design(points)
+        scale_group_ids = tuple(
+            self._spatial_group_ids(points, cell_size_m)
+            for cell_size_m in self.config.scale_space_cell_sizes_m
+        )
+        context_group_ids = self._context_group_ids(
+            points, self.config.context_length_m
+        )
         offsets_world = points @ state.rotation.T
         zero = np.zeros(3, dtype=np.float64)
         before = self._score(
-            zero, state, offsets_world, values, design
+            zero,
+            state,
+            offsets_world,
+            values,
+            design,
+            scale_group_ids,
+            context_group_ids,
         )[0]
         translation_values = self._axis_samples(
             self.config.maximum_translation_m,
@@ -1569,7 +1988,13 @@ class BackscatterMapMatcher:
                         continue
                     correction = np.array([dx, dy, yaw], dtype=np.float64)
                     diagnostics = self._score(
-                        correction, state, offsets_world, values, design
+                        correction,
+                        state,
+                        offsets_world,
+                        values,
+                        design,
+                        scale_group_ids,
+                        context_group_ids,
                     )
                     evaluated += 1
                     if np.isfinite(diagnostics[0]):
@@ -1608,7 +2033,13 @@ class BackscatterMapMatcher:
                     ):
                         continue
                     diagnostics = self._score(
-                        correction, state, offsets_world, values, design
+                        correction,
+                        state,
+                        offsets_world,
+                        values,
+                        design,
+                        scale_group_ids,
+                        context_group_ids,
                     )
                     evaluated += 1
                     if np.isfinite(diagnostics[0]):
@@ -1678,6 +2109,10 @@ class BackscatterMapMatcher:
                 observation_texture_std=observation_std,
                 map_texture_std=map_std,
                 evaluated_candidates=evaluated,
+                fine_correlation_after=float(best_diagnostics[5]),
+                scale_space_correlation_after=float(best_diagnostics[6]),
+                context_consistency_after=float(best_diagnostics[7]),
+                valid_contexts_after=int(best_diagnostics[8]),
             )
 
         covariance = np.diag(
@@ -1706,6 +2141,10 @@ class BackscatterMapMatcher:
             observation_texture_std=observation_std,
             map_texture_std=map_std,
             evaluated_candidates=evaluated,
+            fine_correlation_after=float(best_diagnostics[5]),
+            scale_space_correlation_after=float(best_diagnostics[6]),
+            context_consistency_after=float(best_diagnostics[7]),
+            valid_contexts_after=int(best_diagnostics[8]),
         )
 
 

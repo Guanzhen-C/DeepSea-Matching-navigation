@@ -314,6 +314,97 @@ Live metrics are written to
 
 ![Live Isaac Sim large-area SLAM UI](../../demo/large_scale_slam/isaac_live_ui.png)
 
+## Whole-map relocalization after a navigation outage
+
+The normal terrain matcher is deliberately local. When repeated bounded
+matches fail, the optional recovery path searches the complete measured map
+and all yaw angles, but it does not turn the largest correlation peak directly
+into a pose-graph factor. The recovery chain is:
+
+1. Joint coarse bathymetry/backscatter retrieval returns several spatially
+   separated basins. This is an OceanSim implementation inspired by the
+   cohort-filtering architecture of Global UTAN, not that paper's reference
+   code.
+2. Every basin must pass the pinned official
+   [3D-BBS](https://github.com/KOKIAOKI/3d_bbs) branch-and-bound occupancy
+   verifier. IMU roll/pitch and pressure depth remain fixed, so only residual
+   horizontal translation and yaw are searched. The coarse 3D-BBS argmax and
+   the original appearance proposal are both retained as metric-refinement
+   seeds; diagnostics, never truth, choose the better converged basin.
+3. A 5 m MBES terrain fit and multi-scale side-scan cell correlation check the
+   candidate. The side-scan context treatment follows the reliability idea of
+   SC-Match, but is not an exact SC-Match implementation because OceanSim
+   matches geocoded samples to a prior raster rather than matching two raw
+   waterfalls.
+4. Refined duplicates from the same acquisition are merged. Genuinely
+   separated aliases become separate particle cohorts alongside an explicit
+   `no valid fix` state. Each cohort contains 256 weighted SE(2) particles;
+   local IMU/DVL/depth odometry propagates every particle, sonar evidence
+   updates its weight, and low effective sample size triggers systematic
+   resampling followed by covariance-preserving regularization. Overlapping
+   windows receive discounted weight, and three non-overlapping ping/time
+   windows must support the same cohort before confirmation.
+5. The confirmed pose re-seeds the outage segment and adds a robust Cauchy
+   x/y/yaw factor to GTSAM. The published `map -> odom` correction follows the
+   graph target with time and rate limits; it never writes into the local
+   15-state ESIKF, and all matchers continue to use the unsmoothed graph pose.
+
+With `--enable-terrain-cohort-particle-backend`, the same particle policy also
+sits in front of ordinary bounded terrain factors. Persistent proposals retain
+their originating cohort ID, so a broad whole-map alias cannot steal or
+overwrite an established mode through covariance-normalized association. A
+single accepted bathymetry/side-scan match only initializes/tracks a cohort;
+three non-overlapping observations must support the same propagated mode
+before GTSAM authorization.
+
+The graph never receives the recursive particle posterior as if it were a new
+sensor measurement. For every independent 300-ping window, the confirmed
+cohort selects only a local basin. A deterministic search and finite-
+difference Laplace approximation then derive the pose and information matrix
+from that current raw MBES/side-scan likelihood alone. This also supplies
+ordinary factors when the compact matcher has no usable Gaussian proposal.
+The curvature is projected onto its positive-semidefinite observable subspace,
+and chart/model covariance floors are applied only inside that subspace; flat,
+textureless directions therefore contribute zero information rather than a
+false precise constraint.
+
+Build the native verifier and run the deterministic, UI-free integration
+check with:
+
+```bash
+standalone/build_bbs3d_bridge.sh
+PYTHONPATH=isaacsim \
+  /home/cgz/.conda/envs/isaacsim-6.0/bin/python \
+  standalone/validate_global_relocalization_chain.py
+```
+
+That check samples three disjoint strips from the complete Monterey product,
+injects a kilometre-class rigid local-frame error, and validates whole-map
+retrieval, native 3D-BBS, both metric refinements, persistent confirmation,
+the robust graph factor, and continuous output correction. Truth is used only
+after each estimate is produced to calculate error. Bathymetry is matched
+against a separately low-pass navigation surface, but side-scan observations
+and the prior still come from the same public backscatter survey. It is
+therefore a deterministic integration and wiring upper bound, not an
+independent chart-to-field or sea-trial accuracy result.
+
+The complete-route candidate can be run without a UI using:
+
+```bash
+standalone/run_backend_ab_gtsam_global_utan_full_route_isaac.sh --headless
+```
+
+It preserves the archived seed-31 sensor, route, local front end, and fixed-lag
+GTSAM settings while enabling complete-yaw search, persistent cohorts, the
+native verifier, robust relocalization factors, and output-only soft
+correction. The 72 km run is intentionally separate from the short check
+because it takes hours and is the evidence required for a full-route accuracy
+claim.
+
+The controlled 2 km same-seed A/B result and its scientific limitations
+are recorded in
+[`demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md`](../../demo/large_scale_slam/global_utan_cohort_pf_ab_20260911.md).
+
 ## Python sensor interface
 
 The estimator has no Isaac Sim dependency, so the same object can consume a
@@ -382,6 +473,14 @@ The design was checked against these public projects, specifications, and papers
   navigation and bathymetric matching.
 - [Dense side-scan acoustic SLAM](https://github.com/halajun/acoustic_slam):
   side-scan place constraints and mapping.
+- [3D-BBS repository](https://github.com/KOKIAOKI/3d_bbs) and
+  [paper](https://arxiv.org/abs/2310.10023): the exact pinned native
+  branch-and-bound implementation used only for candidate verification.
+- [Global UTAN](https://doi.org/10.1109/TIM.2026.3716492): appearance
+  retrieval, geometric verification, and persistent cohort reasoning used as
+  an architectural reference for whole-map recovery.
+- [SC-Match](https://arxiv.org/abs/2607.25937): multi-scale side-scan context
+  consistency used as a design reference, not copied reference code.
 
 This is a research and simulation implementation, not a claim of
 hydrographic-grade navigation.  The current global graph assumes a

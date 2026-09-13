@@ -119,6 +119,13 @@ def test_invalid_terrain_robust_kernel_is_rejected() -> None:
     with pytest.raises(ValueError, match="terrain_prior_robust_kernel"):
         PlanarPoseGraph(PoseGraphConfig(terrain_prior_robust_kernel="invalid"))
 
+    with pytest.raises(
+        ValueError, match="relocalization_prior_robust_kernel"
+    ):
+        PlanarPoseGraph(
+            PoseGraphConfig(relocalization_prior_robust_kernel="invalid")
+        )
+
 
 def test_absolute_terrain_prior_wraps_yaw_at_pi() -> None:
     graph = PlanarPoseGraph(PoseGraphConfig(optimizer_iterations=30))
@@ -228,6 +235,104 @@ def test_confirmed_terrain_relocalization_rebases_an_unknown_initial_gauge() -> 
     )
     assert diagnostics.last_terrain_relocalization_yaw_deg == pytest.approx(0.0)
     assert diagnostics.last_terrain_relocalization_anchor_index is None
+
+
+def test_cohort_confirmed_relocalization_keeps_bounded_influence_after_reseed() -> None:
+    backend = AcousticPoseGraph(
+        PoseGraphConfig(
+            terrain_prior_robust_kernel="huber",
+            relocalization_prior_robust_kernel="cauchy",
+            robust_relocalization_prior_delta=3.5,
+            terrain_prior_optimize_interval=1,
+        )
+    )
+    identity = np.eye(3)
+    empty = np.empty((0, 3), dtype=np.float64)
+    for observation_id, x_m in enumerate((100.0, 110.0, 120.0)):
+        assert backend.add_if_needed(
+            float(observation_id),
+            identity,
+            np.array([x_m, 0.0, -5.0]),
+            empty,
+            observation_id=observation_id,
+            force=True,
+            detect_loops=False,
+        )
+
+    assert backend.add_terrain_prior(
+        timestamp=2.0,
+        observation_id=2,
+        prior_pose2=np.array([120.0, 0.0, 0.0]),
+        raw_rotation_world_body=identity,
+        raw_position_world=np.array([120.0, 0.0, -5.0]),
+        matched_pose2=np.array([20.0, 0.0, 0.0]),
+        information_world=np.diag([4.0, 4.0, 100.0]),
+        optimize_interval=1,
+        relocalization_seed=True,
+        relocalization_prior_robust=True,
+    )
+
+    np.testing.assert_allclose(backend.graph.poses[-1], [20.0, 0.0, 0.0])
+    prior = backend.graph.priors[-1]
+    assert prior.robust
+    assert prior.robust_kernel == "cauchy"
+    assert prior.robust_delta == pytest.approx(3.5)
+    assert backend.diagnostics().last_terrain_prefit_bypassed_for_relocalization
+
+
+def test_ordinary_and_relocalization_priors_use_separate_robust_policies() -> None:
+    graph = PlanarPoseGraph(
+        PoseGraphConfig(
+            terrain_prior_robust_kernel="huber",
+            robust_terrain_prior_delta=2.5,
+            relocalization_prior_robust_kernel="cauchy",
+            robust_relocalization_prior_delta=4.0,
+        )
+    )
+    graph.add_pose(np.zeros(3))
+    graph.add_pose(np.ones(3))
+    graph.add_prior(1, np.ones(3), np.eye(3), robust=True)
+    graph.add_prior(
+        1,
+        np.ones(3),
+        np.eye(3),
+        robust=True,
+        robust_kernel="cauchy",
+        robust_delta=4.0,
+    )
+
+    assert graph._prior_robust_policy(graph.priors[0]) == ("huber", 2.5)
+    assert graph._prior_robust_policy(graph.priors[1]) == ("cauchy", 4.0)
+    payload = graph.factor_stream_payload()
+    assert payload["priors"][0]["robust_kernel"] is None
+    assert payload["priors"][1]["robust_kernel"] == "cauchy"
+
+
+def test_robust_relocalization_prior_requires_a_relocalization_seed() -> None:
+    backend = AcousticPoseGraph(PoseGraphConfig())
+    identity = np.eye(3)
+    assert backend.add_if_needed(
+        0.0,
+        identity,
+        np.array([0.0, 0.0, -5.0]),
+        np.empty((0, 3), dtype=np.float64),
+        observation_id=0,
+        force=True,
+        detect_loops=False,
+    )
+    assert not backend.add_terrain_prior(
+        timestamp=0.0,
+        observation_id=0,
+        prior_pose2=np.zeros(3),
+        raw_rotation_world_body=identity,
+        raw_position_world=np.array([0.0, 0.0, -5.0]),
+        matched_pose2=np.zeros(3),
+        information_world=_information(),
+        relocalization_prior_robust=True,
+    )
+    assert backend.diagnostics().last_terrain_prior_rejection_reason == (
+        "robust_relocalization_prior_without_seed"
+    )
 
 
 def test_confirmed_relocalization_can_cross_a_distant_graph_basin() -> None:

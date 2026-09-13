@@ -94,6 +94,12 @@ class PoseGraphConfig:
     terrain_prior_enabled: bool = True
     terrain_prior_robust_kernel: str = "huber"
     robust_terrain_prior_delta: float = 2.5
+    # A confirmed whole-map relocalization is first re-seeded to zero
+    # residual, then kept as a redescending factor in case later independent
+    # evidence contradicts it.  This policy is deliberately separate from
+    # ordinary local terrain matches, which retain the historical Huber loss.
+    relocalization_prior_robust_kernel: str = "cauchy"
+    robust_relocalization_prior_delta: float = 2.5
     terrain_prior_optimize_interval: int = 1
     # Terrain-map curvature can make the local optimum look extremely
     # precise even though the graph seed has accumulated metres of systematic
@@ -153,6 +159,11 @@ class PoseGraphPrior:
     # A separately confirmed relocalization may disable that kernel after it
     # has first re-seeded the graph into the verified absolute basin.
     robust: bool = True
+    # Optional per-factor policy.  ``None`` uses the ordinary terrain-prior
+    # settings from :class:`PoseGraphConfig` and keeps old factor streams
+    # backward compatible.
+    robust_kernel: str | None = None
+    robust_delta: float | None = None
 
 
 @dataclass
@@ -348,13 +359,19 @@ class PlanarPoseGraph:
 
     def __init__(self, config: PoseGraphConfig | None = None) -> None:
         self.config = config or PoseGraphConfig()
-        if self.config.terrain_prior_robust_kernel not in (
-            "huber",
-            "cauchy",
+        for name in (
+            "terrain_prior_robust_kernel",
+            "relocalization_prior_robust_kernel",
         ):
-            raise ValueError(
-                "terrain_prior_robust_kernel must be 'huber' or 'cauchy'"
-            )
+            if getattr(self.config, name) not in ("huber", "cauchy"):
+                raise ValueError(f"{name} must be 'huber' or 'cauchy'")
+        for name in (
+            "robust_terrain_prior_delta",
+            "robust_relocalization_prior_delta",
+        ):
+            value = float(getattr(self.config, name))
+            if not np.isfinite(value) or value <= 0.0:
+                raise ValueError(f"{name} must be finite and positive")
         self.poses = np.empty((0, 3), dtype=np.float64)
         self.edges: list[PoseGraphEdge] = []
         self.priors: list[PoseGraphPrior] = []
@@ -434,6 +451,8 @@ class PlanarPoseGraph:
                     "kind": prior.kind,
                     "score": prior.score,
                     "robust": prior.robust,
+                    "robust_kernel": prior.robust_kernel,
+                    "robust_delta": prior.robust_delta,
                 }
                 for prior in self.priors
             ],
@@ -477,6 +496,12 @@ class PlanarPoseGraph:
                 ),
                 "robust_terrain_prior_delta": float(
                     self.config.robust_terrain_prior_delta
+                ),
+                "relocalization_prior_robust_kernel": (
+                    self.config.relocalization_prior_robust_kernel
+                ),
+                "robust_relocalization_prior_delta": float(
+                    self.config.robust_relocalization_prior_delta
                 ),
                 "robust_loop_delta": float(self.config.robust_loop_delta),
                 "robust_intensity_delta": float(
@@ -525,6 +550,8 @@ class PlanarPoseGraph:
         kind: str = "terrain_prior",
         score: float = 0.0,
         robust: bool = True,
+        robust_kernel: str | None = None,
+        robust_delta: float | None = None,
     ) -> None:
         """Add a unary absolute ``x, y, yaw`` observation in world axes.
 
@@ -547,6 +574,24 @@ class PlanarPoseGraph:
         factor_kind = str(kind)
         if factor_kind != "terrain_prior":
             raise ValueError("only terrain_prior unary factors are supported")
+        use_robust = bool(robust)
+        if (robust_kernel is None) != (robust_delta is None):
+            raise ValueError(
+                "prior robust_kernel and robust_delta must be supplied together"
+            )
+        factor_robust_kernel = None
+        factor_robust_delta = None
+        if robust_kernel is not None:
+            if not use_robust:
+                raise ValueError(
+                    "a non-robust prior cannot override a robust kernel"
+                )
+            factor_robust_kernel = str(robust_kernel)
+            if factor_robust_kernel not in ("huber", "cauchy"):
+                raise ValueError("unsupported prior robust kernel")
+            factor_robust_delta = float(robust_delta)
+            if not np.isfinite(factor_robust_delta) or factor_robust_delta <= 0.0:
+                raise ValueError("prior robust delta must be finite and positive")
         self.priors.append(
             PoseGraphPrior(
                 target=int(target),
@@ -554,8 +599,24 @@ class PlanarPoseGraph:
                 information=_validated_psd_information(information),
                 kind=factor_kind,
                 score=float(score),
-                robust=bool(robust),
+                robust=use_robust,
+                robust_kernel=factor_robust_kernel,
+                robust_delta=factor_robust_delta,
             )
+        )
+
+    def _prior_robust_policy(
+        self, prior: PoseGraphPrior
+    ) -> tuple[str | None, float | None]:
+        """Resolve the robust policy for one absolute factor."""
+
+        if not prior.robust:
+            return None, None
+        if prior.robust_kernel is not None:
+            return prior.robust_kernel, float(prior.robust_delta)
+        return (
+            self.config.terrain_prior_robust_kernel,
+            float(self.config.robust_terrain_prior_delta),
         )
 
     def _cost(self, poses: np.ndarray) -> float:
@@ -580,10 +641,9 @@ class PlanarPoseGraph:
             squared = float(error @ prior.information @ error)
             if prior.robust:
                 norm = np.sqrt(max(squared, 0.0))
-                delta = max(
-                    float(self.config.robust_terrain_prior_delta), 1.0e-12
-                )
-                if self.config.terrain_prior_robust_kernel == "huber":
+                kernel, configured_delta = self._prior_robust_policy(prior)
+                delta = max(float(configured_delta), 1.0e-12)
+                if kernel == "huber":
                     if norm > delta:
                         squared = 2.0 * delta * norm - delta * delta
                 else:
@@ -647,10 +707,11 @@ class PlanarPoseGraph:
                         float(error @ information @ error), 0.0
                     )
                     whitened_norm = np.sqrt(whitened_squared)
-                    robust_delta = max(
-                        float(self.config.robust_terrain_prior_delta), 1.0e-12
+                    robust_kernel, configured_delta = (
+                        self._prior_robust_policy(prior)
                     )
-                    if self.config.terrain_prior_robust_kernel == "huber":
+                    robust_delta = max(float(configured_delta), 1.0e-12)
+                    if robust_kernel == "huber":
                         if whitened_norm > robust_delta:
                             information = information * (
                                 robust_delta / whitened_norm
@@ -891,9 +952,7 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         )
 
     def _prior_factor(self, prior: PoseGraphPrior):
-        robust_kernel = (
-            self.config.terrain_prior_robust_kernel if prior.robust else None
-        )
+        robust_kernel, robust_delta = self._prior_robust_policy(prior)
         target_key = self._key(prior.target)
 
         def error_function(_factor, values, jacobians):
@@ -909,7 +968,7 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
             self._noise_model(
                 prior.information,
                 robust_kernel=robust_kernel,
-                robust_delta=self.config.robust_terrain_prior_delta,
+                robust_delta=robust_delta,
             ),
             [target_key],
             error_function,
@@ -2010,6 +2069,7 @@ class AcousticPoseGraph:
         optimize_interval: int | None = None,
         relocalization_seed: bool = False,
         relocalization_seed_pose2: np.ndarray | None = None,
+        relocalization_prior_robust: bool = False,
     ) -> bool:
         """Commit one independently matched world-frame terrain pose.
 
@@ -2026,8 +2086,13 @@ class AcousticPoseGraph:
         inputs do not leave a node or edge behind. One terrain prior is
         accepted per observation id. ``relocalization_seed`` is reserved for
         a match that an external confirmation policy has already verified; it
-        re-seeds the outage segment and disables the ordinary single-match
-        Huber kernel for this factor. ``relocalization_seed_pose2`` may carry
+        re-seeds the outage segment and, by default, disables the ordinary
+        single-match robust kernel for this factor.  A persistent
+        multi-hypothesis policy with an explicit null state may set
+        ``relocalization_prior_robust`` after it has selected and re-seeded the
+        verified basin; the factor then starts at zero residual but retains
+        bounded influence if later evidence contradicts it.
+        ``relocalization_seed_pose2`` may carry
         a separately estimated gauge pose (for example, yaw derived from two
         absolute-position fixes) while ``matched_pose2`` remains the actual
         unary measurement. Omitting it seeds directly from ``matched_pose2``.
@@ -2047,6 +2112,13 @@ class AcousticPoseGraph:
             if not isinstance(relocalization_seed, (bool, np.bool_)):
                 raise TypeError
             use_relocalization_seed = bool(relocalization_seed)
+            if not isinstance(
+                relocalization_prior_robust, (bool, np.bool_)
+            ):
+                raise TypeError
+            robust_relocalization_prior = bool(
+                relocalization_prior_robust
+            )
             prior = np.asarray(prior_pose2, dtype=np.float64).reshape(3).copy()
             raw_rotation = np.asarray(
                 raw_rotation_world_body, dtype=np.float64
@@ -2086,6 +2158,10 @@ class AcousticPoseGraph:
         seed_matched[2] = wrap_angle(seed_matched[2])
         if relocalization_seed_pose2 is not None and not use_relocalization_seed:
             return self._reject_terrain_prior("unused_relocalization_seed_pose")
+        if robust_relocalization_prior and not use_relocalization_seed:
+            return self._reject_terrain_prior(
+                "robust_relocalization_prior_without_seed"
+            )
 
         try:
             factor_information = _validated_psd_information(
@@ -2230,7 +2306,22 @@ class AcousticPoseGraph:
             matched,
             factor_information,
             kind="terrain_prior",
-            robust=not use_relocalization_seed,
+            robust=(
+                not use_relocalization_seed
+                or robust_relocalization_prior
+            ),
+            robust_kernel=(
+                self.config.relocalization_prior_robust_kernel
+                if use_relocalization_seed
+                and robust_relocalization_prior
+                else None
+            ),
+            robust_delta=(
+                self.config.robust_relocalization_prior_delta
+                if use_relocalization_seed
+                and robust_relocalization_prior
+                else None
+            ),
         )
         self._terrain_prior_count += 1
         self._terrain_prior_observations.add(match_observation_id)

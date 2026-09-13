@@ -109,6 +109,25 @@ def parse_args() -> argparse.Namespace:
             "zero disables"
         ),
     )
+    parser.add_argument(
+        "--survey-start-distance-m",
+        type=float,
+        default=0.0,
+        help=(
+            "start a fresh estimator run at this arc distance along the "
+            "periodic survey route; this changes only the truth-route phase "
+            "and is not a serialized estimator checkpoint"
+        ),
+    )
+    parser.add_argument(
+        "--survey-segment-distance-m",
+        type=float,
+        default=0.0,
+        help=(
+            "stop after travelling this 3-D arc distance from the selected "
+            "route start; zero leaves the existing lap/window termination"
+        ),
+    )
     parser.add_argument("--survey-center-x-m", type=float, default=0.0)
     parser.add_argument("--survey-center-y-m", type=float, default=0.0)
     parser.add_argument(
@@ -369,11 +388,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--backscatter-ci-bathymetry-weight",
         type=float,
-        default=0.5,
+        default=-1.0,
         help=(
             "bathymetry weight in covariance intersection with an accepted "
             "co-registered backscatter fix; the side-scan weight is one minus "
-            "this value and no independence assumption is made"
+            "this value and no independence assumption is made; -1 selects "
+            "the minimum-log-determinant CI weight separately for each patch"
         ),
     )
     parser.add_argument(
@@ -631,6 +651,101 @@ def parse_args() -> argparse.Namespace:
         help="minimum best-versus-second spatial-basin proposal score gap",
     )
     parser.add_argument(
+        "--enable-global-cohort-tracking",
+        action="store_true",
+        help=(
+            "retain every separated whole-map candidate across sonar epochs "
+            "with an explicit null hypothesis; only a dominant cohort "
+            "supported by independent ping windows may enter local refinement"
+        ),
+    )
+    parser.add_argument(
+        "--enable-terrain-cohort-particle-backend",
+        action="store_true",
+        help=(
+            "filter ordinary bathymetry/side-scan absolute matches through a "
+            "persistent SE(2) cohort particle filter before GTSAM insertion"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-maximum-cohorts",
+        type=int,
+        default=48,
+        help="maximum persistent whole-map pose hypotheses",
+    )
+    parser.add_argument(
+        "--terrain-global-particles-per-cohort",
+        type=int,
+        default=256,
+        help="SE(2) particles maintained inside each global pose cohort",
+    )
+    parser.add_argument(
+        "--terrain-global-particle-resample-ess-fraction",
+        type=float,
+        default=0.50,
+        help="systematic-resampling trigger as a fraction of cohort particles",
+    )
+    parser.add_argument(
+        "--terrain-global-particle-kernel-bandwidth",
+        type=float,
+        default=0.15,
+        help="Liu-West regularization bandwidth applied after resampling",
+    )
+    parser.add_argument(
+        "--terrain-global-minimum-independent-evidence",
+        type=int,
+        default=3,
+        help=(
+            "nonoverlapping sonar acquisition windows required before a "
+            "global cohort may be confirmed"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-global-cohort-confirmation-probability",
+        type=float,
+        default=0.97,
+        help="minimum normalized posterior probability of the leading cohort",
+    )
+    parser.add_argument(
+        "--terrain-global-cohort-confirmation-odds",
+        type=float,
+        default=20.0,
+        help="minimum leading-cohort odds over the runner-up or null state",
+    )
+    parser.add_argument(
+        "--enable-bbs3d-global-verification",
+        action="store_true",
+        help=(
+            "verify every persistent whole-map candidate with the pinned "
+            "official 3D-BBS GPU implementation while holding pressure "
+            "depth and IMU roll/pitch fixed"
+        ),
+    )
+    parser.add_argument(
+        "--bbs3d-global-translation-window-m",
+        type=float,
+        default=30.0,
+        help="residual x/y half-window for 3D-BBS candidate verification",
+    )
+    parser.add_argument(
+        "--bbs3d-global-yaw-window-deg",
+        type=float,
+        default=6.0,
+        help="residual yaw half-window for 3D-BBS candidate verification",
+    )
+    parser.add_argument(
+        "--bbs3d-global-minimum-score-fraction",
+        type=float,
+        default=0.25,
+        help="minimum fraction of MBES source points occupying map voxels",
+    )
+    parser.add_argument(
+        "--bbs3d-global-timeout-ms",
+        type=int,
+        default=5000,
+        help="per-candidate 3D-BBS search timeout; zero disables the timeout",
+    )
+    parser.add_argument(
         "--terrain-global-confirmation-position-tolerance-m",
         type=float,
         default=25.0,
@@ -790,6 +905,41 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=1,
     )
+    parser.add_argument(
+        "--enable-map-to-odom-soft-correction",
+        "--enable-map-to-odom-soft-feedback",
+        dest="enable_map_to_odom_soft_correction",
+        action="store_true",
+        help=(
+            "continuously follow pose-graph corrections in the published "
+            "map->odom transform; the local ESIKF and matcher seed remain "
+            "unchanged"
+        ),
+    )
+    parser.add_argument(
+        "--map-to-odom-translation-time-constant-s",
+        type=float,
+        default=5.0,
+        help="first-order time constant for published horizontal correction",
+    )
+    parser.add_argument(
+        "--map-to-odom-yaw-time-constant-s",
+        type=float,
+        default=5.0,
+        help="first-order time constant for published yaw correction",
+    )
+    parser.add_argument(
+        "--map-to-odom-maximum-translation-rate-mps",
+        type=float,
+        default=5.0,
+        help="maximum map-frame correction speed at the current AUV pose",
+    )
+    parser.add_argument(
+        "--map-to-odom-maximum-yaw-rate-deg-s",
+        type=float,
+        default=5.0,
+        help="maximum published map-frame yaw correction rate",
+    )
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument(
         "--progress-distance-m",
@@ -831,6 +981,10 @@ def parse_args() -> argparse.Namespace:
         or args.map_insert_stride < 1
         or args.survey_speed_mps < 0.0
         or args.survey_laps < 0
+        or not math.isfinite(args.survey_start_distance_m)
+        or args.survey_start_distance_m < 0.0
+        or not math.isfinite(args.survey_segment_distance_m)
+        or args.survey_segment_distance_m < 0.0
         or args.survey_x_amplitude_m <= 0.0
         or args.survey_y_amplitude_m <= 0.0
         or args.survey_altitude_m <= 0.0
@@ -860,7 +1014,10 @@ def parse_args() -> argparse.Namespace:
         or not math.isfinite(args.backscatter_match_yaw_window_deg)
         or args.backscatter_match_yaw_window_deg <= 0.5
         or args.backscatter_match_yaw_window_deg >= 15.0
-        or not 0.0 <= args.backscatter_ci_bathymetry_weight <= 1.0
+        or (
+            args.backscatter_ci_bathymetry_weight != -1.0
+            and not 0.0 <= args.backscatter_ci_bathymetry_weight <= 1.0
+        )
         or not math.isfinite(args.cross_modal_large_correction_m)
         or args.cross_modal_large_correction_m < 0.0
         or not math.isfinite(
@@ -920,6 +1077,35 @@ def parse_args() -> argparse.Namespace:
         <= 1.0
         or not math.isfinite(args.terrain_global_minimum_score_gap)
         or not 0.0 < args.terrain_global_minimum_score_gap <= 2.0
+        or args.terrain_global_maximum_cohorts < 1
+        or args.terrain_global_particles_per_cohort < 1
+        or not math.isfinite(
+            args.terrain_global_particle_resample_ess_fraction
+        )
+        or not 0.0
+        < args.terrain_global_particle_resample_ess_fraction
+        < 1.0
+        or not math.isfinite(
+            args.terrain_global_particle_kernel_bandwidth
+        )
+        or not 0.0 < args.terrain_global_particle_kernel_bandwidth < 1.0
+        or args.terrain_global_minimum_independent_evidence < 1
+        or not math.isfinite(
+            args.terrain_global_cohort_confirmation_probability
+        )
+        or not 0.0
+        < args.terrain_global_cohort_confirmation_probability
+        < 1.0
+        or not math.isfinite(args.terrain_global_cohort_confirmation_odds)
+        or args.terrain_global_cohort_confirmation_odds <= 1.0
+        or not math.isfinite(args.bbs3d_global_translation_window_m)
+        or args.bbs3d_global_translation_window_m <= 0.0
+        or not math.isfinite(args.bbs3d_global_yaw_window_deg)
+        or args.bbs3d_global_yaw_window_deg <= 0.0
+        or args.bbs3d_global_yaw_window_deg >= 45.0
+        or not math.isfinite(args.bbs3d_global_minimum_score_fraction)
+        or not 0.0 < args.bbs3d_global_minimum_score_fraction < 1.0
+        or args.bbs3d_global_timeout_ms < 0
         or not math.isfinite(
             args.terrain_global_confirmation_position_tolerance_m
         )
@@ -949,6 +1135,20 @@ def parse_args() -> argparse.Namespace:
         )
         or args.pose_graph_isam_relinearize_threshold <= 0.0
         or args.pose_graph_isam_relinearize_skip < 1
+        or not math.isfinite(
+            args.map_to_odom_translation_time_constant_s
+        )
+        or args.map_to_odom_translation_time_constant_s <= 0.0
+        or not math.isfinite(args.map_to_odom_yaw_time_constant_s)
+        or args.map_to_odom_yaw_time_constant_s <= 0.0
+        or not math.isfinite(
+            args.map_to_odom_maximum_translation_rate_mps
+        )
+        or args.map_to_odom_maximum_translation_rate_mps <= 0.0
+        or not math.isfinite(
+            args.map_to_odom_maximum_yaw_rate_deg_s
+        )
+        or args.map_to_odom_maximum_yaw_rate_deg_s <= 0.0
         or args.terrain_display_stride < 1
         or args.sonar_terrain_stride < 1
         or args.progress_distance_m <= 0.0
@@ -981,6 +1181,15 @@ def parse_args() -> argparse.Namespace:
         )
     if args.survey_pattern == "full-map-route" and args.survey_speed_mps <= 0.0:
         parser.error("--survey-speed-mps must be positive for full-map-route")
+    if (
+        (args.survey_start_distance_m > 0.0
+         or args.survey_segment_distance_m > 0.0)
+        and args.survey_speed_mps <= 0.0
+    ):
+        parser.error(
+            "survey start/segment distances require positive "
+            "--survey-speed-mps"
+        )
     if args.terrain_recovery_translation_window_m > 0.0:
         if (
             args.terrain_recovery_translation_window_m
@@ -1013,6 +1222,14 @@ def parse_args() -> argparse.Namespace:
     ):
         parser.error(
             "--enable-backscatter-map-matching requires "
+            "--enable-terrain-map-matching"
+        )
+    if (
+        args.enable_terrain_cohort_particle_backend
+        and not args.enable_terrain_map_matching
+    ):
+        parser.error(
+            "--enable-terrain-cohort-particle-backend requires "
             "--enable-terrain-map-matching"
         )
     if args.terrain_confirm_every_prior:
@@ -1061,6 +1278,22 @@ def parse_args() -> argparse.Namespace:
                 "--terrain-global-window-pings must exceed the ordinary "
                 "terrain-matching window"
             )
+    if (
+        args.enable_global_cohort_tracking
+        and not args.enable_global_terrain_relocalization
+    ):
+        parser.error(
+            "--enable-global-cohort-tracking requires "
+            "--enable-global-terrain-relocalization"
+        )
+    if (
+        args.enable_bbs3d_global_verification
+        and not args.enable_global_cohort_tracking
+    ):
+        parser.error(
+            "--enable-bbs3d-global-verification requires "
+            "--enable-global-cohort-tracking"
+        )
     sys.argv = [sys.argv[0], *kit_args]
     return args
 
@@ -1118,23 +1351,33 @@ from isaacsim.oceansim.sensors.bathymetric_sidescan_profiles import (
 )
 from isaacsim.oceansim.slam import (
     AcousticESIKF,
+    AcousticTerrainParticleLikelihood,
     BackscatterMapMatcher,
     BackscatterMatcherConfig,
+    BBS3DCandidateVerifier,
+    BBS3DVerifierConfig,
     BathymetricTerrainMatcher,
     ESIKFConfig,
     FastSonarSLAM,
     FastSonarSLAMConfig,
+    GlobalCohortTracker,
+    GlobalCohortTrackerConfig,
+    GlobalPoseEvidence,
     GlobalTerrainRelocalizer,
     GlobalTerrainRelocalizerConfig,
     InertialState,
     NavigationInitialization,
+    ParticleLikelihoodObservation,
     PoseGraphConfig,
     TerrainEmergencyRecoveryController,
     TerrainRecoveryController,
     TerrainMatcherConfig,
+    TerrainParticleLikelihoodConfig,
+    covariance_intersection_pose2,
     fixed_lag_fused_deskew_states,
     gauge_anchored_initial_covariance,
     initialize_from_imu_dvl_depth,
+    information_with_covariance_floor,
     map_to_odom_change_metrics,
     make_terrain_recovery_config,
     motion_compensate_to_body,
@@ -2051,6 +2294,40 @@ def main() -> int:
         minimum_clearance_m=sonar_profile.maximum_range_m,
         require_measured_backscatter=True,
     )
+    route_length_m = float(route_report.path_length_m)
+    if ARGS.survey_start_distance_m >= route_length_m:
+        raise ValueError(
+            "--survey-start-distance-m must be smaller than the validated "
+            f"route length ({route_length_m:.3f} m)"
+        )
+    if (
+        ARGS.survey_segment_distance_m > 0.0
+        and ARGS.survey_start_distance_m
+        + ARGS.survey_segment_distance_m
+        > route_length_m + 1.0e-9
+    ):
+        raise ValueError(
+            "the requested survey segment crosses the periodic route seam; "
+            "choose a shorter segment so the focused run remains contiguous"
+        )
+    survey_start_time_offset_s = (
+        ARGS.survey_start_distance_m / ARGS.survey_speed_mps
+        if ARGS.survey_speed_mps > 0.0
+        else 0.0
+    )
+    survey_segment_duration_s = (
+        ARGS.survey_segment_distance_m / ARGS.survey_speed_mps
+        if ARGS.survey_segment_distance_m > 0.0
+        else None
+    )
+
+    def survey_state(segment_timestamp_s: float):
+        """Evaluate truth on a selected route segment using a fresh clock."""
+
+        return survey.state(
+            float(segment_timestamp_s) + survey_start_time_offset_s
+        )
+
     navigation = LargeScaleSensorSimulator(
         world_model,
         survey,
@@ -2116,7 +2393,7 @@ def main() -> int:
     )
     status_window, status_label = _make_status_window(world_model)
 
-    truth0 = survey.state(0.0)
+    truth0 = survey_state(0.0)
     startup_specific_force = []
     startup_dvl = []
     startup_depth = []
@@ -2189,6 +2466,21 @@ def main() -> int:
             ),
             intensity_updates_enabled=not ARGS.disable_intensity_updates,
             trajectory_sample_interval_s=ARGS.trajectory_sample_interval_s,
+            map_to_odom_soft_correction_enabled=(
+                ARGS.enable_map_to_odom_soft_correction
+            ),
+            map_to_odom_translation_time_constant_s=(
+                ARGS.map_to_odom_translation_time_constant_s
+            ),
+            map_to_odom_yaw_time_constant_s=(
+                ARGS.map_to_odom_yaw_time_constant_s
+            ),
+            map_to_odom_maximum_translation_rate_mps=(
+                ARGS.map_to_odom_maximum_translation_rate_mps
+            ),
+            map_to_odom_maximum_yaw_rate_deg_s=(
+                ARGS.map_to_odom_maximum_yaw_rate_deg_s
+            ),
             pose_graph=PoseGraphConfig(
                 optimizer_backend=ARGS.pose_graph_backend.replace("-", "_"),
                 fixed_lag_seconds=ARGS.pose_graph_fixed_lag_s,
@@ -2365,6 +2657,16 @@ def main() -> int:
                     10.0, 2.0 * world_model.resolution_m
                 ),
                 basin_yaw_separation_deg=2.0,
+                scale_space_cell_sizes_m=(
+                    2.0 * world_model.resolution_m,
+                    5.0 * world_model.resolution_m,
+                    10.0 * world_model.resolution_m,
+                ),
+                scale_space_weight=0.35,
+                context_consistency_weight=0.20,
+                context_length_m=10.0 * world_model.resolution_m,
+                minimum_scale_cells=12,
+                minimum_context_points=24,
             ),
         )
         if ARGS.enable_global_terrain_relocalization
@@ -2436,6 +2738,103 @@ def main() -> int:
         if ARGS.enable_global_terrain_relocalization
         else None
     )
+    terrain_particle_likelihood_config = TerrainParticleLikelihoodConfig(
+        bathymetry_measurement_std_m=terrain_prior_vertical_model_std_m,
+        maximum_bathymetry_points=min(
+            768, ARGS.terrain_match_maximum_points
+        ),
+        maximum_backscatter_points=min(
+            768, ARGS.backscatter_match_maximum_points
+        ),
+    )
+    global_cohort_tracker = (
+        GlobalCohortTracker(
+            GlobalCohortTrackerConfig(
+                maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
+                particles_per_cohort=(
+                    ARGS.terrain_global_particles_per_cohort
+                ),
+                random_seed=ARGS.seed,
+                resample_effective_sample_fraction=(
+                    ARGS.terrain_global_particle_resample_ess_fraction
+                ),
+                resample_kernel_bandwidth=(
+                    ARGS.terrain_global_particle_kernel_bandwidth
+                ),
+                minimum_total_evidence=(
+                    ARGS.terrain_global_minimum_independent_evidence
+                ),
+                minimum_independent_evidence=(
+                    ARGS.terrain_global_minimum_independent_evidence
+                ),
+                confirmation_probability=(
+                    ARGS.terrain_global_cohort_confirmation_probability
+                ),
+                confirmation_odds_over_second=(
+                    ARGS.terrain_global_cohort_confirmation_odds
+                ),
+            )
+        )
+        if ARGS.enable_global_cohort_tracking
+        else None
+    )
+    terrain_backend_particle_tracker = (
+        GlobalCohortTracker(
+            GlobalCohortTrackerConfig(
+                maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
+                particles_per_cohort=(
+                    ARGS.terrain_global_particles_per_cohort
+                ),
+                random_seed=ARGS.seed + 1,
+                resample_effective_sample_fraction=(
+                    ARGS.terrain_global_particle_resample_ess_fraction
+                ),
+                resample_kernel_bandwidth=(
+                    ARGS.terrain_global_particle_kernel_bandwidth
+                ),
+                minimum_total_evidence=(
+                    ARGS.terrain_global_minimum_independent_evidence
+                ),
+                minimum_independent_evidence=(
+                    ARGS.terrain_global_minimum_independent_evidence
+                ),
+                confirmation_probability=(
+                    ARGS.terrain_global_cohort_confirmation_probability
+                ),
+                confirmation_odds_over_second=(
+                    ARGS.terrain_global_cohort_confirmation_odds
+                ),
+            )
+        )
+        if ARGS.enable_terrain_cohort_particle_backend
+        else None
+    )
+    bbs3d_candidate_verifier = (
+        BBS3DCandidateVerifier(
+            world_model,
+            BBS3DVerifierConfig(
+                minimum_level_resolution_m=world_model.resolution_m,
+                maximum_level=3,
+                maximum_translation_m=(
+                    ARGS.bbs3d_global_translation_window_m
+                ),
+                maximum_yaw_deg=ARGS.bbs3d_global_yaw_window_deg,
+                minimum_score_fraction=(
+                    ARGS.bbs3d_global_minimum_score_fraction
+                ),
+                minimum_source_points=min(
+                    128, ARGS.terrain_match_maximum_points
+                ),
+                maximum_source_points=max(
+                    8_192, 4 * ARGS.terrain_match_maximum_points
+                ),
+                timeout_milliseconds=ARGS.bbs3d_global_timeout_ms,
+            ),
+            require_native=True,
+        )
+        if ARGS.enable_bbs3d_global_verification
+        else None
+    )
     terrain_recovery = TerrainRecoveryController(
         enabled=terrain_recovery_matcher is not None,
         after_rejections=ARGS.terrain_recovery_after_rejections,
@@ -2482,6 +2881,31 @@ def main() -> int:
         }
         for mode in ("normal", "recovery", "emergency", "global")
     }
+    terrain_backend_particle_stats = {
+        "updates": 0,
+        "raw_likelihood_updates": 0,
+        "candidate_seed_updates": 0,
+        "unseeded_tracking_updates": 0,
+        "confirmed_updates": 0,
+        "tracking_updates": 0,
+        "no_fix_updates": 0,
+        "factor_authorizations": 0,
+        "factor_holds": 0,
+        "nonindependent_factor_reuses_prevented": 0,
+        "posterior_as_measurement_reuses_prevented": 0,
+        "raw_likelihood_refinements": 0,
+        "raw_likelihood_refinement_translation_sum_m": 0.0,
+        "raw_likelihood_refinement_translation_max_m": 0.0,
+        "raw_likelihood_refinement_abs_yaw_sum_deg": 0.0,
+        "raw_likelihood_refinement_abs_yaw_max_deg": 0.0,
+        "cohort_basin_refinements": 0,
+        "compact_proposal_refinements": 0,
+        "raw_likelihood_factor_attempts": 0,
+        "raw_likelihood_factor_accepts": 0,
+        "raw_likelihood_factor_rejections": 0,
+    }
+    terrain_backend_particle_records: list[dict] = []
+    terrain_backend_particle_last_patch_end_observation_id = -1
     global_relocalization_stats = {
         "invocations": 0,
         "accepted_proposals": 0,
@@ -2490,6 +2914,9 @@ def main() -> int:
         "bathymetry_refinement_accepts": 0,
         "bathymetry_refinement_rejections": 0,
         "bathymetry_refinement_rejection_reasons": Counter(),
+        "bathymetry_refinement_seed_attempts": 0,
+        "bathymetry_refinement_appearance_seeds_selected": 0,
+        "bathymetry_refinement_bbs3d_seeds_selected": 0,
         "bathymetry_position_fallback_invocations": 0,
         "bathymetry_position_fallback_accepts": 0,
         "bathymetry_position_fallback_rejections": 0,
@@ -2504,8 +2931,26 @@ def main() -> int:
         "last_candidate_count": 0,
         "last_evaluated_yaws": 0,
         "last_finite_lattice_candidates": 0,
+        "cohort_updates": 0,
+        "cohort_confirmed_updates": 0,
+        "cohort_tracking_updates": 0,
+        "cohort_no_fix_updates": 0,
+        "candidate_verification_invocations": 0,
+        "candidate_verification_accepts": 0,
+        "candidate_verification_rejections": 0,
+        "bbs3d_verification_invocations": 0,
+        "bbs3d_verification_accepts": 0,
+        "bbs3d_verification_rejections": 0,
+        "bbs3d_verification_rejection_reasons": Counter(),
+        "bbs3d_verification_wall_time_s": 0.0,
+        "last_bbs3d_score_fraction": float("nan"),
+        "last_cohort_count": 0,
+        "last_cohort_null_probability": float("nan"),
+        "last_cohort_best_probability": float("nan"),
+        "last_cohort_odds_over_second": float("nan"),
     }
     global_relocalization_records: list[dict] = []
+    global_cohort_records: list[dict] = []
     terrain_accepted_invocation_stats = {
         "count": 0,
         "rmse_before_sum": 0.0,
@@ -2542,6 +2987,9 @@ def main() -> int:
         "rejection_reasons": Counter(),
         "wall_time_s": 0.0,
         "fused_fixes": 0,
+        "automatic_ci_fixes": 0,
+        "bathymetry_ci_weight_sum": 0.0,
+        "last_bathymetry_ci_weight": None,
         "compatibility_vetoes": 0,
         "compatibility_veto_reasons": Counter(),
         "boundary_yaw_retries": 0,
@@ -2726,6 +3174,7 @@ def main() -> int:
                 True,
                 False,
                 False,
+                None,
             )
         bathymetric_pose2 = np.asarray(
             terrain_result.matched_pose2, dtype=np.float64
@@ -2835,40 +3284,26 @@ def main() -> int:
             # is unknown and independence must not be assumed. Equal-weight
             # covariance intersection retains the complementary optimum while
             # avoiding the over-confident information sum.
-            bathymetric_weight = float(
+            configured_weight = float(
                 ARGS.backscatter_ci_bathymetry_weight
             )
-            intensity_weight = 1.0 - bathymetric_weight
-            combined_information = (
-                bathymetric_weight * fused_information
-                + intensity_weight * intensity_information
+            (
+                fused_pose2,
+                fused_information,
+                bathymetric_weight,
+            ) = covariance_intersection_pose2(
+                bathymetric_pose2,
+                fused_information,
+                backscatter_result.matched_pose2,
+                intensity_information,
+                first_weight=(
+                    None if configured_weight < 0.0 else configured_weight
+                ),
             )
-            intensity_delta = (
-                np.asarray(backscatter_result.matched_pose2, dtype=np.float64)
-                - bathymetric_pose2
-            )
-            intensity_delta[2] = math.atan2(
-                math.sin(intensity_delta[2]), math.cos(intensity_delta[2])
-            )
-            try:
-                fused_delta = np.linalg.solve(
-                    combined_information,
-                    intensity_weight
-                    * intensity_information
-                    @ intensity_delta,
-                )
-            except np.linalg.LinAlgError:
-                fused_delta = np.linalg.pinv(combined_information) @ (
-                    intensity_weight
-                    * intensity_information
-                    @ intensity_delta
-                )
-            fused_pose2 += fused_delta
-            fused_pose2[2] = math.atan2(
-                math.sin(fused_pose2[2]), math.cos(fused_pose2[2])
-            )
-            fused_information = combined_information
             stats["fused_fixes"] += 1
+            stats["automatic_ci_fixes"] += int(configured_weight < 0.0)
+            stats["bathymetry_ci_weight_sum"] += bathymetric_weight
+            stats["last_bathymetry_ci_weight"] = bathymetric_weight
 
         # Once the global gauge is established, a correction exceeding one
         # configured map-scale cell needs cross-modal support.  A multi-modal
@@ -2964,6 +3399,18 @@ def main() -> int:
                 "map_texture_std": float(
                     backscatter_result.map_texture_std
                 ),
+                "fine_correlation_after": float(
+                    backscatter_result.fine_correlation_after
+                ),
+                "scale_space_correlation_after": float(
+                    backscatter_result.scale_space_correlation_after
+                ),
+                "context_consistency_after": float(
+                    backscatter_result.context_consistency_after
+                ),
+                "valid_contexts_after": int(
+                    backscatter_result.valid_contexts_after
+                ),
                 "correction_from_bathymetry": (
                     backscatter_result.correction.tolist()
                 ),
@@ -2978,6 +3425,15 @@ def main() -> int:
                 "backscatter_yaw_error_deg": backscatter_errors[1],
                 "fused_horizontal_error_m": fused_errors[0],
                 "fused_yaw_error_deg": fused_errors[1],
+                "bathymetry_ci_weight": (
+                    None
+                    if not backscatter_result.accepted
+                    else float(bathymetric_weight)
+                ),
+                "automatic_ci_weight": bool(
+                    backscatter_result.accepted
+                    and ARGS.backscatter_ci_bathymetry_weight < 0.0
+                ),
                 "truth_evaluation_only": True,
                 "truth_used_by_matcher_or_fusion": False,
                 "wall_time_s": elapsed_s,
@@ -2993,10 +3449,11 @@ def main() -> int:
             bool(cross_modal_compatible),
             bool(information_includes_model_floors),
             bool(backscatter_result.accepted),
+            backscatter_result,
         )
 
     def build_global_relocalization_patch():
-        """Build the long, inertially deskewed strip used only after loss."""
+        """Build the long acoustic-inertial deskewed strip used after loss."""
 
         scans = list(global_terrain_patch_scans)
         inertial_states = list(global_terrain_patch_inertial_states)
@@ -3006,7 +3463,12 @@ def main() -> int:
             or len(inertial_states) != len(scans)
         ):
             return None
-        reference_state = inertial_states[-1].copy()
+        motion_states = [scan[0].copy() for scan in scans]
+        if ARGS.terrain_patch_motion_source == "acoustic-fixed-lag":
+            motion_states = fixed_lag_fused_deskew_states(
+                motion_states, inertial_states
+            )
+        reference_state = motion_states[-1].copy()
         terrain_chunks = [
             motion_compensate_to_body(
                 scan[1],
@@ -3015,7 +3477,7 @@ def main() -> int:
                 sensor_rotation_body=slam.filter.sensor_rotation_body,
                 sensor_translation_body=slam.filter.sensor_translation_body,
             )
-            for acquisition_state, scan in zip(inertial_states, scans)
+            for acquisition_state, scan in zip(motion_states, scans)
             if scan[1].size
         ]
         if not terrain_chunks:
@@ -3029,7 +3491,7 @@ def main() -> int:
 
         backscatter_point_chunks = []
         backscatter_value_chunks = []
-        for acquisition_state, scan in zip(inertial_states, scans):
+        for acquisition_state, scan in zip(motion_states, scans):
             if scan[2].size == 0:
                 continue
             backscatter_point_chunks.append(
@@ -3075,6 +3537,334 @@ def main() -> int:
             "patch_end_observation_id": int(scans[-1][5]),
         }
 
+    def verify_global_candidate(candidate, global_patch, *, truth_state):
+        """Run 3D-BBS, independent 5 m MBES and side-scan checks.
+
+        The whole-map appearance stage is intentionally permissive when the
+        cohort tracker is enabled.  Every separated basin is therefore
+        subjected first to full 3-D occupancy verification and then to the
+        same metric bathymetry and backscatter registration before it may
+        contribute positive persistent evidence.
+        """
+
+        global_stats = global_relocalization_stats
+        candidate_pose2 = np.asarray(candidate.pose2, dtype=np.float64)
+        bbs3d_result = None
+        bbs3d_wall_time_s = 0.0
+        if bbs3d_candidate_verifier is not None:
+            bbs3d_started = time.perf_counter()
+            bbs3d_result = bbs3d_candidate_verifier.verify(
+                global_patch["terrain_points_body"],
+                global_patch["reference_state"],
+                candidate_pose2,
+            )
+            bbs3d_wall_time_s = time.perf_counter() - bbs3d_started
+            global_stats["bbs3d_verification_invocations"] += 1
+            global_stats["bbs3d_verification_wall_time_s"] += (
+                bbs3d_wall_time_s
+            )
+            global_stats["last_bbs3d_score_fraction"] = (
+                bbs3d_result.score_fraction
+            )
+            if not bbs3d_result.accepted:
+                global_stats["bbs3d_verification_rejections"] += 1
+                global_stats["bbs3d_verification_rejection_reasons"][
+                    bbs3d_result.rejection_reason or "unspecified"
+                ] += 1
+                return {
+                    "terrain_result": None,
+                    "refine_elapsed_s": float(bbs3d_wall_time_s),
+                    "accepted": False,
+                    "matched_pose2": np.asarray(
+                        bbs3d_result.matched_pose2, dtype=np.float64
+                    ),
+                    "information": np.zeros((3, 3), dtype=np.float64),
+                    "information_has_floors": False,
+                    "yaw_observable": False,
+                    "observable_rank": 0,
+                    "translation_observable_rank": 0,
+                    "backscatter_result": None,
+                    "bbs3d_result": bbs3d_result,
+                    "terrain_seed_source": None,
+                    "terrain_seed_attempts": [],
+                    "geometry_score": float(bbs3d_result.score_fraction),
+                    "backscatter_observability": 0.0,
+                }
+            global_stats["bbs3d_verification_accepts"] += 1
+
+        # 3D-BBS uses quantized occupancy.  Several translations can therefore
+        # attain the same coarse score, especially over a broad sloping patch.
+        # It remains a required geometric veto, but its argmax must not erase
+        # an already good appearance proposal.  Refine from both independent
+        # seeds and select only by matcher diagnostics (never simulator truth).
+        metric_seeds = [("appearance", candidate_pose2.copy())]
+        if bbs3d_result is not None:
+            bbs3d_pose2 = np.asarray(
+                bbs3d_result.matched_pose2, dtype=np.float64
+            )
+            seed_translation_separation = float(
+                np.linalg.norm(bbs3d_pose2[:2] - candidate_pose2[:2])
+            )
+            seed_yaw_separation_deg = abs(
+                math.degrees(
+                    math.atan2(
+                        math.sin(bbs3d_pose2[2] - candidate_pose2[2]),
+                        math.cos(bbs3d_pose2[2] - candidate_pose2[2]),
+                    )
+                )
+            )
+            if (
+                seed_translation_separation
+                > 0.25 * world_model.resolution_m
+                or seed_yaw_separation_deg > 0.10
+            ):
+                metric_seeds.append(("bbs3d", bbs3d_pose2))
+
+        refinement_attempts = []
+        refinement_wall_time_s = 0.0
+        for seed_source, seed_pose2 in metric_seeds:
+            proposal_state = global_patch["reference_state"].copy()
+            proposal_rpy = rpy_from_rotation(proposal_state.rotation)
+            proposal_state.rotation = rotation_from_rpy(
+                float(proposal_rpy[0]),
+                float(proposal_rpy[1]),
+                float(seed_pose2[2]),
+            )
+            proposal_state.position[:2] = seed_pose2[:2]
+
+            refine_started = time.perf_counter()
+            seed_result = terrain_matcher.match(
+                global_patch["terrain_points_body"],
+                proposal_state,
+                points_are_body_frame=True,
+            )
+            seed_elapsed_s = time.perf_counter() - refine_started
+            refinement_wall_time_s += seed_elapsed_s
+            global_stats["bathymetry_refinement_seed_attempts"] += 1
+            record_terrain_match_invocation(
+                "global",
+                seed_result,
+                seed_elapsed_s,
+                truth_state=truth_state,
+            )
+            if (
+                not seed_result.accepted
+                and seed_result.rejection_reason == "yaw_unobservable"
+                and terrain_position_fallback_matcher is not None
+            ):
+                global_stats[
+                    "bathymetry_position_fallback_invocations"
+                ] += 1
+                fallback_started = time.perf_counter()
+                seed_result = terrain_position_fallback_matcher.match(
+                    global_patch["terrain_points_body"],
+                    proposal_state,
+                    points_are_body_frame=True,
+                )
+                fallback_elapsed_s = time.perf_counter() - fallback_started
+                refinement_wall_time_s += fallback_elapsed_s
+                record_terrain_match_invocation(
+                    "global",
+                    seed_result,
+                    fallback_elapsed_s,
+                    truth_state=truth_state,
+                )
+                if seed_result.accepted:
+                    global_stats[
+                        "bathymetry_position_fallback_accepts"
+                    ] += 1
+                else:
+                    global_stats[
+                        "bathymetry_position_fallback_rejections"
+                    ] += 1
+                    global_stats[
+                        "bathymetry_position_fallback_rejection_reasons"
+                    ][seed_result.rejection_reason or "unspecified"] += 1
+            refinement_attempts.append((seed_source, seed_pose2, seed_result))
+
+        def refinement_quality(attempt):
+            _source, _seed, match_result = attempt
+            likelihood_ratio = float(
+                match_result.basin_log_likelihood_ratio
+            )
+            if not np.isfinite(likelihood_ratio):
+                likelihood_ratio = 1.0e300 if likelihood_ratio > 0.0 else -1.0e300
+            rmse = float(match_result.rmse_after)
+            if not np.isfinite(rmse):
+                rmse = 1.0e300
+            return (
+                int(match_result.accepted),
+                int(not match_result.reached_search_boundary),
+                int(match_result.observable_rank),
+                likelihood_ratio,
+                -rmse,
+                -float(match_result.translation_correction_m),
+            )
+
+        selected_attempt = max(
+            refinement_attempts, key=refinement_quality
+        )
+        selected_seed_source, _selected_seed_pose2, refined_result = (
+            selected_attempt
+        )
+        global_stats[
+            "bathymetry_refinement_"
+            + selected_seed_source
+            + "_seeds_selected"
+        ] += 1
+        refine_elapsed_s = bbs3d_wall_time_s + refinement_wall_time_s
+        public_refinement_attempts = [
+            {
+                "seed_source": seed_source,
+                "seed_pose2": seed_pose2.tolist(),
+                "accepted": bool(match_result.accepted),
+                "rejection_reason": match_result.rejection_reason,
+                "matched_pose2": match_result.matched_pose2.tolist(),
+                "rmse_after_m": _finite_float_or_none(
+                    match_result.rmse_after
+                ),
+                "observable_rank": int(match_result.observable_rank),
+                "reached_search_boundary": bool(
+                    match_result.reached_search_boundary
+                ),
+            }
+            for seed_source, seed_pose2, match_result in refinement_attempts
+        ]
+
+        result = {
+            "terrain_result": refined_result,
+            "refine_elapsed_s": float(refine_elapsed_s),
+            "accepted": False,
+            "matched_pose2": np.asarray(
+                refined_result.matched_pose2, dtype=np.float64
+            ),
+            "information": np.asarray(
+                refined_result.information, dtype=np.float64
+            ),
+            "information_has_floors": False,
+            "yaw_observable": bool(refined_result.yaw_observable),
+            "observable_rank": int(refined_result.observable_rank),
+            "translation_observable_rank": int(
+                refined_result.translation_observable_rank
+            ),
+            "backscatter_result": None,
+            "bbs3d_result": bbs3d_result,
+            "terrain_seed_source": selected_seed_source,
+            "terrain_seed_attempts": public_refinement_attempts,
+            "geometry_score": 0.0,
+            "backscatter_observability": 0.0,
+        }
+        if not refined_result.accepted:
+            global_stats["bathymetry_refinement_rejections"] += 1
+            global_stats["bathymetry_refinement_rejection_reasons"][
+                refined_result.rejection_reason or "unspecified"
+            ] += 1
+            return result
+
+        global_stats["bathymetry_refinement_accepts"] += 1
+        (
+            refined_pose2,
+            refined_information,
+            refined_yaw_observable,
+            refined_compatible,
+            refined_information_has_floors,
+            refined_backscatter_accepted,
+            refined_backscatter_result,
+        ) = refine_terrain_fix_with_backscatter(
+            refined_result,
+            global_patch["backscatter_points_body"],
+            global_patch["backscatter_values"],
+            truth_state=truth_state,
+            use_global_refinement=True,
+        )
+        dual_modal_accepted = bool(
+            refined_compatible and refined_backscatter_accepted
+        )
+        if dual_modal_accepted:
+            global_stats["dual_modal_refinement_accepts"] += 1
+        else:
+            global_stats["dual_modal_refinement_rejections"] += 1
+            rejection_reason = (
+                "backscatter_refinement_rejected"
+                if not refined_backscatter_accepted
+                else "cross_modal_incompatible"
+            )
+            global_stats["dual_modal_refinement_rejection_reasons"][
+                rejection_reason
+            ] += 1
+
+        inlier_ratio = float(
+            refined_result.inliers / max(refined_result.correspondences, 1)
+        )
+        chi_square_excess = max(
+            0.0, float(refined_result.reduced_chi_square) - 1.0
+        )
+        geometry_score = float(
+            np.clip(
+                0.5 * inlier_ratio + 0.5 * math.exp(-0.5 * chi_square_excess),
+                0.0,
+                1.0,
+            )
+        )
+        if bbs3d_result is not None:
+            # Both values derive from MBES geometry, so they are not treated
+            # as independent likelihood channels.  Their geometric mean is a
+            # conservative agreement score: either verifier can lower it.
+            geometry_score = float(
+                math.sqrt(
+                    max(0.0, geometry_score)
+                    * max(0.0, bbs3d_result.score_fraction)
+                )
+            )
+        backscatter_observability = 0.0
+        if refined_backscatter_result is not None:
+            texture_scale = max(
+                5.0
+                * global_backscatter_refinement_matcher.config.minimum_texture_std,
+                1.0e-12,
+            )
+            backscatter_observability = float(
+                np.clip(
+                    refined_backscatter_result.observation_texture_std
+                    / texture_scale,
+                    0.0,
+                    1.0,
+                )
+                * np.clip(
+                    refined_backscatter_result.valid_fraction, 0.0, 1.0
+                )
+            )
+        result.update(
+            {
+                "accepted": dual_modal_accepted,
+                "matched_pose2": np.asarray(
+                    refined_pose2, dtype=np.float64
+                ),
+                "information": np.asarray(
+                    refined_information, dtype=np.float64
+                ),
+                "information_has_floors": bool(
+                    refined_information_has_floors
+                ),
+                "yaw_observable": bool(refined_yaw_observable),
+                "observable_rank": (
+                    3
+                    if (
+                        refined_backscatter_accepted
+                        and refined_result.translation_observable_rank == 2
+                    )
+                    else int(refined_result.observable_rank)
+                ),
+                "translation_observable_rank": int(
+                    refined_result.translation_observable_rank
+                ),
+                "backscatter_result": refined_backscatter_result,
+                "geometry_score": geometry_score,
+                "backscatter_observability": backscatter_observability,
+            }
+        )
+        return result
+
     def terrain_prior_information(
         result,
         component_mode="full",
@@ -3108,20 +3898,25 @@ def main() -> int:
             covariance_xy = np.asarray(
                 source_covariance[:2, :2], dtype=np.float64
             ).copy()
-            covariance_xy += floor_variance * np.eye(2, dtype=np.float64)
-            information = np.zeros((3, 3), dtype=np.float64)
-            information[:2, :2] = np.linalg.pinv(
+            marginal_information_xy = np.linalg.pinv(
                 covariance_xy, rcond=1.0e-12, hermitian=True
+            )
+            information = np.zeros((3, 3), dtype=np.float64)
+            information[:2, :2] = information_with_covariance_floor(
+                marginal_information_xy,
+                floor_variance * np.eye(2, dtype=np.float64),
             )
             return information
         if component_mode != "full":
             raise ValueError(f"unsupported terrain-prior mode: {component_mode}")
         if floor_variance <= 0.0 and yaw_floor_variance <= 0.0:
             return source_information
-        covariance = source_covariance.copy()
-        covariance[:2, :2] += floor_variance * np.eye(2, dtype=np.float64)
-        covariance[2, 2] += yaw_floor_variance
-        return np.linalg.pinv(covariance, rcond=1.0e-12, hermitian=True)
+        floor_covariance = np.diag(
+            [floor_variance, floor_variance, yaw_floor_variance]
+        )
+        return information_with_covariance_floor(
+            source_information, floor_covariance
+        )
 
     def prepare_initial_terrain_gauge(
         result,
@@ -3370,6 +4165,563 @@ def main() -> int:
         )
         return gauge_pose2, False, component_mode
 
+    def update_terrain_backend_particle_filter(
+        *,
+        timestamp,
+        observation_id,
+        mode,
+        patch_body,
+        patch_reference_state,
+        backscatter_patch_body,
+        backscatter_patch_values,
+        patch_start_timestamp,
+        patch_end_timestamp,
+        patch_start_observation_id,
+        patch_end_observation_id,
+        evidences=(),
+        evaluation_truth_state=None,
+    ):
+        """Apply one raw sonar window exactly once to the ordinary cohort PF."""
+
+        nonlocal terrain_backend_particle_last_patch_end_observation_id
+        if terrain_backend_particle_tracker is None:
+            return None
+        if (
+            patch_end_observation_id
+            <= terrain_backend_particle_last_patch_end_observation_id
+        ):
+            raise RuntimeError(
+                "ordinary terrain particle windows must advance monotonically"
+            )
+        local_pose2 = np.array(
+            [
+                slam.state.position[0],
+                slam.state.position[1],
+                rpy_from_rotation(slam.state.rotation)[2],
+            ],
+            dtype=np.float64,
+        )
+        raw_likelihood = AcousticTerrainParticleLikelihood(
+            terrain_prior_model,
+            patch_reference_state,
+            patch_body,
+            backscatter_terrain=world_model,
+            backscatter_points_body=backscatter_patch_body,
+            backscatter_values=backscatter_patch_values,
+            config=terrain_particle_likelihood_config,
+        )
+        particle_observation = ParticleLikelihoodObservation(
+            evaluator=raw_likelihood,
+            patch_start_timestamp_s=patch_start_timestamp,
+            patch_end_timestamp_s=patch_end_timestamp,
+            patch_start_observation_id=patch_start_observation_id,
+            patch_end_observation_id=patch_end_observation_id,
+        )
+        original_evidence_tuple = tuple(evidences)
+        refinement_records = []
+        refined_evidences = []
+        truth_yaw = (
+            None
+            if evaluation_truth_state is None
+            else float(
+                rpy_from_rotation(evaluation_truth_state.rotation)[2]
+            )
+        )
+
+        def append_refined_evidence(
+            evidence, seed_pose2, refined_pose2, *, role, cohort_id=None
+        ):
+            seed_pose2 = np.asarray(seed_pose2, dtype=np.float64).reshape(3)
+            refined_pose2 = np.asarray(
+                refined_pose2, dtype=np.float64
+            ).reshape(3)
+            translation_m = float(
+                np.linalg.norm(refined_pose2[:2] - seed_pose2[:2])
+            )
+            yaw_deg = float(
+                np.rad2deg(
+                    math.atan2(
+                        math.sin(refined_pose2[2] - seed_pose2[2]),
+                        math.cos(refined_pose2[2] - seed_pose2[2]),
+                    )
+                )
+            )
+            source_pose2 = np.asarray(
+                evidence.map_pose2, dtype=np.float64
+            ).reshape(3)
+            source_disagreement = refined_pose2 - source_pose2
+            source_disagreement[2] = math.atan2(
+                math.sin(source_disagreement[2]),
+                math.cos(source_disagreement[2]),
+            )
+            # The compact Gaussian was linearized at source_pose2.  Moving its
+            # mean to another raw-likelihood mode without changing covariance
+            # would be over-confident.  Treat the mode disagreement as a
+            # correlated systematic uncertainty; this continuously weakens
+            # the affected directions instead of introducing an error gate.
+            refined_covariance = (
+                evidence.covariance
+                + np.outer(source_disagreement, source_disagreement)
+            )
+            refined_position_std_m = float(
+                np.sqrt(
+                    np.max(
+                        np.linalg.eigvalsh(refined_covariance[:2, :2])
+                    )
+                )
+            )
+            refined_yaw_std_deg = float(
+                np.rad2deg(np.sqrt(refined_covariance[2, 2]))
+            )
+            refined_evidences.append(
+                replace(
+                    evidence,
+                    map_pose2=refined_pose2,
+                    source_index=len(refined_evidences),
+                    position_std_m=refined_position_std_m,
+                    yaw_std_deg=refined_yaw_std_deg,
+                    covariance_matrix=refined_covariance,
+                    target_cohort_id=cohort_id,
+                    information_matrix=np.linalg.inv(refined_covariance),
+                )
+            )
+            refinement_records.append(
+                {
+                    "role": role,
+                    "cohort_id": cohort_id,
+                    "original_pose2": seed_pose2.tolist(),
+                    "refined_pose2": refined_pose2.tolist(),
+                    "translation_m": translation_m,
+                    "yaw_deg": yaw_deg,
+                    "source_gaussian_disagreement": (
+                        source_disagreement.tolist()
+                    ),
+                    "inflated_position_std_m": refined_position_std_m,
+                    "inflated_yaw_std_deg": refined_yaw_std_deg,
+                    "truth_evaluation": (
+                        None
+                        if evaluation_truth_state is None
+                        else {
+                            "original_horizontal_error_m": float(
+                                np.linalg.norm(
+                                    seed_pose2[:2]
+                                    - evaluation_truth_state.position[:2]
+                                )
+                            ),
+                            "refined_horizontal_error_m": float(
+                                np.linalg.norm(
+                                    refined_pose2[:2]
+                                    - evaluation_truth_state.position[:2]
+                                )
+                            ),
+                            "original_yaw_error_deg": float(
+                                np.rad2deg(
+                                    math.atan2(
+                                        math.sin(
+                                            seed_pose2[2] - truth_yaw
+                                        ),
+                                        math.cos(
+                                            seed_pose2[2] - truth_yaw
+                                        ),
+                                    )
+                                )
+                            ),
+                            "refined_yaw_error_deg": float(
+                                np.rad2deg(
+                                    math.atan2(
+                                        math.sin(
+                                            refined_pose2[2] - truth_yaw
+                                        ),
+                                        math.cos(
+                                            refined_pose2[2] - truth_yaw
+                                        ),
+                                    )
+                                )
+                            ),
+                            "used_by_estimator": False,
+                        }
+                    ),
+                }
+            )
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinements"
+            ] += 1
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_translation_sum_m"
+            ] += translation_m
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_translation_max_m"
+            ] = max(
+                terrain_backend_particle_stats[
+                    "raw_likelihood_refinement_translation_max_m"
+                ],
+                translation_m,
+            )
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_abs_yaw_sum_deg"
+            ] += abs(yaw_deg)
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_abs_yaw_max_deg"
+            ] = max(
+                terrain_backend_particle_stats[
+                    "raw_likelihood_refinement_abs_yaw_max_deg"
+                ],
+                abs(yaw_deg),
+            )
+
+        # A persistent cohort selects a data-association basin.  The current
+        # raw sonar window alone supplies both the local maximum and its
+        # rank-aware curvature, so an independent graph measurement remains
+        # available even when the compact whole-map matcher has no proposal.
+        # No recursive particle covariance is reused as measurement noise.
+        for cohort_id, predicted_pose2 in (
+            terrain_backend_particle_tracker.prediction_seeds(local_pose2)
+        ):
+            approximation = raw_likelihood.approximate_local_measurement(
+                predicted_pose2
+            )
+            basin_pose2 = np.asarray(
+                approximation.pose2, dtype=np.float64
+            ).reshape(3)
+            measurement_covariance = np.asarray(
+                approximation.covariance, dtype=np.float64
+            ).reshape(3, 3)
+            diagnostics = approximation.diagnostics
+            bathymetry_score = (
+                float(
+                    np.tanh(
+                        (
+                            terrain_particle_likelihood_config
+                            .bathymetry_reference_normalized_loss
+                            - diagnostics.best_bathymetry_normalized_loss
+                        )
+                        / terrain_particle_likelihood_config
+                        .bathymetry_fit_temperature
+                    )
+                )
+                if np.isfinite(
+                    diagnostics.best_bathymetry_normalized_loss
+                )
+                else 0.0
+            )
+            backscatter_score = (
+                float(
+                    np.clip(
+                        diagnostics.best_backscatter_correlation,
+                        -1.0,
+                        1.0,
+                    )
+                )
+                if np.isfinite(
+                    diagnostics.best_backscatter_correlation
+                )
+                else 0.0
+            )
+            position_std_m = float(
+                np.sqrt(
+                    np.max(
+                        np.linalg.eigvalsh(
+                            measurement_covariance[:2, :2]
+                        )
+                    )
+                )
+            )
+            yaw_std_deg = float(
+                np.rad2deg(
+                    np.sqrt(measurement_covariance[2, 2])
+                )
+            )
+            refined_evidences.append(
+                GlobalPoseEvidence(
+                    map_pose2=basin_pose2,
+                    bathymetry_score=bathymetry_score,
+                    backscatter_score=backscatter_score,
+                    bathymetry_observability=(
+                        diagnostics.bathymetry_observability
+                    ),
+                    backscatter_observability=(
+                        diagnostics.backscatter_observability
+                    ),
+                    geometry_score=None,
+                    cross_modal_consistent=True,
+                    position_std_m=position_std_m,
+                    yaw_std_deg=yaw_std_deg,
+                    patch_start_timestamp_s=patch_start_timestamp,
+                    patch_end_timestamp_s=patch_end_timestamp,
+                    patch_start_observation_id=(
+                        patch_start_observation_id
+                    ),
+                    patch_end_observation_id=patch_end_observation_id,
+                    source_index=len(refined_evidences),
+                    covariance_matrix=measurement_covariance,
+                    target_cohort_id=int(cohort_id),
+                    information_matrix=approximation.information,
+                )
+            )
+            predicted_pose2 = np.asarray(
+                predicted_pose2, dtype=np.float64
+            ).reshape(3)
+            translation_m = float(
+                np.linalg.norm(basin_pose2[:2] - predicted_pose2[:2])
+            )
+            yaw_deg = float(
+                np.rad2deg(
+                    math.atan2(
+                        math.sin(basin_pose2[2] - predicted_pose2[2]),
+                        math.cos(basin_pose2[2] - predicted_pose2[2]),
+                    )
+                )
+            )
+            refinement_records.append(
+                {
+                    "role": "persistent_cohort_basin",
+                    "cohort_id": int(cohort_id),
+                    "measurement_source": (
+                        "current_raw_likelihood_laplace"
+                    ),
+                    "original_pose2": predicted_pose2.tolist(),
+                    "refined_pose2": basin_pose2.tolist(),
+                    "translation_m": translation_m,
+                    "yaw_deg": yaw_deg,
+                    "source_gaussian_disagreement": None,
+                    "inflated_position_std_m": position_std_m,
+                    "inflated_yaw_std_deg": yaw_std_deg,
+                    "observable_rank": int(
+                        approximation.observable_rank
+                    ),
+                    "scaled_information_eigenvalues": (
+                        approximation.scaled_information_eigenvalues.tolist()
+                    ),
+                    "truth_evaluation": (
+                        None
+                        if evaluation_truth_state is None
+                        else {
+                            "original_horizontal_error_m": float(
+                                np.linalg.norm(
+                                    predicted_pose2[:2]
+                                    - evaluation_truth_state.position[:2]
+                                )
+                            ),
+                            "refined_horizontal_error_m": float(
+                                np.linalg.norm(
+                                    basin_pose2[:2]
+                                    - evaluation_truth_state.position[:2]
+                                )
+                            ),
+                            "original_yaw_error_deg": float(
+                                np.rad2deg(
+                                    math.atan2(
+                                        math.sin(
+                                            predicted_pose2[2] - truth_yaw
+                                        ),
+                                        math.cos(
+                                            predicted_pose2[2] - truth_yaw
+                                        ),
+                                    )
+                                )
+                            ),
+                            "refined_yaw_error_deg": float(
+                                np.rad2deg(
+                                    math.atan2(
+                                        math.sin(
+                                            basin_pose2[2] - truth_yaw
+                                        ),
+                                        math.cos(
+                                            basin_pose2[2] - truth_yaw
+                                        ),
+                                    )
+                                )
+                            ),
+                            "used_by_estimator": False,
+                        }
+                    ),
+                }
+            )
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinements"
+            ] += 1
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_translation_sum_m"
+            ] += translation_m
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_translation_max_m"
+            ] = max(
+                terrain_backend_particle_stats[
+                    "raw_likelihood_refinement_translation_max_m"
+                ],
+                translation_m,
+            )
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_abs_yaw_sum_deg"
+            ] += abs(yaw_deg)
+            terrain_backend_particle_stats[
+                "raw_likelihood_refinement_abs_yaw_max_deg"
+            ] = max(
+                terrain_backend_particle_stats[
+                    "raw_likelihood_refinement_abs_yaw_max_deg"
+                ],
+                abs(yaw_deg),
+            )
+            terrain_backend_particle_stats[
+                "cohort_basin_refinements"
+            ] += 1
+
+        for evidence in original_evidence_tuple:
+            original_pose2 = np.asarray(
+                evidence.map_pose2, dtype=np.float64
+            ).reshape(3)
+            refined_pose2 = raw_likelihood.refine_pose(original_pose2)
+            append_refined_evidence(
+                evidence,
+                original_pose2,
+                refined_pose2,
+                role="compact_proposal_basin",
+            )
+            terrain_backend_particle_stats[
+                "compact_proposal_refinements"
+            ] += 1
+        evidence_tuple = tuple(refined_evidences)
+        decision = terrain_backend_particle_tracker.update(
+            timestamp_s=timestamp,
+            raw_pose2=local_pose2,
+            evidences=evidence_tuple,
+            particle_observation=particle_observation,
+        )
+        terrain_backend_particle_last_patch_end_observation_id = int(
+            patch_end_observation_id
+        )
+        terrain_backend_particle_stats["updates"] += 1
+        terrain_backend_particle_stats["raw_likelihood_updates"] += 1
+        terrain_backend_particle_stats[
+            "candidate_seed_updates"
+            if evidence_tuple
+            else "unseeded_tracking_updates"
+        ] += 1
+        terrain_backend_particle_stats[
+            f"{decision.status}_updates"
+        ] += 1
+        leading = decision.cohorts[0] if decision.cohorts else None
+        diagnostics = raw_likelihood.last_diagnostics
+        terrain_backend_particle_records.append(
+            {
+                "timestamp_s": float(timestamp),
+                "observation_id": int(observation_id),
+                "mode": mode,
+                "status": decision.status,
+                "candidate_count": len(evidence_tuple),
+                "raw_likelihood_refinements": refinement_records,
+                "null_probability": float(decision.null_probability),
+                "best_probability": float(decision.best_probability),
+                "odds_over_second": float(decision.odds_over_second),
+                "cohort_count": len(decision.cohorts),
+                "best_particle_count": (
+                    0 if leading is None else int(leading.particle_count)
+                ),
+                "best_effective_sample_size": (
+                    0.0
+                    if leading is None
+                    else float(leading.effective_sample_size)
+                ),
+                "best_independent_evidence": (
+                    0
+                    if leading is None
+                    else int(leading.independent_evidence)
+                ),
+                "best_map_pose2": (
+                    None if leading is None else leading.map_pose2.tolist()
+                ),
+                "best_map_to_odom_pose2": (
+                    None
+                    if leading is None
+                    else leading.map_to_odom_pose2.tolist()
+                ),
+                "best_last_measurement_pose2": (
+                    None
+                    if leading is None
+                    else leading.last_measurement_pose2.tolist()
+                ),
+                "best_last_measurement_position_std_m": (
+                    None
+                    if leading is None
+                    else float(
+                        np.sqrt(
+                            np.max(
+                                np.linalg.eigvalsh(
+                                    leading.last_measurement_covariance[:2, :2]
+                                )
+                            )
+                        )
+                    )
+                ),
+                "best_last_measurement_yaw_std_deg": (
+                    None
+                    if leading is None
+                    else float(
+                        np.rad2deg(
+                            np.sqrt(
+                                max(
+                                    0.0,
+                                    float(
+                                        leading.last_measurement_covariance[2, 2]
+                                    ),
+                                )
+                            )
+                        )
+                    )
+                ),
+                "best_last_observation_log_likelihood_ratio": (
+                    None
+                    if leading is None
+                    else float(
+                        leading.last_observation_log_likelihood_ratio
+                    )
+                ),
+                "best_last_observation_novel_fraction": (
+                    None
+                    if leading is None
+                    else float(leading.last_observation_novel_fraction)
+                ),
+                "confirmed_with_new_independent_evidence": bool(
+                    decision.confirmed_with_new_independent_evidence
+                ),
+                "best_measurement_graph_ready": bool(
+                    leading is not None
+                    and leading.last_measurement_is_graph_ready
+                ),
+                "bathymetry_observability": (
+                    None
+                    if diagnostics is None
+                    else float(diagnostics.bathymetry_observability)
+                ),
+                "backscatter_observability": (
+                    None
+                    if diagnostics is None
+                    else float(diagnostics.backscatter_observability)
+                ),
+                "best_bathymetry_normalized_loss": (
+                    None
+                    if diagnostics is None
+                    else _finite_float_or_none(
+                        diagnostics.best_bathymetry_normalized_loss
+                    )
+                ),
+                "best_backscatter_correlation": (
+                    None
+                    if diagnostics is None
+                    else _finite_float_or_none(
+                        diagnostics.best_backscatter_correlation
+                    )
+                ),
+                "particle_log_likelihood_ratio_std": (
+                    None
+                    if diagnostics is None
+                    else float(diagnostics.log_likelihood_ratio_std)
+                ),
+                "uses_truth": False,
+            }
+        )
+        return decision
+
     def try_add_terrain_prior_result(
         result,
         *,
@@ -3377,6 +4729,9 @@ def main() -> int:
         timestamp,
         observation_id,
         patch_body,
+        patch_reference_state=None,
+        backscatter_patch_body=None,
+        backscatter_patch_values=None,
         patch_start_timestamp,
         patch_end_timestamp,
         patch_start_observation_id,
@@ -3385,6 +4740,8 @@ def main() -> int:
         information_override=None,
         information_override_includes_model_floors=False,
         yaw_observable_override=None,
+        backscatter_result=None,
+        evaluation_truth_state=None,
     ):
         """Attempt one factor and retain matcher-versus-graph diagnostics."""
 
@@ -3398,6 +4755,7 @@ def main() -> int:
         )
         initialize_global_gauge = bool(
             ARGS.terrain_initialize_global_gauge
+            and not ARGS.initialize_from_truth
             and terrain_prior_factor_stats["accepts"] == 0
             and mode not in ("emergency", "global")
         )
@@ -3408,7 +4766,161 @@ def main() -> int:
             else matched_pose2_override,
             dtype=np.float64,
         ).reshape(3)
-        if initialize_global_gauge:
+        particle_filter_confirmed = False
+        if (
+            terrain_backend_particle_tracker is not None
+            and mode in ("normal", "recovery")
+        ):
+            measurement_information = terrain_prior_information(
+                result,
+                "full",
+                base_information=information_override,
+                apply_model_floors=(
+                    not information_override_includes_model_floors
+                ),
+            )
+            measurement_covariance = np.linalg.pinv(
+                measurement_information, rcond=1.0e-12, hermitian=True
+            )
+            position_std_m = math.sqrt(
+                max(
+                    1.0e-12,
+                    float(
+                        np.linalg.eigvalsh(
+                            measurement_covariance[:2, :2]
+                        )[-1]
+                    ),
+                )
+            )
+            yaw_std_deg = math.degrees(
+                math.sqrt(max(1.0e-12, float(measurement_covariance[2, 2])))
+            )
+            inlier_ratio = float(
+                result.inliers / max(result.correspondences, 1)
+            )
+            reduced_chi_square = float(result.reduced_chi_square)
+            chi_square_quality = (
+                math.exp(-0.5 * max(0.0, reduced_chi_square - 1.0))
+                if math.isfinite(reduced_chi_square)
+                else 0.0
+            )
+            bathymetry_score = float(
+                np.clip(
+                    0.5 * inlier_ratio + 0.5 * chi_square_quality,
+                    -1.0,
+                    1.0,
+                )
+            )
+            bathymetry_observability = float(
+                np.clip(result.translation_observable_rank / 2.0, 0.0, 1.0)
+            )
+            backscatter_score = 0.0
+            backscatter_observability = 0.0
+            if backscatter_result is not None:
+                correlation = float(backscatter_result.correlation_after)
+                if math.isfinite(correlation):
+                    backscatter_score = float(np.clip(correlation, -1.0, 1.0))
+                if backscatter_matcher is not None:
+                    texture_scale = max(
+                        5.0 * backscatter_matcher.config.minimum_texture_std,
+                        1.0e-12,
+                    )
+                    backscatter_observability = float(
+                        np.clip(
+                            backscatter_result.observation_texture_std
+                            / texture_scale,
+                            0.0,
+                            1.0,
+                        )
+                        * np.clip(backscatter_result.valid_fraction, 0.0, 1.0)
+                    )
+            particle_evidence = GlobalPoseEvidence(
+                map_pose2=factor_matched_pose2,
+                bathymetry_score=bathymetry_score,
+                backscatter_score=backscatter_score,
+                bathymetry_observability=bathymetry_observability,
+                backscatter_observability=backscatter_observability,
+                geometry_score=float(np.clip(inlier_ratio, 0.0, 1.0)),
+                cross_modal_consistent=True,
+                position_std_m=position_std_m,
+                yaw_std_deg=yaw_std_deg,
+                patch_start_timestamp_s=patch_start_timestamp,
+                patch_end_timestamp_s=patch_end_timestamp,
+                patch_start_observation_id=patch_start_observation_id,
+                patch_end_observation_id=patch_end_observation_id,
+                source_index=0,
+                covariance_matrix=measurement_covariance,
+                information_matrix=measurement_information,
+            )
+            if patch_reference_state is None:
+                raise RuntimeError(
+                    "particle-backed terrain priors require a patch reference pose"
+                )
+            if backscatter_patch_body is None:
+                backscatter_patch_body = np.empty((0, 3), dtype=np.float64)
+            if backscatter_patch_values is None:
+                backscatter_patch_values = np.empty(0, dtype=np.float64)
+            particle_decision = update_terrain_backend_particle_filter(
+                timestamp=timestamp,
+                observation_id=observation_id,
+                mode=mode,
+                patch_body=patch_body,
+                patch_reference_state=patch_reference_state,
+                backscatter_patch_body=backscatter_patch_body,
+                backscatter_patch_values=backscatter_patch_values,
+                patch_start_timestamp=patch_start_timestamp,
+                patch_end_timestamp=patch_end_timestamp,
+                patch_start_observation_id=patch_start_observation_id,
+                patch_end_observation_id=patch_end_observation_id,
+                evidences=(particle_evidence,),
+                evaluation_truth_state=evaluation_truth_state,
+            )
+            confirmed_particle_cohort = (
+                particle_decision.confirmed_cohort
+            )
+            if confirmed_particle_cohort is None:
+                terrain_backend_particle_stats["factor_holds"] += 1
+                return False, True
+            if (
+                not particle_decision.confirmed_with_new_independent_evidence
+                or not confirmed_particle_cohort.last_measurement_is_graph_ready
+            ):
+                # A confirmed recursive posterior may be returned on an
+                # overlapping rolling window.  Reusing it as a new unary
+                # factor would count the same historical sonar information
+                # again and make GTSAM falsely over-confident.
+                terrain_backend_particle_stats["factor_holds"] += 1
+                terrain_backend_particle_stats[
+                    "nonindependent_factor_reuses_prevented"
+                ] += 1
+                return False, True
+
+            particle_filter_confirmed = True
+            terrain_backend_particle_stats["factor_authorizations"] += 1
+            factor_matched_pose2 = np.asarray(
+                confirmed_particle_cohort.last_measurement_pose2,
+                dtype=np.float64,
+            ).copy()
+            # This is the local Laplace information from the *current
+            # independent acquisition*, not the recursively accumulated PF
+            # posterior.  Its map/model floors were already applied when the
+            # evidence was constructed, so do not apply them a second time.
+            information_override = np.asarray(
+                confirmed_particle_cohort.last_measurement_information,
+                dtype=np.float64,
+            ).copy()
+            information_override_includes_model_floors = True
+            terrain_backend_particle_stats[
+                "posterior_as_measurement_reuses_prevented"
+            ] += 1
+
+        if particle_filter_confirmed:
+            factor_component_mode = "full"
+            # Only the first confirmed PF output establishes/re-establishes
+            # the graph gauge. Subsequent PF factors pass normal graph prefit.
+            if initialize_global_gauge:
+                gauge_seed_pose2 = factor_matched_pose2.copy()
+        elif initialize_global_gauge:
             (
                 gauge_seed_pose2,
                 held_for_confirmation,
@@ -3488,6 +5000,20 @@ def main() -> int:
                 initializes_global_gauge=gauge_seed_pose2 is not None,
             ),
             relocalization_seed_pose2=gauge_seed_pose2,
+            # Normal PF-authorized measurements already use the pose graph's
+            # bounded Huber kernel.  Select the separate Cauchy policy only
+            # when an externally confirmed basin also re-seeds the graph;
+            # the pose-graph API intentionally forbids that relocalization
+            # kernel without a corresponding seed operation.
+            relocalization_prior_robust=bool(
+                (
+                    mode == "global" and global_cohort_tracker is not None
+                )
+                or (
+                    particle_filter_confirmed
+                    and gauge_seed_pose2 is not None
+                )
+            ),
         )
         diagnostics = slam.pose_graph.diagnostics()
         if diagnostics.last_terrain_prefit_performed:
@@ -3507,6 +5033,98 @@ def main() -> int:
                 diagnostics.last_terrain_prior_rejection_reason or "unspecified"
             ] += 1
         return bool(added), False
+
+    def try_add_current_raw_particle_prior(
+        decision,
+        *,
+        timestamp,
+        observation_id,
+        patch_body,
+    ):
+        """Insert one current-window likelihood factor after PF association.
+
+        The PF selects the persistent basin, but neither its recursive mean nor
+        its recursive covariance enters this unary factor.  Both measurement
+        pose and rank-aware information come only from the current independent
+        raw sonar window's local Laplace approximation.
+        """
+
+        cohort = None if decision is None else decision.confirmed_cohort
+        if cohort is None:
+            terrain_backend_particle_stats["factor_holds"] += 1
+            return False
+        if (
+            not decision.confirmed_with_new_independent_evidence
+            or not cohort.last_measurement_is_graph_ready
+        ):
+            terrain_backend_particle_stats["factor_holds"] += 1
+            terrain_backend_particle_stats[
+                "nonindependent_factor_reuses_prevented"
+            ] += 1
+            return False
+
+        terrain_backend_particle_stats["factor_authorizations"] += 1
+        terrain_backend_particle_stats[
+            "posterior_as_measurement_reuses_prevented"
+        ] += 1
+        terrain_backend_particle_stats[
+            "raw_likelihood_factor_attempts"
+        ] += 1
+        terrain_prior_factor_stats["attempts"] += 1
+        terrain_match_mode_stats["normal"]["prior_factor_attempts"] += 1
+        local_pose2 = np.array(
+            [
+                slam.state.position[0],
+                slam.state.position[1],
+                rpy_from_rotation(slam.state.rotation)[2],
+            ],
+            dtype=np.float64,
+        )
+        added = slam.pose_graph.add_terrain_prior(
+            timestamp=timestamp,
+            observation_id=observation_id,
+            prior_pose2=local_pose2,
+            raw_rotation_world_body=slam.state.rotation,
+            raw_position_world=slam.state.position,
+            matched_pose2=cohort.last_measurement_pose2,
+            information_world=cohort.last_measurement_information,
+            points_body=patch_body,
+            optimize_interval=ARGS.terrain_prior_optimize_interval,
+            relocalization_seed=False,
+            relocalization_seed_pose2=None,
+            relocalization_prior_robust=False,
+        )
+        diagnostics = slam.pose_graph.diagnostics()
+        if diagnostics.last_terrain_prefit_performed:
+            prefit_samples = (
+                terrain_prefit_accepted_chi2
+                if added
+                else terrain_prefit_rejected_chi2
+            )
+            prefit_samples.append(
+                float(diagnostics.last_terrain_prefit_chi2)
+            )
+        if added:
+            terrain_backend_particle_stats[
+                "raw_likelihood_factor_accepts"
+            ] += 1
+            terrain_prior_factor_stats["accepts"] += 1
+            terrain_match_mode_stats["normal"][
+                "prior_factor_accepts"
+            ] += 1
+        else:
+            terrain_backend_particle_stats[
+                "raw_likelihood_factor_rejections"
+            ] += 1
+            terrain_prior_factor_stats["rejections"] += 1
+            terrain_match_mode_stats["normal"][
+                "prior_factor_rejections"
+            ] += 1
+            terrain_prior_factor_stats["rejection_reasons"][
+                diagnostics.last_terrain_prior_rejection_reason
+                or "unspecified"
+            ] += 1
+        return bool(added)
 
     truth_track: list[np.ndarray] = [truth0.position.copy()]
     truth_rotation_track: list[np.ndarray] = [truth0.rotation.copy()]
@@ -3615,8 +5233,9 @@ def main() -> int:
         print(
             f"[OceanSim] complete measured Monterey Canyon "
             f"{world_model.width / 1000.0:.2f} x "
-            f"{world_model.length / 1000.0:.2f} km + full-scale LAUV UI "
-            f"is live; measured backscatter coverage "
+            f"{world_model.length / 1000.0:.2f} km + full-scale LAUV "
+            f"{'headless runtime is active' if ARGS.headless else 'UI is live'}; "
+            f"measured backscatter coverage "
             f"{100.0 * world_model.backscatter_coverage_fraction:.2f}%; "
             f"target time scale {ARGS.time_scale:.1f}x; "
             f"sonar backend {acoustic_backend_label}; "
@@ -3693,17 +5312,38 @@ def main() -> int:
                 f"+/-{ARGS.terrain_match_translation_window_m:g} m x/y, "
                 f"+/-{ARGS.terrain_match_yaw_window_deg:g} deg yaw, "
                 f"prior {terrain_prior_model_kind}; "
-                "accepted matches enter only the global pose graph.",
+                + (
+                    "accepted matches first enter the cohort particle filter."
+                    if terrain_backend_particle_tracker is not None
+                    else "accepted matches enter only the global pose graph."
+                ),
                 flush=True,
             )
+            if terrain_backend_particle_tracker is not None:
+                print(
+                    "[OceanSim] ordinary terrain cohort PF enabled: "
+                    f"{terrain_backend_particle_tracker.config.particles_per_cohort} "
+                    "SE(2) particles/cohort, explicit null hypothesis, "
+                    f"{terrain_backend_particle_tracker.config.minimum_independent_evidence} "
+                    "nonoverlapping observations before GTSAM authorization; "
+                    "single matches cannot create absolute graph factors.",
+                    flush=True,
+                )
             if backscatter_matcher is not None:
+                ci_description = (
+                    "adaptive minimum-logdet per patch"
+                    if ARGS.backscatter_ci_bathymetry_weight < 0.0
+                    else (
+                        f"fixed {ARGS.backscatter_ci_bathymetry_weight:g}/"
+                        f"{1.0 - ARGS.backscatter_ci_bathymetry_weight:g}"
+                    )
+                )
                 print(
                     "[OceanSim] measured side-scan map refinement enabled: "
                     "log-radiometric trend removal + normalized correlation; "
                     "accepted texture and bathymetric fixes use covariance "
-                    "intersection with bathymetry/backscatter weights "
-                    f"{ARGS.backscatter_ci_bathymetry_weight:g}/"
-                    f"{1.0 - ARGS.backscatter_ci_bathymetry_weight:g} "
+                    "intersection with bathymetry/backscatter weighting "
+                    f"{ci_description} "
                     "(same-survey upper bound).",
                     flush=True,
                 )
@@ -3740,18 +5380,43 @@ def main() -> int:
                     flush=True,
                 )
             if global_terrain_relocalizer is not None:
+                cohort_description = (
+                    ""
+                    if global_cohort_tracker is None
+                    else (
+                        "; persistent cohort particle filter enabled with "
+                        f"up to {global_cohort_tracker.config.maximum_cohorts} "
+                        "modes and "
+                        f"{global_cohort_tracker.config.particles_per_cohort} "
+                        "SE(2) particles per mode, explicit null state, and "
+                        f"{global_cohort_tracker.config.minimum_independent_evidence} "
+                        "nonoverlapping windows required"
+                    )
+                )
+                bbs3d_description = (
+                    ""
+                    if bbs3d_candidate_verifier is None
+                    else (
+                        "; every cohort proposal is independently checked by "
+                        "the pinned official 3D-BBS GPU solver over +/-"
+                        f"{bbs3d_candidate_verifier.config.maximum_translation_m:g} m/"
+                        f"{bbs3d_candidate_verifier.config.maximum_yaw_deg:g} deg "
+                        "with pressure depth and IMU roll/pitch fixed"
+                    )
+                )
                 print(
                     "[OceanSim] whole-map joint terrain relocalization enabled: "
-                    f"{ARGS.terrain_global_window_pings} inertially deskewed pings "
+                    f"{ARGS.terrain_global_window_pings} acoustic-inertially deskewed pings "
                     f"({ARGS.terrain_global_window_pings / ARGS.ping_hz:.0f} s, "
                     f"nominal {ARGS.terrain_global_window_pings * ARGS.survey_speed_mps / ARGS.ping_hz:.0f} m), "
                     f"{global_terrain_relocalizer.resolution_m:g} m proposal grid, "
                     f"+/-{ARGS.terrain_global_yaw_window_deg:g} deg around "
-                    "IMU/DVL yaw; joint bathymetry/backscatter proposals require "
+                    "local acoustic-inertial yaw; joint bathymetry/backscatter proposals require "
                     "5 m dual-modal refinement (global side-scan window "
                     f"+/-{global_backscatter_refinement_matcher.config.maximum_translation_m:g} m/"
                     f"{global_backscatter_refinement_matcher.config.maximum_yaw_deg:g} deg) "
-                    "and a disjoint-strip confirmation.",
+                    "and a disjoint-strip confirmation"
+                    f"{cohort_description}{bbs3d_description}.",
                     flush=True,
                 )
 
@@ -3764,6 +5429,13 @@ def main() -> int:
                 run_status = "completed"
                 termination_reason = "requested_max_frames_reached"
                 break
+            if (
+                survey_segment_duration_s is not None
+                and sim_time + 1.0e-10 >= survey_segment_duration_s
+            ):
+                run_status = "completed"
+                termination_reason = "requested_survey_segment_reached"
+                break
             if ARGS.survey_laps and sim_time >= ARGS.survey_laps * survey.period:
                 run_status = "completed"
                 termination_reason = "requested_survey_laps_reached"
@@ -3773,13 +5445,15 @@ def main() -> int:
             # a rounded modulo test: at accelerated display rates that pattern
             # duplicated DVL/depth observations and biased the estimator.
             target_time = (frame_count + 1) * ARGS.time_scale / 60.0
+            if survey_segment_duration_s is not None:
+                target_time = min(target_time, survey_segment_duration_s)
             event_loop_started = time.perf_counter()
             while True:
                 event_time = min(next_imu, next_dvl, next_depth, next_ping)
                 if event_time > target_time + 1.0e-10:
                     break
                 sim_time = event_time
-                truth = survey.state(sim_time)
+                truth = survey_state(sim_time)
 
                 if next_imu <= sim_time + 1.0e-10:
                     gyro, acceleration = navigation.imu(truth)
@@ -4090,8 +5764,12 @@ def main() -> int:
                                     last_backscatter_patch_reduced_points = (
                                         int(backscatter_patch_body.shape[0])
                                     )
+                            # Match against the actual graph target.  The
+                            # map->odom soft follower is an output/UI contract
+                            # only; using it here would make an already
+                            # verified correction needlessly lag the matcher.
                             global_rotation_seed, global_position_seed = (
-                                slam.global_pose()
+                                slam.raw_global_pose()
                             )
                             global_seed_state = local_reference_state.copy()
                             global_seed_state.rotation = global_rotation_seed
@@ -4179,6 +5857,8 @@ def main() -> int:
                                 information_override = None
                                 yaw_observable_override = None
                                 cross_modal_compatible = True
+                                backscatter_refinement_accepted = False
+                                backscatter_refinement_result = None
                                 information_override_includes_model_floors = (
                                     False
                                 )
@@ -4189,7 +5869,8 @@ def main() -> int:
                                         yaw_observable_override,
                                         cross_modal_compatible,
                                         information_override_includes_model_floors,
-                                        _backscatter_refinement_accepted,
+                                        backscatter_refinement_accepted,
+                                        backscatter_refinement_result,
                                     ) = refine_terrain_fix_with_backscatter(
                                         terrain_result,
                                         backscatter_patch_body,
@@ -4206,6 +5887,15 @@ def main() -> int:
                                         timestamp=sim_time,
                                         observation_id=observation_id,
                                         patch_body=patch_body,
+                                        patch_reference_state=(
+                                            local_reference_state
+                                        ),
+                                        backscatter_patch_body=(
+                                            backscatter_patch_body
+                                        ),
+                                        backscatter_patch_values=(
+                                            backscatter_patch_values
+                                        ),
                                         patch_start_timestamp=(
                                             patch_start_timestamp
                                         ),
@@ -4228,6 +5918,12 @@ def main() -> int:
                                         yaw_observable_override=(
                                             yaw_observable_override
                                         ),
+                                        backscatter_result=(
+                                            backscatter_refinement_result
+                                            if backscatter_refinement_accepted
+                                            else None
+                                        ),
+                                        evaluation_truth_state=truth,
                                     )
                                 else:
                                     terrain_prior_factor_stats["attempts"] += 1
@@ -4258,7 +5954,7 @@ def main() -> int:
                                     normal_prior_added=terrain_prior_added
                                 )
                             ):
-                                # This is intentionally the identical 30-ping
+                                # This is intentionally the identical 300-ping
                                 # motion-compensated patch and identical graph
                                 # seed.  Recovery expands only the bounded
                                 # terrain search; it does not use truth or a
@@ -4302,6 +5998,15 @@ def main() -> int:
                                         timestamp=sim_time,
                                         observation_id=observation_id,
                                         patch_body=patch_body,
+                                        patch_reference_state=(
+                                            local_reference_state
+                                        ),
+                                        backscatter_patch_body=(
+                                            backscatter_patch_body
+                                        ),
+                                        backscatter_patch_values=(
+                                            backscatter_patch_values
+                                        ),
                                         patch_start_timestamp=(
                                             patch_start_timestamp
                                         ),
@@ -4314,6 +6019,7 @@ def main() -> int:
                                         patch_end_observation_id=(
                                             patch_end_observation_id
                                         ),
+                                        evaluation_truth_state=truth,
                                     )
                                     recovery_graph_diagnostics = (
                                         slam.pose_graph.diagnostics()
@@ -4530,6 +6236,15 @@ def main() -> int:
                                     ),
                                 )
                             )
+                            if (
+                                terrain_prior_added
+                                and global_cohort_tracker is not None
+                            ):
+                                # Any successfully inserted absolute prior has
+                                # re-established the graph gauge.  Old outage
+                                # cohorts are then stale and must not survive
+                                # into a later, unrelated loss episode.
+                                global_cohort_tracker.reset()
                             if emergency_request.should_attempt:
                                 emergency_outage_snapshot = {
                                     "observation_index": int(
@@ -4668,7 +6383,13 @@ def main() -> int:
                                                         "backscatter_values"
                                                     ]
                                                 ),
-                                                yaw_center_rad=raw_pose2[2],
+                                                yaw_center_rad=float(
+                                                    rpy_from_rotation(
+                                                        global_patch[
+                                                            "reference_state"
+                                                        ].rotation
+                                                    )[2]
+                                                ),
                                             )
                                         )
                                         global_elapsed_s = (
@@ -4804,7 +6525,11 @@ def main() -> int:
                                                     ].shape[0]
                                                 ),
                                                 "yaw_center_rad": float(
-                                                    raw_pose2[2]
+                                                    rpy_from_rotation(
+                                                        global_patch[
+                                                            "reference_state"
+                                                        ].rotation
+                                                    )[2]
                                                 ),
                                                 "candidates": [
                                                     {
@@ -4877,9 +6602,569 @@ def main() -> int:
                                             }
                                         )
 
-                                        if global_search_result.accepted:
+                                        proposal_authorized = bool(
+                                            global_search_result.accepted
+                                        )
+                                        proposal_index = 0
+                                        global_tracking_decision = None
+                                        global_candidate_verifications = {}
+                                        if global_cohort_tracker is not None:
+                                            cohort_evidence_list = []
+                                            for (
+                                                candidate_index,
+                                                candidate,
+                                            ) in enumerate(
+                                                global_search_result.candidates
+                                            ):
+                                                verification = (
+                                                    verify_global_candidate(
+                                                        candidate,
+                                                        global_patch,
+                                                        truth_state=truth,
+                                                    )
+                                                )
+                                                global_candidate_verifications[
+                                                    candidate_index
+                                                ] = verification
+                                                global_stats[
+                                                    "candidate_verification_invocations"
+                                                ] += 1
+                                                if not verification["accepted"]:
+                                                    global_stats[
+                                                        "candidate_verification_rejections"
+                                                    ] += 1
+                                                    continue
+                                                global_stats[
+                                                    "candidate_verification_accepts"
+                                                ] += 1
+                                                verification_covariance = (
+                                                    np.linalg.pinv(
+                                                        verification[
+                                                            "information"
+                                                        ],
+                                                        rcond=1.0e-12,
+                                                        hermitian=True,
+                                                    )
+                                                )
+                                                position_variance = max(
+                                                    0.0,
+                                                    float(
+                                                        np.linalg.eigvalsh(
+                                                            verification_covariance[
+                                                                :2, :2
+                                                            ]
+                                                        )[-1]
+                                                    ),
+                                                )
+                                                position_std_m = max(
+                                                    0.5
+                                                    * world_model.resolution_m,
+                                                    math.sqrt(
+                                                        position_variance
+                                                    ),
+                                                )
+                                                yaw_std_deg = max(
+                                                    0.5,
+                                                    math.degrees(
+                                                        math.sqrt(
+                                                            max(
+                                                                0.0,
+                                                                float(
+                                                                    verification_covariance[
+                                                                        2, 2
+                                                                    ]
+                                                                ),
+                                                            )
+                                                        )
+                                                    ),
+                                                )
+                                                backscatter_result = (
+                                                    verification[
+                                                        "backscatter_result"
+                                                    ]
+                                                )
+                                                cohort_evidence_list.append(
+                                                    GlobalPoseEvidence(
+                                                        map_pose2=verification[
+                                                            "matched_pose2"
+                                                        ],
+                                                        bathymetry_score=float(
+                                                            candidate
+                                                            .bathymetry_evidence_score
+                                                        ),
+                                                        backscatter_score=float(
+                                                            backscatter_result
+                                                            .correlation_after
+                                                        ),
+                                                        bathymetry_observability=(
+                                                            global_search_result
+                                                            .bathymetry_observability
+                                                            * min(
+                                                                1.0,
+                                                                verification[
+                                                                    "translation_observable_rank"
+                                                                ]
+                                                                / 2.0,
+                                                            )
+                                                        ),
+                                                        backscatter_observability=(
+                                                            verification[
+                                                                "backscatter_observability"
+                                                            ]
+                                                        ),
+                                                        geometry_score=(
+                                                            verification[
+                                                                "geometry_score"
+                                                            ]
+                                                        ),
+                                                        cross_modal_consistent=True,
+                                                        position_std_m=(
+                                                            position_std_m
+                                                        ),
+                                                        yaw_std_deg=yaw_std_deg,
+                                                        patch_start_timestamp_s=(
+                                                            global_patch[
+                                                                "patch_start_timestamp"
+                                                            ]
+                                                        ),
+                                                        patch_end_timestamp_s=(
+                                                            global_patch[
+                                                                "patch_end_timestamp"
+                                                            ]
+                                                        ),
+                                                        patch_start_observation_id=(
+                                                            global_patch[
+                                                                "patch_start_observation_id"
+                                                            ]
+                                                        ),
+                                                        patch_end_observation_id=(
+                                                            global_patch[
+                                                                "patch_end_observation_id"
+                                                            ]
+                                                        ),
+                                                        source_index=(
+                                                            candidate_index
+                                                        ),
+                                                        covariance_matrix=(
+                                                            verification_covariance
+                                                        ),
+                                                    )
+                                                )
+                                            cohort_evidences = tuple(
+                                                cohort_evidence_list
+                                            )
+                                            global_particle_likelihood = (
+                                                AcousticTerrainParticleLikelihood(
+                                                    terrain_prior_model,
+                                                    global_patch[
+                                                        "reference_state"
+                                                    ],
+                                                    global_patch[
+                                                        "terrain_points_body"
+                                                    ],
+                                                    backscatter_terrain=(
+                                                        world_model
+                                                    ),
+                                                    backscatter_points_body=(
+                                                        global_patch[
+                                                            "backscatter_points_body"
+                                                        ]
+                                                    ),
+                                                    backscatter_values=(
+                                                        global_patch[
+                                                            "backscatter_values"
+                                                        ]
+                                                    ),
+                                                    config=replace(
+                                                        terrain_particle_likelihood_config,
+                                                        bathymetry_measurement_std_m=max(
+                                                            terrain_prior_vertical_model_std_m,
+                                                            float(
+                                                                global_search_result
+                                                                .bathymetry_observation_std_m
+                                                            ),
+                                                        ),
+                                                    ),
+                                                )
+                                            )
+                                            global_particle_observation = (
+                                                ParticleLikelihoodObservation(
+                                                    evaluator=(
+                                                        global_particle_likelihood
+                                                    ),
+                                                    patch_start_timestamp_s=(
+                                                        global_patch[
+                                                            "patch_start_timestamp"
+                                                        ]
+                                                    ),
+                                                    patch_end_timestamp_s=(
+                                                        global_patch[
+                                                            "patch_end_timestamp"
+                                                        ]
+                                                    ),
+                                                    patch_start_observation_id=(
+                                                        global_patch[
+                                                            "patch_start_observation_id"
+                                                        ]
+                                                    ),
+                                                    patch_end_observation_id=(
+                                                        global_patch[
+                                                            "patch_end_observation_id"
+                                                        ]
+                                                    ),
+                                                )
+                                            )
+                                            local_acoustic_pose2 = np.array(
+                                                [
+                                                    slam.state.position[0],
+                                                    slam.state.position[1],
+                                                    rpy_from_rotation(
+                                                        slam.state.rotation
+                                                    )[2],
+                                                ],
+                                                dtype=np.float64,
+                                            )
+                                            global_tracking_decision = (
+                                                global_cohort_tracker.update(
+                                                    timestamp_s=sim_time,
+                                                    raw_pose2=(
+                                                        local_acoustic_pose2
+                                                    ),
+                                                    evidences=cohort_evidences,
+                                                    particle_observation=(
+                                                        global_particle_observation
+                                                    ),
+                                                )
+                                            )
+                                            global_stats["cohort_updates"] += 1
+                                            global_stats[
+                                                f"cohort_{global_tracking_decision.status}_updates"
+                                            ] += 1
+                                            global_stats[
+                                                "last_cohort_count"
+                                            ] = len(
+                                                global_tracking_decision.cohorts
+                                            )
+                                            global_stats[
+                                                "last_cohort_null_probability"
+                                            ] = (
+                                                global_tracking_decision
+                                                .null_probability
+                                            )
+                                            global_stats[
+                                                "last_cohort_best_probability"
+                                            ] = (
+                                                global_tracking_decision
+                                                .best_probability
+                                            )
+                                            global_stats[
+                                                "last_cohort_odds_over_second"
+                                            ] = (
+                                                global_tracking_decision
+                                                .odds_over_second
+                                            )
+                                            confirmed_cohort = (
+                                                global_tracking_decision
+                                                .confirmed_cohort
+                                            )
+                                            proposal_authorized = bool(
+                                                confirmed_cohort is not None
+                                                and global_tracking_decision
+                                                .confirmed_with_new_independent_evidence
+                                                and confirmed_cohort
+                                                .last_measurement_is_graph_ready
+                                                and confirmed_cohort
+                                                .last_source_index
+                                                in global_candidate_verifications
+                                                and global_candidate_verifications[
+                                                    confirmed_cohort
+                                                    .last_source_index
+                                                ]["accepted"]
+                                            )
+                                            if proposal_authorized:
+                                                proposal_index = int(
+                                                    confirmed_cohort
+                                                    .last_source_index
+                                                )
+                                            global_cohort_records.append(
+                                                {
+                                                    "timestamp_s": float(
+                                                        sim_time
+                                                    ),
+                                                    "observation_id": int(
+                                                        observation_id
+                                                    ),
+                                                    "status": (
+                                                        global_tracking_decision
+                                                        .status
+                                                    ),
+                                                    "proposal_authorized": bool(
+                                                        proposal_authorized
+                                                    ),
+                                                    "selected_candidate_index": (
+                                                        proposal_index
+                                                        if proposal_authorized
+                                                        else None
+                                                    ),
+                                                    "null_probability": float(
+                                                        global_tracking_decision
+                                                        .null_probability
+                                                    ),
+                                                    "best_probability": float(
+                                                        global_tracking_decision
+                                                        .best_probability
+                                                    ),
+                                                    "odds_over_second": float(
+                                                        global_tracking_decision
+                                                        .odds_over_second
+                                                    ),
+                                                    "bathymetry_observation_std_m": float(
+                                                        global_search_result
+                                                        .bathymetry_observation_std_m
+                                                    ),
+                                                    "backscatter_observation_log_std": float(
+                                                        global_search_result
+                                                        .backscatter_observation_log_std
+                                                    ),
+                                                    "bathymetry_observability": float(
+                                                        global_search_result
+                                                        .bathymetry_observability
+                                                    ),
+                                                    "backscatter_observability": float(
+                                                        global_search_result
+                                                        .backscatter_observability
+                                                    ),
+                                                    "candidate_verifications": [
+                                                        {
+                                                            "source_index": int(
+                                                                source_index
+                                                            ),
+                                                            "accepted": bool(
+                                                                verification[
+                                                                    "accepted"
+                                                                ]
+                                                            ),
+                                                            "bbs3d": (
+                                                                None
+                                                                if verification[
+                                                                    "bbs3d_result"
+                                                                ]
+                                                                is None
+                                                                else {
+                                                                    "accepted": bool(
+                                                                        verification[
+                                                                            "bbs3d_result"
+                                                                        ].accepted
+                                                                    ),
+                                                                    "score_fraction": float(
+                                                                        verification[
+                                                                            "bbs3d_result"
+                                                                        ].score_fraction
+                                                                    ),
+                                                                    "correction_pose2": verification[
+                                                                        "bbs3d_result"
+                                                                    ].correction_pose2.tolist(),
+                                                                    "source_points": int(
+                                                                        verification[
+                                                                            "bbs3d_result"
+                                                                        ].source_points
+                                                                    ),
+                                                                    "target_points": int(
+                                                                        verification[
+                                                                            "bbs3d_result"
+                                                                        ].target_points
+                                                                    ),
+                                                                    "elapsed_ms": float(
+                                                                        verification[
+                                                                            "bbs3d_result"
+                                                                        ].elapsed_milliseconds
+                                                                    ),
+                                                                    "rejection_reason": verification[
+                                                                        "bbs3d_result"
+                                                                    ].rejection_reason,
+                                                                }
+                                                            ),
+                                                            "bathymetry_accepted": bool(
+                                                                verification[
+                                                                    "terrain_result"
+                                                                ]
+                                                                is not None
+                                                                and verification[
+                                                                    "terrain_result"
+                                                                ].accepted
+                                                            ),
+                                                            "backscatter_accepted": bool(
+                                                                verification[
+                                                                    "backscatter_result"
+                                                                ]
+                                                                is not None
+                                                                and verification[
+                                                                    "backscatter_result"
+                                                                ].accepted
+                                                            ),
+                                                            "terrain_seed_source": (
+                                                                verification[
+                                                                    "terrain_seed_source"
+                                                                ]
+                                                            ),
+                                                            "terrain_seed_attempts": (
+                                                                verification[
+                                                                    "terrain_seed_attempts"
+                                                                ]
+                                                            ),
+                                                            "geometry_score": float(
+                                                                verification[
+                                                                    "geometry_score"
+                                                                ]
+                                                            ),
+                                                        }
+                                                        for source_index, verification in sorted(
+                                                            global_candidate_verifications.items()
+                                                        )
+                                                    ],
+                                                    "cohorts": [
+                                                        {
+                                                            "cohort_id": int(
+                                                                cohort.cohort_id
+                                                            ),
+                                                            "map_pose2": (
+                                                                cohort.map_pose2.tolist()
+                                                            ),
+                                                            "map_to_odom_pose2": (
+                                                                cohort
+                                                                .map_to_odom_pose2
+                                                                .tolist()
+                                                            ),
+                                                            "probability": float(
+                                                                cohort.probability
+                                                            ),
+                                                            "total_evidence": int(
+                                                                cohort
+                                                                .total_evidence
+                                                            ),
+                                                            "independent_evidence": int(
+                                                                cohort
+                                                                .independent_evidence
+                                                            ),
+                                                            "consecutive_misses": int(
+                                                                cohort
+                                                                .consecutive_misses
+                                                            ),
+                                                            "last_source_index": int(
+                                                                cohort
+                                                                .last_source_index
+                                                            ),
+                                                            "particle_count": int(
+                                                                cohort
+                                                                .particle_count
+                                                            ),
+                                                            "effective_sample_size": float(
+                                                                cohort
+                                                                .effective_sample_size
+                                                            ),
+                                                            "resampling_events": int(
+                                                                cohort
+                                                                .resampling_events
+                                                            ),
+                                                        }
+                                                        for cohort in (
+                                                            global_tracking_decision
+                                                            .cohorts
+                                                        )
+                                                    ],
+                                                    "uses_truth": False,
+                                                }
+                                            )
+
+                                        if (
+                                            proposal_authorized
+                                            and global_cohort_tracker is not None
+                                        ):
+                                            selected_verification = (
+                                                global_candidate_verifications[
+                                                    proposal_index
+                                                ]
+                                            )
+                                            refined_result = selected_verification[
+                                                "terrain_result"
+                                            ]
+                                            match_elapsed_s = (
+                                                selected_verification[
+                                                    "refine_elapsed_s"
+                                                ]
+                                            )
+                                            confirmation_result = refined_result
+                                            confirmation_mode = "global"
+                                            confirmation_accepted = bool(
+                                                selected_verification["accepted"]
+                                            )
+                                            confirmation_matched_pose2 = np.asarray(
+                                                selected_verification[
+                                                    "matched_pose2"
+                                                ],
+                                                dtype=np.float64,
+                                            )
+                                            confirmation_information_override = np.asarray(
+                                                selected_verification[
+                                                    "information"
+                                                ],
+                                                dtype=np.float64,
+                                            )
+                                            confirmation_information_has_floors = bool(
+                                                selected_verification[
+                                                    "information_has_floors"
+                                                ]
+                                            )
+                                            confirmation_yaw_observable = bool(
+                                                selected_verification[
+                                                    "yaw_observable"
+                                                ]
+                                            )
+                                            confirmation_observable_rank = int(
+                                                selected_verification[
+                                                    "observable_rank"
+                                                ]
+                                            )
+                                            confirmation_translation_observable_rank = int(
+                                                selected_verification[
+                                                    "translation_observable_rank"
+                                                ]
+                                            )
+                                            confirmation_patch_body = global_patch[
+                                                "terrain_points_body"
+                                            ]
+                                            confirmation_patch_ping_count = len(
+                                                global_terrain_patch_scans
+                                            )
+                                            confirmation_patch_start_timestamp = (
+                                                global_patch[
+                                                    "patch_start_timestamp"
+                                                ]
+                                            )
+                                            confirmation_patch_end_timestamp = (
+                                                global_patch[
+                                                    "patch_end_timestamp"
+                                                ]
+                                            )
+                                            confirmation_patch_start_observation_id = (
+                                                global_patch[
+                                                    "patch_start_observation_id"
+                                                ]
+                                            )
+                                            confirmation_patch_end_observation_id = (
+                                                global_patch[
+                                                    "patch_end_observation_id"
+                                                ]
+                                            )
+
+                                        if (
+                                            proposal_authorized
+                                            and global_cohort_tracker is None
+                                        ):
                                             proposal = (
-                                                global_search_result.candidates[0]
+                                                global_search_result.candidates[
+                                                    proposal_index
+                                                ]
                                             )
                                             proposal_state = global_patch[
                                                 "reference_state"
@@ -4983,6 +7268,7 @@ def main() -> int:
                                                     refined_compatible,
                                                     refined_information_has_floors,
                                                     refined_backscatter_accepted,
+                                                    refined_backscatter_result,
                                                 ) = refine_terrain_fix_with_backscatter(
                                                     refined_result,
                                                     global_patch[
@@ -5134,6 +7420,20 @@ def main() -> int:
                                             else None
                                         ),
                                         confirmation_source=confirmation_mode,
+                                        externally_confirmed_independent_evidence=(
+                                            None
+                                            if (
+                                                confirmation_mode != "global"
+                                                or global_tracking_decision
+                                                is None
+                                                or global_tracking_decision
+                                                .confirmed_cohort
+                                                is None
+                                            )
+                                            else global_tracking_decision
+                                            .confirmed_cohort
+                                            .independent_evidence
+                                        ),
                                     )
                                 )
                                 emergency_prior_attempted = False
@@ -5179,6 +7479,16 @@ def main() -> int:
                                     )
                                     if terrain_prior_added:
                                         terrain_emergency_recovery.record_prior_insertion()
+                                        if global_cohort_tracker is not None:
+                                            global_cohort_tracker.reset()
+                                        if (
+                                            terrain_backend_particle_tracker
+                                            is not None
+                                        ):
+                                            # The externally confirmed global
+                                            # basin supersedes all locally
+                                            # seeded tracking cohorts.
+                                            terrain_backend_particle_tracker.reset()
                                     else:
                                         terrain_emergency_recovery.record_factor_rejection()
 
@@ -5450,6 +7760,58 @@ def main() -> int:
                                     }
                                 )
 
+                            if (
+                                terrain_backend_particle_tracker is not None
+                                and terrain_backend_particle_last_patch_end_observation_id
+                                < patch_end_observation_id
+                            ):
+                                # Even when the compact local optimizer has no
+                                # certified proposal, the current raw MBES/
+                                # side-scan likelihood updates every cohort.
+                                # Its basin-local Laplace approximation is an
+                                # independent, rank-aware graph measurement;
+                                # the recursive PF posterior is never reused.
+                                raw_only_decision = (
+                                    update_terrain_backend_particle_filter(
+                                        timestamp=sim_time,
+                                        observation_id=observation_id,
+                                        mode="raw_likelihood_only",
+                                        patch_body=patch_body,
+                                        patch_reference_state=(
+                                            local_reference_state
+                                        ),
+                                        backscatter_patch_body=(
+                                            backscatter_patch_body
+                                        ),
+                                        backscatter_patch_values=(
+                                            backscatter_patch_values
+                                        ),
+                                        patch_start_timestamp=(
+                                            patch_start_timestamp
+                                        ),
+                                        patch_end_timestamp=(
+                                            patch_end_timestamp
+                                        ),
+                                        patch_start_observation_id=(
+                                            patch_start_observation_id
+                                        ),
+                                        patch_end_observation_id=(
+                                            patch_end_observation_id
+                                        ),
+                                        evidences=(),
+                                        evaluation_truth_state=truth,
+                                    )
+                                )
+                                if raw_only_decision is not None:
+                                    terrain_prior_added = (
+                                        try_add_current_raw_particle_prior(
+                                            raw_only_decision,
+                                            timestamp=sim_time,
+                                            observation_id=observation_id,
+                                            patch_body=patch_body,
+                                        )
+                                    )
+
                             terrain_match_accepts += int(
                                 observation_matcher_accepted
                             )
@@ -5603,6 +7965,20 @@ def main() -> int:
                                     "accepted_proposals"
                                 ]
                             ),
+                            "terrain_global_active_cohorts": (
+                                0
+                                if global_cohort_tracker is None
+                                else int(
+                                    global_cohort_tracker.diagnostics()[
+                                        "active_cohorts"
+                                    ]
+                                )
+                            ),
+                            "terrain_global_cohort_confirmations": (
+                                0
+                                if global_cohort_tracker is None
+                                else int(global_cohort_tracker.confirmations)
+                            ),
                             "terrain_consecutive_failed_observations": (
                                 terrain_recovery.consecutive_failed_observations
                             ),
@@ -5711,7 +8087,7 @@ def main() -> int:
                 time.perf_counter() - event_loop_started
             )
             sim_time = target_time
-            truth = survey.state(sim_time)
+            truth = survey_state(sim_time)
             display_stage_started = time.perf_counter()
             _set_vehicle_pose(
                 vehicle_translate, vehicle_rotate, truth.position, truth.rotation
@@ -5803,7 +8179,7 @@ def main() -> int:
         slam.pose_graph.optimize()
         diagnostics = slam.diagnostics()
         _, global_position = slam.global_pose()
-        truth = survey.state(sim_time)
+        truth = survey_state(sim_time)
         sample_times = np.asarray(evaluation_timestamps, dtype=np.float64)
         truth_samples = np.asarray(truth_track, dtype=np.float64)
         truth_rotation_samples = np.asarray(
@@ -6148,11 +8524,23 @@ def main() -> int:
                         "estimate; marginalized poses retain their last "
                         "online value, while confirmed cross-window factors "
                         "supply a rigid global map anchor"
+                        + (
+                            "; the published map->odom transform follows "
+                            "that target continuously with bounded rates"
+                            if ARGS.enable_map_to_odom_soft_correction
+                            else ""
+                        )
                     )
                     if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
                     else (
                         "online NumPy batch pose graph including accepted "
                         "loop, intensity, and absolute terrain factors"
+                        + (
+                            "; the published map->odom transform follows "
+                            "that target continuously with bounded rates"
+                            if ARGS.enable_map_to_odom_soft_correction
+                            else ""
+                        )
                     )
                 ),
                 "final_optimized_global_slam": (
@@ -6321,8 +8709,15 @@ def main() -> int:
                     "coordinates; bathymetry/backscatter independence is "
                     "not assumed"
                 ),
-                "covariance_intersection_bathymetry_weight": float(
-                    ARGS.backscatter_ci_bathymetry_weight
+                "covariance_intersection_weight_mode": (
+                    "automatic_minimum_logdet"
+                    if ARGS.backscatter_ci_bathymetry_weight < 0.0
+                    else "fixed"
+                ),
+                "covariance_intersection_bathymetry_weight": (
+                    None
+                    if ARGS.backscatter_ci_bathymetry_weight < 0.0
+                    else float(ARGS.backscatter_ci_bathymetry_weight)
                 ),
                 "maximum_points": ARGS.backscatter_match_maximum_points,
                 "maximum_yaw_deg": ARGS.backscatter_match_yaw_window_deg,
@@ -6855,6 +9250,36 @@ def main() -> int:
                 "maximum_automatic_translation_window_m": 150.0,
                 "uses_truth": False,
             },
+            "terrain_cohort_particle_backend": {
+                "enabled": terrain_backend_particle_tracker is not None,
+                "role": (
+                    "persistent_multimodal_data_association_and_current_"
+                    "window_rank_aware_factor_authorization_before_gtsam"
+                ),
+                "state": "map-frame vehicle SE(2)",
+                "motion_source": "local_acoustic_inertial_odometry_se2_increment",
+                "persistent_proposal_provenance_enforced": True,
+                "graph_measurement_source": (
+                    "current_independent_raw_sonar_likelihood_local_laplace"
+                ),
+                "recursive_particle_posterior_used_as_graph_measurement": False,
+                "unobservable_directions_preserve_zero_information": True,
+                "particles_per_cohort": (
+                    None
+                    if terrain_backend_particle_tracker is None
+                    else terrain_backend_particle_tracker.config
+                    .particles_per_cohort
+                ),
+                "explicit_null_hypothesis": True,
+                "statistics": dict(terrain_backend_particle_stats),
+                "diagnostics": (
+                    None
+                    if terrain_backend_particle_tracker is None
+                    else terrain_backend_particle_tracker.diagnostics()
+                ),
+                "records": terrain_backend_particle_records,
+                "uses_truth": False,
+            },
             "terrain_global_relocalization": {
                 "enabled": global_terrain_relocalizer is not None,
                 "search_scope": "complete_measured_map",
@@ -6863,9 +9288,24 @@ def main() -> int:
                 "requires_joint_bathymetry_backscatter": True,
                 "requires_local_bathymetry_refinement": True,
                 "requires_local_backscatter_refinement": True,
-                "requires_second_disjoint_strip_confirmation": True,
-                "confirmation_motion_source": "imu_dvl_depth_dead_reckoning",
-                "patch_motion_source": "imu_dvl_depth_dead_reckoning",
+                "requires_second_disjoint_strip_confirmation": (
+                    global_cohort_tracker is None
+                ),
+                "persistent_cohort_confirmation_replaces_legacy_hold": (
+                    global_cohort_tracker is not None
+                ),
+                "confirmation_motion_source": (
+                    "local_acoustic_inertial_odometry_se2_increment"
+                ),
+                "patch_motion_source": {
+                    "acoustic-fixed-lag": (
+                        "causal_fixed_lag_imu_dvl_motion_with_acoustic_endpoints"
+                    ),
+                    "acoustic-predictive": (
+                        "causal_acoustic_inertial_prediction_before_current_ping"
+                    ),
+                    "inertial": "independent_imu_dvl_depth_dead_reckoning",
+                }[ARGS.terrain_patch_motion_source],
                 "window_pings": ARGS.terrain_global_window_pings,
                 "nominal_window_duration_s": float(
                     ARGS.terrain_global_window_pings / ARGS.ping_hz
@@ -6897,6 +9337,112 @@ def main() -> int:
                 "minimum_basin_score_gap": (
                     ARGS.terrain_global_minimum_score_gap
                 ),
+                "persistent_cohort_tracking": {
+                    "enabled": global_cohort_tracker is not None,
+                    "state": "map-frame vehicle pose",
+                    "motion_source": "imu_dvl_depth_dead_reckoning_se2_increment",
+                    "filter": "cohort_particle_filter",
+                    "explicit_null_hypothesis": True,
+                    "all_spatially_separated_candidates_retained": True,
+                    "same_observation_refined_basin_nms": True,
+                    "overlapping_window_evidence_discounted": True,
+                    "same_observation_nms_position_m": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .same_observation_nms_position_m
+                    ),
+                    "same_observation_nms_yaw_deg": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .same_observation_nms_yaw_deg
+                    ),
+                    "maximum_cohorts": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config.maximum_cohorts
+                    ),
+                    "particles_per_cohort": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config.particles_per_cohort
+                    ),
+                    "resample_effective_sample_fraction": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .resample_effective_sample_fraction
+                    ),
+                    "resample_kernel_bandwidth": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .resample_kernel_bandwidth
+                    ),
+                    "minimum_independent_evidence": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .minimum_independent_evidence
+                    ),
+                    "confirmation_probability": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .confirmation_probability
+                    ),
+                    "confirmation_odds_over_second": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.config
+                        .confirmation_odds_over_second
+                    ),
+                    "diagnostics": (
+                        None
+                        if global_cohort_tracker is None
+                        else global_cohort_tracker.diagnostics()
+                    ),
+                    "uses_truth": False,
+                },
+                "bbs3d_geometric_verification": {
+                    "enabled": bbs3d_candidate_verifier is not None,
+                    "backend": "KOKIAOKI/3d_bbs@41529a34a2fb9618b5ff560fb3c2363f1615666d",
+                    "role": "candidate_verifier_not_standalone_absolute_factor",
+                    "search_state": "residual_x_y_yaw",
+                    "pressure_depth_fixed": True,
+                    "imu_roll_pitch_fixed": True,
+                    "minimum_level_resolution_m": (
+                        None
+                        if bbs3d_candidate_verifier is None
+                        else bbs3d_candidate_verifier.config
+                        .minimum_level_resolution_m
+                    ),
+                    "maximum_translation_m": (
+                        None
+                        if bbs3d_candidate_verifier is None
+                        else bbs3d_candidate_verifier.config
+                        .maximum_translation_m
+                    ),
+                    "maximum_yaw_deg": (
+                        None
+                        if bbs3d_candidate_verifier is None
+                        else bbs3d_candidate_verifier.config.maximum_yaw_deg
+                    ),
+                    "minimum_score_fraction": (
+                        None
+                        if bbs3d_candidate_verifier is None
+                        else bbs3d_candidate_verifier.config
+                        .minimum_score_fraction
+                    ),
+                    "timeout_milliseconds": (
+                        None
+                        if bbs3d_candidate_verifier is None
+                        else bbs3d_candidate_verifier.config
+                        .timeout_milliseconds
+                    ),
+                    "uses_truth": False,
+                },
                 "local_backscatter_refinement": {
                     "maximum_points": (
                         None
@@ -6940,6 +9486,39 @@ def main() -> int:
                         else global_backscatter_refinement_matcher
                         .config.minimum_basin_correlation_gap
                     ),
+                    "sc_match_inspired_scale_space_context": {
+                        "exact_paper_implementation": False,
+                        "reason": (
+                            "runtime input is geocoded reflectivity points "
+                            "against a prior mosaic, not two raw waterfall images"
+                        ),
+                        "scale_cell_sizes_m": (
+                            None
+                            if global_backscatter_refinement_matcher is None
+                            else list(
+                                global_backscatter_refinement_matcher.config
+                                .scale_space_cell_sizes_m
+                            )
+                        ),
+                        "scale_space_weight": (
+                            None
+                            if global_backscatter_refinement_matcher is None
+                            else global_backscatter_refinement_matcher.config
+                            .scale_space_weight
+                        ),
+                        "context_consistency_weight": (
+                            None
+                            if global_backscatter_refinement_matcher is None
+                            else global_backscatter_refinement_matcher.config
+                            .context_consistency_weight
+                        ),
+                        "context_length_m": (
+                            None
+                            if global_backscatter_refinement_matcher is None
+                            else global_backscatter_refinement_matcher.config
+                            .context_length_m
+                        ),
+                    },
                 },
                 "confirmation_position_tolerance_m": (
                     ARGS.terrain_global_confirmation_position_tolerance_m
@@ -6988,6 +9567,12 @@ def main() -> int:
             ),
             "terrain_prior_robust_kernel": (
                 ARGS.terrain_prior_robust_kernel
+            ),
+            "terrain_relocalization_prior_robust_kernel": (
+                slam.config.pose_graph.relocalization_prior_robust_kernel
+            ),
+            "terrain_relocalization_prior_robust_delta": (
+                slam.config.pose_graph.robust_relocalization_prior_delta
             ),
             # Observation counts remain independent of the one-to-three matcher
             # invocations used by the adaptive policy.
@@ -7144,6 +9729,7 @@ def main() -> int:
                 for key, value in global_relocalization_stats.items()
             },
             "global_relocalization_records": global_relocalization_records,
+            "global_cohort_records": global_cohort_records,
             "emergency_recovery_attempts": int(
                 terrain_emergency_recovery.recovery_attempts
             ),
@@ -7576,6 +10162,26 @@ def main() -> int:
                 diagnostics.pose_graph.global_isam_final_cost
             ),
             "online_map_to_odom_change_audit": map_to_odom_audit,
+            "map_to_odom_soft_correction": {
+                "enabled": bool(ARGS.enable_map_to_odom_soft_correction),
+                "role": "online_output_only_not_frontend_state_feedback",
+                "matcher_seed_uses_unsmoothed_graph_target": True,
+                "translation_time_constant_s": (
+                    ARGS.map_to_odom_translation_time_constant_s
+                ),
+                "yaw_time_constant_s": (
+                    ARGS.map_to_odom_yaw_time_constant_s
+                ),
+                "maximum_translation_rate_mps": (
+                    ARGS.map_to_odom_maximum_translation_rate_mps
+                ),
+                "maximum_yaw_rate_deg_s": (
+                    ARGS.map_to_odom_maximum_yaw_rate_deg_s
+                ),
+                "final_diagnostics": (
+                    slam.map_to_odom_corrector.diagnostics()
+                ),
+            },
             "local_error_m": float(np.linalg.norm(slam.state.position - truth.position)),
             "global_error_m": float(np.linalg.norm(global_position - truth.position)),
             "position_error_statistics": position_errors,

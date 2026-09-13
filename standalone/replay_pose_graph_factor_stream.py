@@ -59,6 +59,12 @@ def _config(payload: dict[str, Any], backend: str) -> PoseGraphConfig:
         robust_terrain_prior_delta=float(
             recorded.get("robust_terrain_prior_delta", 2.5)
         ),
+        relocalization_prior_robust_kernel=str(
+            recorded.get("relocalization_prior_robust_kernel", "cauchy")
+        ),
+        robust_relocalization_prior_delta=float(
+            recorded.get("robust_relocalization_prior_delta", 2.5)
+        ),
         robust_loop_delta=float(recorded.get("robust_loop_delta", 3.0)),
         robust_intensity_delta=float(
             recorded.get("robust_intensity_delta", 2.5)
@@ -104,6 +110,8 @@ def _build(payload: dict[str, Any], backend: str):
             kind=str(item.get("kind", "terrain_prior")),
             score=float(item.get("score", 0.0)),
             robust=bool(item.get("robust", True)),
+            robust_kernel=item.get("robust_kernel"),
+            robust_delta=item.get("robust_delta"),
         )
     return graph
 

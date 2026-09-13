@@ -77,7 +77,7 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --enable-backscatter-map-matching \
     --backscatter-match-yaw-window-deg 2.5 \
     --backscatter-boundary-yaw-retry-window-deg 5 \
-    --backscatter-ci-bathymetry-weight 0 \
+    --backscatter-ci-bathymetry-weight -1 \
     --cross-modal-large-correction-m 5 \
     --terrain-require-yaw-observable \
     --terrain-initialize-global-gauge \

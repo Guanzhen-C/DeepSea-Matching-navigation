@@ -357,6 +357,69 @@ def test_long_strip_can_use_an_explicit_confirmation_tolerance() -> None:
     assert controller.pending_confirmation_source is None
 
 
+def test_persistent_cohort_confirmation_does_not_wait_for_a_fourth_strip() -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+
+    confirmed = _consider(
+        controller,
+        accepted=True,
+        observable_rank=3,
+        translation_observable_rank=2,
+        yaw_observable=True,
+        seed_pose2=np.array([600.0, 0.0, 0.0]),
+        matched_pose2=np.array([10.0, 20.0, 0.0]),
+        confirmation_source="global",
+        externally_confirmed_independent_evidence=3,
+    )
+
+    assert confirmed.fuse_current_match
+    assert confirmed.status == "confirmed_by_persistent_cohort"
+    assert confirmed.acquisition_windows_disjoint
+    assert not confirmed.pending
+    assert controller.confirmed_recoveries == 1
+    controller.record_factor_rejection()
+    assert controller.cooldown_remaining_observations == 3
+
+
+def test_external_confirmation_still_requires_strict_rank_three() -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+
+    rejected = _consider(
+        controller,
+        accepted=True,
+        observable_rank=2,
+        translation_observable_rank=2,
+        yaw_observable=False,
+        seed_pose2=np.array([600.0, 0.0, 0.0]),
+        matched_pose2=np.array([10.0, 20.0, 0.0]),
+        confirmation_source="global",
+        externally_confirmed_independent_evidence=3,
+    )
+
+    assert not rejected.fuse_current_match
+    assert rejected.status == "strict_rank_three_required"
+
+
+@pytest.mark.parametrize("evidence", [True, 0, 1, 1.5])
+def test_external_confirmation_requires_two_independent_windows(evidence) -> None:
+    controller = TerrainEmergencyRecoveryController()
+    assert _drive_to_emergency(controller).should_attempt
+    with pytest.raises(ValueError, match="at least two"):
+        _consider(
+            controller,
+            accepted=True,
+            observable_rank=3,
+            translation_observable_rank=2,
+            yaw_observable=True,
+            seed_pose2=np.array([600.0, 0.0, 0.0]),
+            matched_pose2=np.array([10.0, 20.0, 0.0]),
+            confirmation_source="global",
+            externally_confirmed_independent_evidence=evidence,
+        )
+
+
 def test_confirmation_requires_the_same_matcher_family() -> None:
     controller = TerrainEmergencyRecoveryController()
     assert _drive_to_emergency(controller).should_attempt

@@ -15,7 +15,9 @@ from oceansim.slam import (
     TerrainRecoveryController,
     TerrainMatcherConfig,
     apply_terrain_match,
+    covariance_intersection_pose2,
     fixed_lag_fused_deskew_states,
+    information_with_covariance_floor,
     make_terrain_recovery_config,
     motion_compensate_to_body,
     terrain_prior_prefit_bypass_allowed,
@@ -118,6 +120,63 @@ def _matcher_config(**overrides) -> TerrainMatcherConfig:
     )
     values.update(overrides)
     return TerrainMatcherConfig(**values)
+
+
+def test_automatic_covariance_intersection_uses_complementary_information() -> None:
+    bathymetry_information = np.diag([100.0, 3.0, 0.2])
+    backscatter_information = np.diag([2.0, 80.0, 30.0])
+    fused_pose, fused_information, weight = covariance_intersection_pose2(
+        np.array([0.0, 0.0, np.deg2rad(179.0)]),
+        bathymetry_information,
+        np.array([1.0, -1.0, np.deg2rad(-179.0)]),
+        backscatter_information,
+    )
+
+    assert 0.0 < weight < 1.0
+    assert np.linalg.slogdet(fused_information)[1] > np.linalg.slogdet(
+        bathymetry_information
+    )[1]
+    assert np.linalg.slogdet(fused_information)[1] > np.linalg.slogdet(
+        backscatter_information
+    )[1]
+    assert np.isfinite(fused_pose).all()
+    assert abs(np.rad2deg(fused_pose[2])) > 170.0
+
+
+def test_covariance_intersection_preserves_a_shared_unobservable_direction() -> None:
+    first = np.diag([20.0, 10.0, 0.0])
+    second = np.diag([5.0, 30.0, 0.0])
+
+    _, information, _ = covariance_intersection_pose2(
+        np.zeros(3), first, np.ones(3), second
+    )
+
+    assert information[2, 2] == 0.0
+
+
+def test_covariance_floor_preserves_an_unobservable_yaw() -> None:
+    information = np.diag([4.0, 9.0, 0.0])
+    floor = np.diag([1.0, 0.25, np.deg2rad(3.0) ** 2])
+
+    floored = information_with_covariance_floor(information, floor)
+
+    np.testing.assert_allclose(
+        floored,
+        np.diag([1.0 / 1.25, 1.0 / (1.0 / 9.0 + 0.25), 0.0]),
+        atol=1.0e-12,
+    )
+
+
+def test_covariance_floor_matches_full_rank_covariance_addition() -> None:
+    information = np.array(
+        [[5.0, 1.0, 0.2], [1.0, 3.0, -0.1], [0.2, -0.1, 8.0]]
+    )
+    floor = np.diag([0.5, 0.5, 0.01])
+
+    expected = np.linalg.inv(np.linalg.inv(information) + floor)
+    actual = information_with_covariance_floor(information, floor)
+
+    np.testing.assert_allclose(actual, expected, rtol=1.0e-11, atol=1.0e-12)
 
 
 def test_full_swath_budget_preserves_cross_track_fans_across_ping_rates() -> None:
@@ -266,6 +325,81 @@ def test_backscatter_map_match_removes_range_gain_and_recovers_pose() -> None:
     assert abs(result.matched_pose2[2] - truth_yaw) < np.deg2rad(0.25)
     assert result.correlation_after > result.correlation_before
     assert result.basin_correlation_gap >= config.minimum_basin_correlation_gap
+
+
+def test_backscatter_global_match_uses_scale_space_and_context_consistency() -> None:
+    world = _backscatter_world()
+    x, y = np.meshgrid(
+        np.linspace(-45.0, 45.0, 37),
+        np.concatenate(
+            (np.linspace(-80.0, -8.0, 33), np.linspace(8.0, 80.0, 33))
+        ),
+    )
+    points_body = np.column_stack(
+        (x.reshape(-1), y.reshape(-1), np.full(x.size, -35.0))
+    )
+    truth_position = np.array([13.0, -11.0, -25.0])
+    truth_yaw = np.deg2rad(17.0)
+    truth_rotation = rotation_from_rpy(0.0, 0.0, truth_yaw)
+    points_world = points_body @ truth_rotation.T + truth_position
+    reflectivity = world.measured_reflectivity(
+        points_world[:, 0], points_world[:, 1]
+    )
+    range_gain = (
+        1.25
+        - 0.004 * np.abs(points_body[:, 1])
+        + 0.08 * np.sign(points_body[:, 1])
+    )
+    intensities = np.clip(reflectivity * range_gain, 0.001, 1.0)
+    seed = InertialState(
+        timestamp=2.0,
+        position=truth_position + np.array([-4.0, 3.0, 0.0]),
+        rotation=rotation_from_rpy(0.0, 0.0, truth_yaw - np.deg2rad(1.2)),
+    )
+    config = BackscatterMatcherConfig(
+        maximum_points=4096,
+        minimum_points=300,
+        minimum_correlation=0.20,
+        minimum_basin_correlation_gap=0.01,
+        maximum_translation_m=8.0,
+        maximum_yaw_deg=2.0,
+        scale_space_cell_sizes_m=(5.0, 15.0, 30.0),
+        scale_space_weight=0.35,
+        context_consistency_weight=0.20,
+        context_length_m=20.0,
+        minimum_scale_cells=8,
+        minimum_context_points=20,
+    )
+
+    result = BackscatterMapMatcher(world, config).match(
+        points_body, intensities, seed
+    )
+
+    assert result.accepted, result.rejection_reason
+    np.testing.assert_allclose(result.matched_pose2[:2], truth_position[:2], atol=0.8)
+    assert abs(result.matched_pose2[2] - truth_yaw) < np.deg2rad(0.25)
+    assert np.isfinite(result.fine_correlation_after)
+    assert np.isfinite(result.scale_space_correlation_after)
+    assert np.isfinite(result.context_consistency_after)
+    assert result.valid_contexts_after >= 4
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"scale_space_cell_sizes_m": (10.0, 5.0)},
+        {"scale_space_cell_sizes_m": (5.0, 5.0)},
+        {"scale_space_weight": 0.2},
+        {
+            "scale_space_cell_sizes_m": (5.0,),
+            "scale_space_weight": 0.6,
+            "context_consistency_weight": 0.4,
+        },
+    ],
+)
+def test_backscatter_scale_space_configuration_is_validated(overrides) -> None:
+    with pytest.raises(ValueError):
+        BackscatterMatcherConfig(**overrides)
 
 
 def test_backscatter_voxel_average_preserves_registered_mean() -> None:

@@ -16,6 +16,7 @@ from .esikf import (
     SonarUpdateResult,
 )
 from .intensity_map import AcousticIntensityMap
+from .map_odom import MapOdomSoftCorrectionConfig, MapOdomSoftCorrector
 from .math3d import transform_points
 from .pose_graph import (
     AcousticPoseGraph,
@@ -86,6 +87,15 @@ class FastSonarSLAMConfig:
     # available to the bathymetric point-to-plane update, but its port/
     # starboard image coordinate is poorly conditioned.
     coregistered_min_cross_track_m: float = 0.25
+    # Pose-graph corrections belong in map->odom, never in the local ESIKF.
+    # Enabling this output layer prevents a newly confirmed global factor from
+    # teleporting the published vehicle pose while preserving the raw graph
+    # target for matching and final optimization.
+    map_to_odom_soft_correction_enabled: bool = False
+    map_to_odom_translation_time_constant_s: float = 5.0
+    map_to_odom_yaw_time_constant_s: float = 5.0
+    map_to_odom_maximum_translation_rate_mps: float = 5.0
+    map_to_odom_maximum_yaw_rate_deg_s: float = 5.0
 
 
 @dataclass(frozen=True)
@@ -190,6 +200,22 @@ class FastSonarSLAM:
             voxel_size=self.config.intensity_voxel_size
         )
         self.pose_graph = AcousticPoseGraph(self.config.pose_graph)
+        self.map_to_odom_corrector = MapOdomSoftCorrector(
+            MapOdomSoftCorrectionConfig(
+                translation_time_constant_s=(
+                    self.config.map_to_odom_translation_time_constant_s
+                ),
+                yaw_time_constant_s=(
+                    self.config.map_to_odom_yaw_time_constant_s
+                ),
+                maximum_translation_rate_mps=(
+                    self.config.map_to_odom_maximum_translation_rate_mps
+                ),
+                maximum_yaw_rate_deg_s=(
+                    self.config.map_to_odom_maximum_yaw_rate_deg_s
+                ),
+            )
+        )
         self._ping_count = 0
         self._accepted_updates = 0
         self._rejected_updates = 0
@@ -261,6 +287,7 @@ class FastSonarSLAM:
         self.quarantine_map.clear()
         self.quarantine_intensity_map.clear()
         self.pose_graph.reset()
+        self.map_to_odom_corrector.reset(timestamp=float(timestamp))
         self._trajectory.clear()
         self._trajectory_timestamps.clear()
         self._mbes_group.clear()
@@ -1150,11 +1177,30 @@ class FastSonarSLAM:
         timestamps, raw = self.trajectory()
         return timestamps, self.pose_graph.correct_trajectory(timestamps, raw)
 
-    def global_pose(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return current loop-corrected ``(rotation, position)``."""
+    def raw_global_pose(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return the latest unsmoothed pose-graph target pose."""
 
         return self.pose_graph.corrected_pose(
             self.state.rotation, self.state.position
+        )
+
+    def global_pose(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return the online ``map`` pose without disturbing the ESIKF.
+
+        When configured, only this published map-frame output is softened.
+        :meth:`raw_global_pose` and :meth:`global_trajectory` retain the exact
+        graph solution for matcher seeds and final scientific evaluation.
+        """
+
+        target_rotation, target_position = self.raw_global_pose()
+        if not self.config.map_to_odom_soft_correction_enabled:
+            return target_rotation, target_position
+        return self.map_to_odom_corrector.correct_pose(
+            self.state.timestamp,
+            self.state.rotation,
+            self.state.position,
+            target_rotation,
+            target_position,
         )
 
     def optimized_map_points(self) -> np.ndarray:
@@ -1211,6 +1257,9 @@ class FastSonarSLAM:
         self._intensity_submap_anchor_id = None
         self._intensity_submap_anchor_timestamp = -np.inf
         self.pose_graph.reset()
+        self.map_to_odom_corrector.reset(
+            timestamp=float(self.state.timestamp)
+        )
 
     def _append_trajectory(self) -> None:
         interval = float(self.config.trajectory_sample_interval_s)
