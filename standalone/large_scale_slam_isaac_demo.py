@@ -8714,6 +8714,27 @@ def main() -> int:
             "termination_reason": termination_reason,
             "completed_requested_route": completed_requested_route,
             "full_map_completed": full_map_completed,
+            "survey_start_distance_m": float(
+                ARGS.survey_start_distance_m
+            ),
+            "requested_survey_segment_distance_m": float(
+                ARGS.survey_segment_distance_m
+            ),
+            "frontend_observability_handling": {
+                "dvl_preserves_accumulated_position": bool(
+                    slam.filter.config.dvl_preserve_pose_gauge
+                ),
+                "dvl_preserves_global_heading_gauge": bool(
+                    slam.filter.config.dvl_preserve_pose_gauge
+                ),
+                "dvl_still_updates": [
+                    "three_axis_velocity",
+                    "imu_biases_via_cross_covariance",
+                    "observable_roll_pitch_subspace",
+                ],
+                "new_dvl_residual_gate_added": False,
+                "posterior_covariance_retracted_after_state_injection": True,
+            },
             "algorithm": (
                 "OceanSim acoustic FAST-LIVO2 adaptation with joint "
                 "point-mass/cohort particle terrain navigation and "

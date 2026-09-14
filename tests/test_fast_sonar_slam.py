@@ -87,6 +87,119 @@ def test_robust_dvl_update_recovers_after_acoustic_attitude_change() -> None:
     assert after < before
 
 
+def test_dvl_observability_projector_preserves_pose_gauge() -> None:
+    estimator = AcousticESIKF()
+    estimator.initialize(
+        0.0,
+        rotation=so3_exp(np.deg2rad([8.0, -6.0, 35.0])),
+        position=np.array([120.0, -45.0, -30.0]),
+        velocity=np.array([2.0, 0.4, -0.1]),
+    )
+    projector = estimator._dvl_correction_projector()
+    world_yaw_axis_body = estimator.state.rotation.T @ np.array(
+        [0.0, 0.0, 1.0]
+    )
+    observable_tilt = np.cross(world_yaw_axis_body, [1.0, 0.0, 0.0])
+    observable_tilt /= np.linalg.norm(observable_tilt)
+
+    np.testing.assert_allclose(projector[3:6], 0.0, atol=0.0)
+    np.testing.assert_allclose(
+        world_yaw_axis_body @ projector[0:3, 0:3],
+        0.0,
+        atol=1.0e-14,
+    )
+    np.testing.assert_allclose(
+        projector[0:3, 0:3] @ observable_tilt,
+        observable_tilt,
+        atol=1.0e-14,
+    )
+    np.testing.assert_allclose(projector[6:, 6:], np.eye(9), atol=0.0)
+
+
+def test_dvl_uses_velocity_without_retracting_local_map_pose() -> None:
+    estimator = AcousticESIKF()
+    rotation = so3_exp(np.deg2rad([7.0, -5.0, 28.0]))
+    velocity = np.array([2.2, 0.35, -0.08])
+    # Deliberately create the strong pose/velocity cross-covariance that made
+    # an ordinary 0.1 m/s DVL residual jump the long-run local pose by metres.
+    coupled_direction = np.zeros(15)
+    coupled_direction[0:3] = [0.08, -0.05, 0.04]
+    coupled_direction[3:6] = [3.0, -2.0, 0.7]
+    coupled_direction[6:9] = [0.22, -0.14, 0.06]
+    covariance = np.diag(np.full(15, 1.0e-5)) + np.outer(
+        coupled_direction, coupled_direction
+    )
+    estimator.initialize(
+        0.0,
+        rotation=rotation,
+        position=np.array([1300.0, -720.0, -55.0]),
+        velocity=velocity,
+        covariance=covariance,
+    )
+    measurement = rotation.T @ velocity + np.array([0.12, -0.07, 0.03])
+    position_before = estimator.state.position.copy()
+    rotation_before = estimator.state.rotation.copy()
+    residual_before = np.linalg.norm(
+        measurement - rotation_before.T @ estimator.state.velocity
+    )
+
+    assert estimator.update_dvl(measurement)
+
+    residual_after = np.linalg.norm(
+        measurement
+        - estimator.state.rotation.T @ estimator.state.velocity
+    )
+    attitude_correction_body = so3_log(
+        rotation_before.T @ estimator.state.rotation
+    )
+    world_yaw_axis_body = rotation_before.T @ np.array([0.0, 0.0, 1.0])
+    np.testing.assert_allclose(estimator.state.position, position_before, atol=0.0)
+    assert residual_after < residual_before
+    assert np.linalg.norm(estimator.state.velocity - velocity) > 1.0e-5
+    assert np.linalg.norm(attitude_correction_body) > 1.0e-7
+    assert abs(attitude_correction_body @ world_yaw_axis_body) < 1.0e-12
+    assert np.isfinite(estimator.state.covariance).all()
+    assert np.linalg.eigvalsh(estimator.state.covariance)[0] > 0.0
+
+
+def test_kalman_update_resets_the_joseph_posterior_covariance() -> None:
+    estimator = AcousticESIKF()
+    generator = np.random.default_rng(73)
+    square_root = generator.normal(size=(15, 15)) * 0.015
+    prior = square_root @ square_root.T + np.eye(15) * 2.0e-4
+    estimator.initialize(
+        0.0,
+        rotation=so3_exp([0.2, -0.1, 0.3]),
+        position=np.array([4.0, -2.0, -8.0]),
+        velocity=np.array([1.5, -0.4, 0.2]),
+        covariance=prior,
+    )
+    jacobian = generator.normal(size=(3, 15))
+    residual = np.array([0.32, -0.18, 0.11])
+    measurement_covariance = np.diag([0.03, 0.04, 0.05]) ** 2
+    innovation = jacobian @ prior @ jacobian.T + measurement_covariance
+    gain = np.linalg.solve(innovation, jacobian @ prior).T
+    error = gain @ residual
+    identity_minus = np.eye(15) - gain @ jacobian
+    joseph = (
+        identity_minus @ prior @ identity_minus.T
+        + gain @ measurement_covariance @ gain.T
+    )
+    reset = estimator._error_reset_jacobian(error)
+    expected = estimator._regularize_covariance(reset @ joseph @ reset.T)
+
+    assert estimator._kalman_update(
+        residual, jacobian, measurement_covariance
+    )
+
+    np.testing.assert_allclose(
+        estimator.state.covariance, expected, rtol=2.0e-11, atol=2.0e-12
+    )
+    # This guard specifically detects the former bug, where the reset result
+    # was immediately overwritten by the untransformed Joseph covariance.
+    assert np.linalg.norm(expected - joseph) > 1.0e-6
+
+
 def test_dvl_extrinsic_lever_arm_does_not_create_false_velocity() -> None:
     estimator = AcousticESIKF(
         ESIKFConfig(dvl_velocity_std=0.01),

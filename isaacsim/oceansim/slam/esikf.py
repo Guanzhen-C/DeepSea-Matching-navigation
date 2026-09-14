@@ -37,6 +37,13 @@ class ESIKFConfig:
     dvl_huber_mahalanobis: float = 16.0
     dvl_max_covariance_scale: float = 100.0
     dvl_max_residual_mps: float = 2.5
+    # A bottom-track DVL measures velocity in the vehicle frame; one sample
+    # contains no absolute-position or global-heading observation.  Preserve
+    # those pose gauge directions during the DVL correction while still
+    # updating velocity, IMU biases, and the observable roll/pitch subspace.
+    # This is an observability-constrained partial update, not a residual gate
+    # or a reduction of the three-axis DVL measurement information.
+    dvl_preserve_pose_gauge: bool = True
     depth_std: float = 0.04
     sonar_range_std: float = 0.035
     sonar_angle_std_deg: float = 0.25
@@ -594,11 +601,51 @@ class AcousticESIKF:
     def _inject(self, error: np.ndarray) -> None:
         old_covariance = self.state.covariance
         self.state = self._state_with_error(self.state, error)
-        reset = np.eye(15)
-        reset[0:3, 0:3] -= 0.5 * skew(error[0:3])
+        reset = self._error_reset_jacobian(error)
         self.state.covariance = self._regularize_covariance(
             reset @ old_covariance @ reset.T
         )
+
+    @staticmethod
+    def _error_reset_jacobian(error: np.ndarray) -> np.ndarray:
+        """Map posterior covariance into the retracted nominal tangent space.
+
+        The filter uses a right attitude perturbation,
+        ``R_true = R_nominal Exp(dtheta)``.  After injecting an estimated
+        error, the attitude-error coordinates change.  The first-order reset
+        Jacobian is therefore ``I - 1/2 [dtheta]x``.  Applying this transform
+        to the *posterior* covariance is essential; applying it before a
+        Joseph update and then overwriting it silently discards the reset.
+        """
+
+        error = np.asarray(error, dtype=np.float64).reshape(15)
+        reset = np.eye(15, dtype=np.float64)
+        reset[0:3, 0:3] -= 0.5 * skew(error[0:3])
+        return reset
+
+    def _dvl_correction_projector(self) -> np.ndarray:
+        """Return the observable-state projector for one DVL update.
+
+        In this filter's right/body attitude coordinates, an infinitesimal
+        rotation about the fixed world vertical is ``R.T @ e_z``.  DVL body
+        velocity cannot observe that global-heading gauge, nor can it observe
+        the vehicle's accumulated position.  Projecting the Kalman correction
+        (rather than rejecting or weakening the measurement) prevents a
+        velocity residual from retracting the live local-map frame.
+        """
+
+        projector = np.eye(15, dtype=np.float64)
+        world_vertical_body = self.state.rotation.T @ np.array(
+            [0.0, 0.0, 1.0], dtype=np.float64
+        )
+        world_vertical_body /= max(
+            float(np.linalg.norm(world_vertical_body)), 1.0e-12
+        )
+        projector[0:3, 0:3] -= np.outer(
+            world_vertical_body, world_vertical_body
+        )
+        projector[3:6, 3:6] = 0.0
+        return projector
 
     def _kalman_update(
         self,
@@ -607,6 +654,7 @@ class AcousticESIKF:
         measurement_covariance: np.ndarray,
         *,
         mahalanobis_limit: float | None = None,
+        correction_projector: np.ndarray | None = None,
     ) -> bool:
         residual = np.asarray(residual, dtype=np.float64).reshape(-1)
         jacobian = np.asarray(jacobian, dtype=np.float64).reshape(
@@ -635,14 +683,24 @@ class AcousticESIKF:
             ).T
         except np.linalg.LinAlgError:
             return False
+        if correction_projector is not None:
+            correction_projector = np.asarray(
+                correction_projector, dtype=np.float64
+            ).reshape(15, 15)
+            gain = correction_projector @ gain
         prior_covariance = self.state.covariance.copy()
         error = gain @ residual
-        self._inject(error)
         identity_minus = np.eye(15) - gain @ jacobian
-        self.state.covariance = self._regularize_covariance(
+        posterior_covariance = (
             identity_minus @ prior_covariance @ identity_minus.T
             + gain @ measurement_covariance @ gain.T
         )
+        candidate = self._state_with_error(self.state, error)
+        reset = self._error_reset_jacobian(error)
+        candidate.covariance = self._regularize_covariance(
+            reset @ posterior_covariance @ reset.T
+        )
+        self.state = candidate
         return True
 
     def update_dvl(
@@ -709,6 +767,11 @@ class AcousticESIKF:
             residual,
             jacobian,
             covariance * covariance_scale,
+            correction_projector=(
+                self._dvl_correction_projector()
+                if self.config.dvl_preserve_pose_gauge
+                else None
+            ),
         )
 
     def update_depth(
@@ -1218,7 +1281,10 @@ class AcousticESIKF:
             final_covariance = np.linalg.inv(final_information)
         except np.linalg.LinAlgError:
             final_covariance = np.linalg.pinv(final_information, rcond=1.0e-10)
-        final_state.covariance = self._regularize_covariance(final_covariance)
+        reset = self._error_reset_jacobian(correction)
+        final_state.covariance = self._regularize_covariance(
+            reset @ final_covariance @ reset.T
+        )
         self.state = final_state
 
         return SonarUpdateResult(
@@ -1992,7 +2058,10 @@ class AcousticESIKF:
             final_covariance = np.linalg.inv(final_information)
         except np.linalg.LinAlgError:
             final_covariance = np.linalg.pinv(final_information, rcond=1.0e-10)
-        final_state.covariance = self._regularize_covariance(final_covariance)
+        reset = self._error_reset_jacobian(correction)
+        final_state.covariance = self._regularize_covariance(
+            reset @ final_covariance @ reset.T
+        )
         # Solve the measurement-only projected normal equation in coordinates
         # where one radian of yaw is represented by a 20 m side-scan lever
         # arm. This keeps the eigenspace test dimensionally meaningful.

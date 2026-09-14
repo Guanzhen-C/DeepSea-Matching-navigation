@@ -1,0 +1,293 @@
+{
+  "schema": "oceansim.dvl-observability-regression/v1",
+  "scope": "navigation-only IMU+DVL+depth; sonar and global matching disabled",
+  "terrain": "USGS Monterey Canyon measured 5 m bathymetry",
+  "seed": 31,
+  "start_distance_m": 30000.0,
+  "requested_segment_distance_m": 4500.0,
+  "travelled_distance_m": 4500.000185666746,
+  "speed_mps": 1.5,
+  "initialization": "exact truth for controlled filter comparison",
+  "measurement_schedule_hz": {
+    "imu": 50.0,
+    "dvl": 5.0,
+    "depth": 10.0
+  },
+  "wall_time_s": 84.29122684200411,
+  "results": {
+    "unconstrained_dvl": {
+      "position_rmse_m": 71.65547420484125,
+      "samples": 150000,
+      "maximum_position_error_m": 139.21492025878047,
+      "maximum_dvl_position_jump_m": 6.601005731522333,
+      "maximum_dvl_attitude_jump_deg": 1.0541707031353904,
+      "maximum_dvl_global_yaw_component_deg": 1.0537934834416234,
+      "final_position_error_m": 66.75960678142567,
+      "final_yaw_error_deg": 2.311751611701412
+    },
+    "observable_dvl": {
+      "position_rmse_m": 39.37607527921958,
+      "samples": 150000,
+      "maximum_position_error_m": 77.54689960775872,
+      "maximum_dvl_position_jump_m": 0.0,
+      "maximum_dvl_attitude_jump_deg": 0.18091027584936456,
+      "maximum_dvl_global_yaw_component_deg": 3.906341962672118e-14,
+      "final_position_error_m": 77.18354933954654,
+      "final_yaw_error_deg": 2.172493763225458
+    }
+  },
+  "checkpoints": [
+    {
+      "travelled_distance_m": 250.02008230340687,
+      "route_distance_m": 30250.020082303407,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 2.129778768342372,
+          "yaw_error_deg": 0.19039047752076743
+        },
+        "observable_dvl": {
+          "position_error_m": 2.1127849092924027,
+          "yaw_error_deg": 0.3698882488691723
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 500.0102955162128,
+      "route_distance_m": 30500.01029551621,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 4.060688707833097,
+          "yaw_error_deg": 0.11657061355516621
+        },
+        "observable_dvl": {
+          "position_error_m": 3.6853258676928875,
+          "yaw_error_deg": 0.42901028885498277
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 750.0002870113696,
+      "route_distance_m": 30750.00028701137,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 6.844647132459697,
+          "yaw_error_deg": 0.5898424063538745
+        },
+        "observable_dvl": {
+          "position_error_m": 5.766507265369644,
+          "yaw_error_deg": 0.08715563497464303
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 1000.0202761121046,
+      "route_distance_m": 31000.020276112104,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 13.543292333131777,
+          "yaw_error_deg": 1.0100298771560166
+        },
+        "observable_dvl": {
+          "position_error_m": 8.341696806675746,
+          "yaw_error_deg": -0.6509014094139098
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 1250.0102757127847,
+      "route_distance_m": 31250.010275712786,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 63.04931794541378,
+          "yaw_error_deg": 6.771917198259783
+        },
+        "observable_dvl": {
+          "position_error_m": 13.383418914429608,
+          "yaw_error_deg": -0.8596396801449092
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 1500.0003830475625,
+      "route_distance_m": 31500.00038304756,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 57.8933146095621,
+          "yaw_error_deg": 2.6252822998114222
+        },
+        "observable_dvl": {
+          "position_error_m": 20.614538026475262,
+          "yaw_error_deg": -0.5482903614808389
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 1750.0203940739736,
+      "route_distance_m": 31750.020394073974,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 47.156952622630115,
+          "yaw_error_deg": -1.055502914135547
+        },
+        "observable_dvl": {
+          "position_error_m": 23.366733259399307,
+          "yaw_error_deg": -0.3732200991215153
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 2000.010383234728,
+      "route_distance_m": 32000.010383234727,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 27.148769352381986,
+          "yaw_error_deg": -3.4866935530821386
+        },
+        "observable_dvl": {
+          "position_error_m": 25.549242947993353,
+          "yaw_error_deg": -0.6240123674080859
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 2250.000336828562,
+      "route_distance_m": 32250.00033682856,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 5.751158847817789,
+          "yaw_error_deg": -4.3362466653277805
+        },
+        "observable_dvl": {
+          "position_error_m": 28.40504297953932,
+          "yaw_error_deg": -0.5835371709523844
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 2500.020153621448,
+      "route_distance_m": 32500.020153621448,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 44.48391956416883,
+          "yaw_error_deg": -8.097100889054271
+        },
+        "observable_dvl": {
+          "position_error_m": 30.10199134477712,
+          "yaw_error_deg": -0.3638869789156035
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 2750.0101331368487,
+      "route_distance_m": 32750.01013313685,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 73.64104141730498,
+          "yaw_error_deg": -7.620164056033719
+        },
+        "observable_dvl": {
+          "position_error_m": 32.07610796300965,
+          "yaw_error_deg": -0.21877342307448092
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 3000.000178082459,
+      "route_distance_m": 33000.00017808246,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 93.33451745790647,
+          "yaw_error_deg": -5.372411238854537
+        },
+        "observable_dvl": {
+          "position_error_m": 41.440745155276026,
+          "yaw_error_deg": 0.536923071608583
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 3250.020133105429,
+      "route_distance_m": 33250.02013310543,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 128.7455164442333,
+          "yaw_error_deg": -4.841758216169865
+        },
+        "observable_dvl": {
+          "position_error_m": 45.07886085018327,
+          "yaw_error_deg": 1.0063221714286066
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 3500.01016762624,
+      "route_distance_m": 33500.01016762624,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 130.57324285705124,
+          "yaw_error_deg": -2.8403509575307684
+        },
+        "observable_dvl": {
+          "position_error_m": 55.477049586686086,
+          "yaw_error_deg": 1.7946077338979942
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 3750.0001246292995,
+      "route_distance_m": 33750.000124629296,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 122.18138441824735,
+          "yaw_error_deg": -0.5608443044044966
+        },
+        "observable_dvl": {
+          "position_error_m": 61.544869174030914,
+          "yaw_error_deg": 2.2377401436242144
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 4000.0201671633918,
+      "route_distance_m": 34000.02016716339,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 106.73779090076516,
+          "yaw_error_deg": 0.9037680661435807
+        },
+        "observable_dvl": {
+          "position_error_m": 69.34977458873898,
+          "yaw_error_deg": 2.208769606640045
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 4250.010162038863,
+      "route_distance_m": 34250.01016203886,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 66.31584353115596,
+          "yaw_error_deg": 3.428847315444397
+        },
+        "observable_dvl": {
+          "position_error_m": 71.07598657852391,
+          "yaw_error_deg": 2.109810098997743
+        }
+      }
+    },
+    {
+      "travelled_distance_m": 4500.000185666746,
+      "route_distance_m": 34500.000185666744,
+      "filters": {
+        "unconstrained_dvl": {
+          "position_error_m": 66.75960678142567,
+          "yaw_error_deg": 2.311751611701412
+        },
+        "observable_dvl": {
+          "position_error_m": 77.18354933954654,
+          "yaw_error_deg": 2.172493763225458
+        }
+      }
+    }
+  ]
+}
