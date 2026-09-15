@@ -24,6 +24,12 @@ from .bbs3d_registration import (
     BBS3DVerifierConfig,
 )
 from .fast_sonar_slam import FastSonarSLAM, FastSonarSLAMConfig
+from .feature_sonar_odometry import (
+    FeatureOdometryDiagnostics,
+    FeatureOdometryResult,
+    FeatureSonarOdometry,
+    FeatureSonarOdometryConfig,
+)
 from .intensity_map import AcousticIntensityMap, IntensityMapSample
 from .map_odom import (
     MapOdomCorrectionSnapshot,
@@ -124,6 +130,10 @@ __all__ = [
     "ESIKFConfig",
     "FastSonarSLAM",
     "FastSonarSLAMConfig",
+    "FeatureOdometryDiagnostics",
+    "FeatureOdometryResult",
+    "FeatureSonarOdometry",
+    "FeatureSonarOdometryConfig",
     "GTSAMPlanarPoseGraph",
     "GlobalCohortSnapshot",
     "GlobalCohortTracker",

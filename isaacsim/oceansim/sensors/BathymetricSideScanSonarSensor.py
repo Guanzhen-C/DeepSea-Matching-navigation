@@ -76,6 +76,7 @@ class BathymetricSideScanSonarSensor(MultibeamEchosounderSensor):
         gain: float = 1.0,
         default_reflectivity: float = 1.0,
         reflectivity_resolver=None,
+        spatial_reflectivity_resolver=None,
         random_seed: int | None = None,
         raycast_backend=None,
         frame_id: str | None = None,
@@ -127,6 +128,12 @@ class BathymetricSideScanSonarSensor(MultibeamEchosounderSensor):
         self._multiplicative_noise_std = float(multiplicative_noise_std)
         self._additive_noise_std = float(additive_noise_std)
         self._gain = float(gain)
+        if (
+            spatial_reflectivity_resolver is not None
+            and not callable(spatial_reflectivity_resolver)
+        ):
+            raise TypeError("spatial_reflectivity_resolver must be callable")
+        self._spatial_reflectivity_resolver = spatial_reflectivity_resolver
         # Keep radiometric noise on an independent deterministic stream so
         # enabling the image product cannot change later bathymetric range
         # samples. This is essential for geometry-only/intensity A/B tests.
@@ -635,7 +642,29 @@ class BathymetricSideScanSonarSensor(MultibeamEchosounderSensor):
         shared_ranges[~shared_hit] = np.nan
 
         accelerated_intensities = getattr(hits, "raw_intensities", None)
-        if accelerated_intensities is None:
+        if self._spatial_reflectivity_resolver is not None:
+            resolved_reflectivity = np.asarray(
+                self._spatial_reflectivity_resolver(
+                    hits.positions_world[:, 0],
+                    hits.positions_world[:, 1],
+                ),
+                dtype=np.float64,
+            ).reshape(shared_hit.size)
+            resolved_reflectivity = np.nan_to_num(
+                resolved_reflectivity, nan=0.0, posinf=0.0, neginf=0.0
+            )
+            resolved_reflectivity = np.clip(
+                resolved_reflectivity, 0.0, None
+            )
+            raw_intensities = compute_backscatter_intensity(
+                distances=hits.distances,
+                directions_world=shared_directions_world,
+                normals_world=hits.normals_world,
+                reflectivities=resolved_reflectivity,
+                hit_mask=shared_hit,
+                attenuation=self._attenuation,
+            )
+        elif accelerated_intensities is None:
             raw_intensities = compute_backscatter_intensity(
                 distances=hits.distances,
                 directions_world=shared_directions_world,

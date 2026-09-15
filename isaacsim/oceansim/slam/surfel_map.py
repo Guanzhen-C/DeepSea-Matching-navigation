@@ -52,11 +52,20 @@ class SurfelMapSnapshot:
 
 @dataclass(slots=True)
 class _VoxelStats:
+    reference: np.ndarray = field(
+        default_factory=lambda: np.zeros(3, dtype=np.float64)
+    )
     count: int = 0
     mean: np.ndarray = field(
         default_factory=lambda: np.zeros(3, dtype=np.float64)
     )
     scatter: np.ndarray = field(
+        default_factory=lambda: np.zeros((3, 3), dtype=np.float64)
+    )
+    offset_sum: np.ndarray = field(
+        default_factory=lambda: np.zeros(3, dtype=np.float64)
+    )
+    offset_outer_sum: np.ndarray = field(
         default_factory=lambda: np.zeros((3, 3), dtype=np.float64)
     )
     intensity_sum: float = 0.0
@@ -65,13 +74,40 @@ class _VoxelStats:
     cached_surfel: Surfel | None = None
 
     def add(self, point: np.ndarray, intensity: float) -> None:
-        self.count += 1
-        delta = point - self.mean
-        self.mean += delta / float(self.count)
-        delta_after = point - self.mean
-        self.scatter += np.outer(delta, delta_after)
-        self.intensity_sum += float(intensity)
-        self.version += 1
+        self.merge(
+            1,
+            np.asarray(point, dtype=np.float64),
+            np.zeros((3, 3)),
+            intensity,
+        )
+
+    def _refresh_centered_statistics(self) -> None:
+        """Derive Welford-style statistics from local additive moments."""
+
+        if self.count <= 0:
+            self.count = 0
+            self.mean.fill(0.0)
+            self.scatter.fill(0.0)
+            self.offset_sum.fill(0.0)
+            self.offset_outer_sum.fill(0.0)
+            return
+        self.mean = self.reference + self.offset_sum / float(self.count)
+        if self.count == 1:
+            # Avoid subtracting two nearly identical second moments for the
+            # common single-return boundary case.
+            self.scatter.fill(0.0)
+            return
+        centered = self.offset_outer_sum - np.outer(
+            self.offset_sum, self.offset_sum
+        ) / float(self.count)
+        centered = 0.5 * (centered + centered.T)
+        if not np.isfinite(centered).all():
+            raise ValueError("voxel additive moments are not finite")
+        # Do not eigendecompose every touched voxel at the sonar rate.  The
+        # surfel cache performs the PSD-safe decomposition only when a voxel
+        # is queried; here the locally referenced raw moments are already the
+        # authoritative statistics.
+        self.scatter = centered
 
     def merge(
         self,
@@ -87,21 +123,61 @@ class _VoxelStats:
             return
         batch_mean = np.asarray(mean, dtype=np.float64).reshape(3)
         batch_scatter = np.asarray(scatter, dtype=np.float64).reshape(3, 3)
-        if self.count == 0:
-            self.count = batch_count
-            self.mean = batch_mean.copy()
-            self.scatter = batch_scatter.copy()
-        else:
-            previous_count = self.count
-            combined_count = previous_count + batch_count
-            delta = batch_mean - self.mean
-            self.mean += delta * (batch_count / float(combined_count))
-            self.scatter += batch_scatter + np.outer(delta, delta) * (
-                previous_count * batch_count / float(combined_count)
-            )
-            self.count = combined_count
+        offset_mean = batch_mean - self.reference
+        self.offset_sum += batch_count * offset_mean
+        self.offset_outer_sum += batch_scatter + batch_count * np.outer(
+            offset_mean, offset_mean
+        )
+        self.count += batch_count
+        self._refresh_centered_statistics()
         self.intensity_sum += float(intensity_sum)
         self.version += 1
+
+    def subtract(
+        self,
+        count: int,
+        mean: np.ndarray,
+        scatter: np.ndarray,
+        intensity_sum: float,
+    ) -> None:
+        """Remove one previously merged batch from sufficient statistics.
+
+        A fixed-lag local map must retire old scans without rebuilding every
+        surviving voxel at the sonar rate.  This is the inverse of the
+        parallel Chan/Welford merge above.  The caller must provide the exact
+        points (and intensities) that were inserted for the retired batch.
+        """
+
+        batch_count = int(count)
+        if batch_count <= 0:
+            return
+        if batch_count > self.count:
+            raise ValueError("cannot remove more points than a voxel contains")
+        if batch_count == self.count:
+            self.count = 0
+            self.mean.fill(0.0)
+            self.scatter.fill(0.0)
+            self.offset_sum.fill(0.0)
+            self.offset_outer_sum.fill(0.0)
+            self.intensity_sum = 0.0
+            self.version += 1
+            self.cached_version = -1
+            self.cached_surfel = None
+            return
+
+        batch_mean = np.asarray(mean, dtype=np.float64).reshape(3)
+        batch_scatter = np.asarray(scatter, dtype=np.float64).reshape(3, 3)
+        offset_mean = batch_mean - self.reference
+        self.offset_sum -= batch_count * offset_mean
+        self.offset_outer_sum -= batch_scatter + batch_count * np.outer(
+            offset_mean, offset_mean
+        )
+        self.count -= batch_count
+        self._refresh_centered_statistics()
+        self.intensity_sum -= float(intensity_sum)
+        self.version += 1
+        self.cached_version = -1
+        self.cached_surfel = None
 
 
 class SurfelVoxelMap:
@@ -378,7 +454,10 @@ class SurfelVoxelMap:
             key = tuple(int(value) for value in key_array)
             stats = self._voxels.get(key)
             if stats is None:
-                stats = _VoxelStats()
+                stats = _VoxelStats(
+                    reference=np.asarray(key, dtype=np.float64)
+                    * self.voxel_size
+                )
                 self._voxels[key] = stats
                 self._blocks.setdefault(self._block_key(key), set()).add(key)
             previous_count = stats.count
@@ -391,6 +470,77 @@ class SurfelVoxelMap:
             if previous_count < self.min_points <= stats.count:
                 self._mature_voxel_count += 1
         self._point_count += int(points.shape[0])
+        self._revision += 1
+        return int(points.shape[0])
+
+    def remove_points(
+        self,
+        points_world: np.ndarray,
+        intensities: np.ndarray | None = None,
+    ) -> int:
+        """Remove an exact, previously inserted point batch.
+
+        This operation supports a temporal fixed-lag surfel map.  It is not a
+        nearest-neighbour deletion: points are grouped by their original voxel
+        keys and their sufficient statistics are subtracted exactly.
+        """
+
+        points = np.asarray(points_world, dtype=np.float64).reshape(-1, 3)
+        finite = np.isfinite(points).all(axis=1)
+        points = points[finite]
+        if intensities is None:
+            intensity_values = np.ones(points.shape[0], dtype=np.float64)
+        else:
+            supplied = np.asarray(intensities, dtype=np.float64).reshape(-1)
+            if supplied.size != finite.size:
+                raise ValueError("intensities must match points")
+            intensity_values = np.nan_to_num(
+                supplied[finite], nan=0.0, posinf=0.0, neginf=0.0
+            )
+        if points.shape[0] == 0:
+            return 0
+
+        voxel_keys = np.floor(points / self.voxel_size).astype(np.int64)
+        unique_keys, inverse = np.unique(
+            voxel_keys, axis=0, return_inverse=True
+        )
+        order = np.argsort(inverse, kind="stable")
+        counts = np.bincount(inverse, minlength=unique_keys.shape[0])
+        starts = np.concatenate(([0], np.cumsum(counts)))
+        for index, key_array in enumerate(unique_keys):
+            selected = order[starts[index] : starts[index + 1]]
+            key = tuple(int(value) for value in key_array)
+            stats = self._voxels.get(key)
+            if stats is None or stats.count < selected.size:
+                raise ValueError(
+                    "point batch was not previously inserted in the surfel map"
+                )
+            batch_points = points[selected]
+            batch_mean = np.mean(batch_points, axis=0)
+            centered = batch_points - batch_mean
+            batch_scatter = centered.T @ centered
+            was_mature = stats.count >= self.min_points
+            stats.subtract(
+                int(selected.size),
+                batch_mean,
+                batch_scatter,
+                float(np.sum(intensity_values[selected])),
+            )
+            if stats.count == 0:
+                if was_mature:
+                    self._mature_voxel_count -= 1
+                del self._voxels[key]
+                block_key = self._block_key(key)
+                block = self._blocks[block_key]
+                block.discard(key)
+                if not block:
+                    del self._blocks[block_key]
+            elif was_mature and stats.count < self.min_points:
+                self._mature_voxel_count -= 1
+
+        self._point_count -= int(points.shape[0])
+        if self._point_count < 0:
+            raise RuntimeError("surfel-map point count became negative")
         self._revision += 1
         return int(points.shape[0])
 

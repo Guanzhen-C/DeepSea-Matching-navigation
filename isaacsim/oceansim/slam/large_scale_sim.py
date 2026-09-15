@@ -16,6 +16,7 @@ from ..utils.acoustic_sonar import (
     imaging_lineage_to_bathymetry,
     integrated_bathymetric_sidescan_fan,
     multibeam_directions,
+    parallel_bathymetric_sidescan_rays,
 )
 from .math3d import rotation_from_rpy, so3_log
 
@@ -408,6 +409,46 @@ class FigureEightSurvey:
         )
 
 
+def unresolved_reflectivity_multiplier(
+    x, y, amplitude: float
+) -> np.ndarray:
+    """Return a deterministic, zero-mean subgrid scattering multiplier."""
+
+    amplitude = float(amplitude)
+    if not 0.0 <= amplitude <= 0.75:
+        raise ValueError("subgrid reflectivity amplitude must lie in [0, 0.75]")
+    x_values, y_values = np.broadcast_arrays(
+        np.asarray(x, dtype=np.float64),
+        np.asarray(y, dtype=np.float64),
+    )
+    if amplitude <= 0.0:
+        return np.ones_like(x_values, dtype=np.float64)
+    wavelengths = np.array(
+        [0.36, 0.53, 0.79, 1.17, 1.73, 2.57], dtype=np.float64
+    )
+    directions = np.array(
+        [0.19, 1.07, 2.11, 2.83, 0.71, 1.69], dtype=np.float64
+    )
+    phases = np.array(
+        [0.37, 2.19, 4.71, 1.43, 5.37, 3.11], dtype=np.float64
+    )
+    weights = np.array(
+        [0.34, 0.27, 0.20, 0.13, 0.08, 0.05], dtype=np.float64
+    )
+    texture = np.zeros_like(x_values, dtype=np.float64)
+    for wavelength, direction, phase, weight in zip(
+        wavelengths, directions, phases, weights, strict=True
+    ):
+        coordinate = (
+            np.cos(direction) * x_values + np.sin(direction) * y_values
+        )
+        texture += weight * np.sin(
+            (2.0 * np.pi / wavelength) * coordinate + phase
+        )
+    texture /= float(np.sqrt(0.5 * np.sum(weights * weights)))
+    return np.clip(1.0 + amplitude * texture, 0.25, 1.75)
+
+
 class LargeScaleSensorSimulator:
     """Generate navigation and shared bathymetry/side-scan measurements."""
 
@@ -422,6 +463,9 @@ class LargeScaleSensorSimulator:
         max_range: float = 62.0,
         sidescan_range_bins: int = 160,
         imaging_rays_per_side: int = 512,
+        along_track_rows_per_side: int = 1,
+        along_track_sample_spacing_m: float = 0.0,
+        subgrid_reflectivity_amplitude: float = 0.0,
         seed: int = 31,
     ) -> None:
         self.world = world
@@ -433,20 +477,71 @@ class LargeScaleSensorSimulator:
         self.imaging_intensity_rng = np.random.default_rng(seed + 30_013)
         self.sidescan_range_bins = int(sidescan_range_bins)
         self.imaging_rays_per_side = int(imaging_rays_per_side)
+        self.along_track_rows_per_side = int(along_track_rows_per_side)
+        self.along_track_sample_spacing_m = float(
+            along_track_sample_spacing_m
+        )
+        self.subgrid_reflectivity_amplitude = float(
+            subgrid_reflectivity_amplitude
+        )
         if self.sidescan_range_bins < 1:
             raise ValueError("sidescan_range_bins must be >= 1")
         if self.imaging_rays_per_side < 1:
             raise ValueError("imaging_rays_per_side must be >= 1")
-        (
-            self.shared_ray_directions_sensor,
-            self.bathymetry_source_ray_indices,
-            self.imaging_directions_sensor,
-            self.imaging_source_ray_indices,
-            self.imaging_angles,
-        ) = integrated_bathymetric_sidescan_fan(
-            num_beams=int(num_beams),
-            swath_width_deg=swath_width_deg,
-            imaging_rays_per_side=self.imaging_rays_per_side,
+        if self.along_track_rows_per_side < 1:
+            raise ValueError("along_track_rows_per_side must be >= 1")
+        if not 0.0 <= self.subgrid_reflectivity_amplitude <= 0.75:
+            raise ValueError(
+                "subgrid_reflectivity_amplitude must lie in [0, 0.75]"
+            )
+        if self.along_track_rows_per_side == 1:
+            if self.along_track_sample_spacing_m < 0.0:
+                raise ValueError(
+                    "along_track_sample_spacing_m must be non-negative"
+                )
+            (
+                self.shared_ray_directions_sensor,
+                self.bathymetry_source_ray_indices,
+                self.imaging_directions_sensor,
+                self.imaging_source_ray_indices,
+                self.imaging_angles,
+            ) = integrated_bathymetric_sidescan_fan(
+                num_beams=int(num_beams),
+                swath_width_deg=swath_width_deg,
+                imaging_rays_per_side=self.imaging_rays_per_side,
+            )
+            self.shared_ray_origins_sensor = np.zeros(
+                (self.shared_ray_directions_sensor.shape[0], 3),
+                dtype=np.float64,
+            )
+        else:
+            if self.along_track_sample_spacing_m <= 0.0:
+                raise ValueError(
+                    "multiple along-track rows require positive sample spacing"
+                )
+            (
+                self.shared_ray_origins_sensor,
+                self.shared_ray_directions_sensor,
+                self.bathymetry_source_ray_indices,
+                _imaging_origins,
+                self.imaging_directions_sensor,
+                self.imaging_source_ray_indices,
+                self.imaging_angles,
+            ) = parallel_bathymetric_sidescan_rays(
+                num_beams=int(num_beams),
+                swath_width_deg=swath_width_deg,
+                imaging_rays_per_side=self.imaging_rays_per_side,
+                along_track_rows_per_side=self.along_track_rows_per_side,
+                along_track_sample_spacing_m=(
+                    self.along_track_sample_spacing_m
+                ),
+            )
+        self.imaging_row_indices = np.tile(
+            np.repeat(
+                np.arange(self.along_track_rows_per_side, dtype=np.int64),
+                self.imaging_rays_per_side,
+            ),
+            2,
         )
         self.beam_angles = self.imaging_angles[
             self.bathymetry_source_ray_indices
@@ -463,6 +558,90 @@ class LargeScaleSensorSimulator:
         self.gyro_bias = gyro_bias_limit * np.array([0.29, -0.23, 0.87])
         self.accel_bias = np.array([0.018, -0.012, 0.025])
         self.dvl_bias = np.array([0.012, -0.008, 0.004])
+
+    def _acoustic_reflectivity(self, x, y) -> np.ndarray:
+        """Measured reflectivity plus optional unresolved spatial texture.
+
+        Public regional backscatter mosaics are metre-scale products, whereas
+        the V2 head samples 0.15 m along track.  When explicitly requested,
+        this deterministic band-limited field represents unresolved sediment
+        scattering below the source-raster cell size.  It is world-fixed (so
+        revisits observe the same seabed), zero-mean, and multiplicative; it
+        does not alter measured bathymetry or claim to be measured intensity.
+        """
+
+        measured = np.asarray(self.world.reflectivity(x, y), dtype=np.float64)
+        amplitude = self.subgrid_reflectivity_amplitude
+        if amplitude <= 0.0:
+            return measured
+        # Incommensurate wavelengths/directions form a reproducible,
+        # non-axis-aligned narrow-band random-field approximation.  The
+        # shortest wavelength remains above twice the 0.15 m standard-mode
+        # sampling interval, avoiding synthetic spatial aliasing.
+        multiplier = unresolved_reflectivity_multiplier(x, y, amplitude)
+        return np.clip(measured * multiplier, 0.0, None)
+
+    def _intersect_sensor_rays(
+        self,
+        truth: GroundTruthState,
+        origins_sensor: np.ndarray,
+        directions_sensor: np.ndarray,
+    ) -> tuple[
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+        np.ndarray,
+    ]:
+        """Intersect possibly displaced simultaneous ray origins."""
+
+        origins_sensor = np.asarray(origins_sensor, dtype=np.float64).reshape(
+            -1, 3
+        )
+        directions_sensor = np.asarray(
+            directions_sensor, dtype=np.float64
+        ).reshape(-1, 3)
+        if origins_sensor.shape != directions_sensor.shape:
+            raise ValueError("ray origins and directions must agree")
+        origins_world = truth.position + origins_sensor @ truth.rotation.T
+        directions_world = directions_sensor @ truth.rotation.T
+        hit = np.zeros(directions_sensor.shape[0], dtype=bool)
+        distances = np.full(directions_sensor.shape[0], np.nan, dtype=np.float64)
+        points_world = np.full(
+            directions_sensor.shape, np.nan, dtype=np.float64
+        )
+        incidence = np.zeros(directions_sensor.shape[0], dtype=np.float64)
+        # Both sides of one documented row share a phase centre.  Grouping by
+        # that centre keeps the analytic height-field API dependency-light.
+        unique_origins, inverse = np.unique(
+            origins_sensor, axis=0, return_inverse=True
+        )
+        for origin_index in range(unique_origins.shape[0]):
+            selected = np.flatnonzero(inverse == origin_index)
+            (
+                selected_hit,
+                selected_distances,
+                selected_points,
+                selected_incidence,
+            ) = self.world.intersect_rays(
+                origins_world[selected[0]],
+                directions_world[selected],
+                min_range=self.min_range,
+                max_range=self.max_range,
+            )
+            hit[selected] = selected_hit
+            distances[selected] = selected_distances
+            points_world[selected] = selected_points
+            incidence[selected] = selected_incidence
+        return (
+            hit,
+            distances,
+            points_world,
+            incidence,
+            origins_world,
+            directions_world,
+        )
 
     def imu(self, truth: GroundTruthState) -> tuple[np.ndarray, np.ndarray]:
         gyro = (
@@ -490,23 +669,34 @@ class LargeScaleSensorSimulator:
     def mbes(
         self, truth: GroundTruthState
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        directions_world = self.beam_directions_sensor @ truth.rotation.T
-        hit, distances, points_world, incidence = self.world.intersect_rays(
-            truth.position,
-            directions_world,
-            min_range=self.min_range,
-            max_range=self.max_range,
+        origins_sensor = self.shared_ray_origins_sensor[
+            self.bathymetry_source_ray_indices
+        ]
+        (
+            hit,
+            distances,
+            points_world,
+            incidence,
+            _origins_world,
+            _directions_world,
+        ) = self._intersect_sensor_rays(
+            truth,
+            origins_sensor,
+            self.beam_directions_sensor,
         )
         measured_ranges = distances.copy()
         measured_ranges[hit] += self.rng.normal(0.0, 0.028, np.count_nonzero(hit))
         measured_ranges[hit] = np.clip(
             measured_ranges[hit], self.min_range, self.max_range
         )
-        points_sensor = self.beam_directions_sensor * measured_ranges[:, None]
+        points_sensor = (
+            origins_sensor
+            + self.beam_directions_sensor * measured_ranges[:, None]
+        )
         points_sensor[~hit] = np.nan
         intensity = np.zeros(hit.size, dtype=np.float64)
         if np.any(hit):
-            reflectivity = self.world.reflectivity(
+            reflectivity = self._acoustic_reflectivity(
                 points_world[hit, 0], points_world[hit, 1]
             )
             intensity[hit] = (
@@ -539,11 +729,17 @@ class LargeScaleSensorSimulator:
         intensities: np.ndarray,
         hit: np.ndarray,
         directions_sensor: np.ndarray | None = None,
+        origins_sensor: np.ndarray | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         if directions_sensor is None:
             directions_sensor = self.beam_directions_sensor
+        origins = (
+            np.zeros_like(points_sensor)
+            if origins_sensor is None
+            else np.asarray(origins_sensor, dtype=np.float64).reshape(-1, 3)
+        )
         measured_ranges = np.linalg.norm(
-            np.where(hit[:, None], points_sensor, 0.0), axis=1
+            np.where(hit[:, None], points_sensor - origins, 0.0), axis=1
         )
         (
             _,
@@ -601,14 +797,17 @@ class LargeScaleSensorSimulator:
         exact output view of those same point-wise XYZ + intensity returns.
         """
 
-        shared_directions_world = (
-            self.shared_ray_directions_sensor @ truth.rotation.T
-        )
-        hit, distances, _, incidence = self.world.intersect_rays(
-            truth.position,
+        (
+            hit,
+            distances,
+            true_points_world,
+            incidence,
+            shared_origins_world,
             shared_directions_world,
-            min_range=self.min_range,
-            max_range=self.max_range,
+        ) = self._intersect_sensor_rays(
+            truth,
+            self.shared_ray_origins_sensor,
+            self.shared_ray_directions_sensor,
         )
         shared_hit = np.asarray(hit, dtype=bool).copy()
         shared_ranges = distances.copy()
@@ -624,12 +823,9 @@ class LargeScaleSensorSimulator:
 
         raw_intensity = np.zeros(shared_hit.size, dtype=np.float64)
         if np.any(shared_hit):
-            true_points = (
-                truth.position
-                + shared_directions_world * distances[:, None]
-            )
-            reflectivity = self.world.reflectivity(
-                true_points[shared_hit, 0], true_points[shared_hit, 1]
+            reflectivity = self._acoustic_reflectivity(
+                true_points_world[shared_hit, 0],
+                true_points_world[shared_hit, 1],
             )
             raw_intensity[shared_hit] = (
                 reflectivity
@@ -647,11 +843,12 @@ class LargeScaleSensorSimulator:
             None,
         )
         shared_points_sensor = (
-            self.shared_ray_directions_sensor * shared_ranges[:, None]
+            self.shared_ray_origins_sensor
+            + self.shared_ray_directions_sensor * shared_ranges[:, None]
         )
         shared_points_sensor[~shared_hit] = np.nan
         shared_points_world = (
-            truth.position
+            shared_origins_world
             + shared_directions_world * shared_ranges[:, None]
         )
         shared_points_world[~shared_hit] = np.nan
@@ -711,6 +908,13 @@ class LargeScaleSensorSimulator:
             points_sensor=imaging_points_sensor,
             points_world=imaging_points_world,
             source_ray_indices=self.imaging_source_ray_indices.copy(),
+            ray_origins_sensor=self.shared_ray_origins_sensor[
+                self.imaging_source_ray_indices
+            ].copy(),
+            ray_origins_world=shared_origins_world[
+                self.imaging_source_ray_indices
+            ].copy(),
+            along_track_row_indices=self.imaging_row_indices.copy(),
         )
         port, starboard, port_source, starboard_source = (
             self._registered_sidescan_lines(
@@ -718,6 +922,7 @@ class LargeScaleSensorSimulator:
                 imaging.intensities,
                 imaging.hit_mask,
                 imaging.beam_directions,
+                imaging.ray_origins_sensor,
             )
         )
         centres = np.linspace(
@@ -764,6 +969,10 @@ class LargeScaleSensorSimulator:
             ),
             origin_world=truth.position.copy(),
             shared_ray_directions=self.shared_ray_directions_sensor.copy(),
+            shared_ray_origins_sensor=(
+                self.shared_ray_origins_sensor.copy()
+            ),
+            shared_ray_origins_world=shared_origins_world.copy(),
             bathymetry_source_ray_indices=(
                 self.bathymetry_source_ray_indices.copy()
             ),
@@ -771,6 +980,12 @@ class LargeScaleSensorSimulator:
             port_source_imaging_indices=port_source,
             starboard_source_imaging_indices=starboard_source,
             products_share_raw_returns=True,
+            along_track_coverage_m=(
+                self.along_track_rows_per_side
+                * self.along_track_sample_spacing_m
+                if self.along_track_rows_per_side > 1
+                else 0.0
+            ),
         )
         self.last_integrated_ping = ping
         return ping

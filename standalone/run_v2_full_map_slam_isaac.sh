@@ -17,21 +17,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # operator images are capped at 2 simulated Hz and only the latest ping before
 # a rendered frame is uploaded.  The raw waterfall still accumulates every
 # ping, while each presented image advances by at most 0.75 m at 1.5 m/s.
-# Each ping already contains eight simultaneous along-track rows, but its
-# 1.2 m aperture is still narrow compared with the 5 m terrain cells.  A
-# causal eight-ping sliding source window spans about 3.3 m along track and is
-# motion-compensated before every physical-ping update.  Only the oldest ping
-# is committed after an update, so the current measurement never matches
-# itself. Consecutive windows share 7/8 acquisitions; their ESIKF likelihood
-# is therefore tempered by 1/8 so reusing a return across the window does not
-# manufacture independent information. Sensor acquisition and estimator
-# output both remain at 5 Hz.  The direct intensity residual excludes the
-# latest four pings from its reference map:
+# Each ping already contains eight simultaneous along-track rows per side.
+# The production front end therefore registers exactly one physical ping once
+# at the native 5 Hz rate.  A 30 s causal fixed-lag surfel map supplies about
+# 45 m of historical along-track aperture; the current ping enters that map
+# only after its update and is removed when it leaves the lag.  Adjacent
+# 1.2 m footprints overlap by 75%, so their full residuals are retained while
+# information is continuously weighted by the newly covered fraction.  The
+# single-ping MBES correction writes position only; yaw is intentionally left
+# to the inertial propagation and the multi-ping Global matcher.  The direct
+# intensity residual excludes the latest four pings from its reference map:
 # at 1.5 m/s this supplies a 1.2 m causal baseline, exactly one documented
 # standard-mode strip, so duplicated along-track rows cannot be reused as
-# independent evidence. Every current ping still updates against the complete
-# causal local map and every converged ping is written back. The 512 XYZI
-# samples are
+# independent evidence. Every current ping still updates against the fixed-lag
+# causal local map and every converged ping is written back. The 512 XYZI samples are
 # correlated inside the 5 m source mosaic, so their aggregate filter weight is
 # capped at 32 independent-equivalent samples.  A 120 s stable intensity-map
 # anchor mirrors FAST-LIVO2's persistent local map instead of fragmenting it
@@ -45,10 +44,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # remains the seed and the fallback when texture matching is rejected. This
 # avoids carrying the measured low-pass bathymetry bias back into an accepted
 # side-scan result through an unjustified independence assumption.
-# The recorded full-route front end reaches 78.6 degrees absolute yaw error;
-# the rare whole-map recovery therefore searches +/-90 degrees around its
-# inertial yaw, leaving measured margin without paying for a blind 360-degree
-# search at every recovery attempt.
+# Rare whole-map recovery searches a broad yaw interval around inertial yaw;
+# ordinary local updates do not use that expensive absolute search.
 # A 20x render time scale was measurably faster than both 8x and 30x on the
 # validated UI workload, while retaining 50% more rendered frames than 30x.
 # Append command-line arguments to override these presentation settings.
@@ -70,9 +67,11 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --slam-voxel-size-m 5.0 \
     --intensity-voxel-size-m 3.0 \
     --map-insert-stride 2 \
-    --mbes-group-pings 8 \
-    --enable-mbes-sliding-window \
+    --mbes-group-pings 1 \
+    --local-map-history-s 30 \
+    --enable-mbes-footprint-overlap-weighting \
     --local-observability-mode continuous \
+    --local-sonar-state-update-policy position \
     --local-intensity-surface-consistency-std-m 0.75 \
     --intensity-group-pings 1 \
     --intensity-min-group-span-m 1.0 \
@@ -81,6 +80,7 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --intensity-submap-anchor-interval-s 120 \
     --intensity-factor-min-interval-s 300 \
     --intensity-factor-optimize-interval 20 \
+    --disable-local-intensity-state-update \
     --trajectory-sample-interval-s 0.2 \
     --enable-terrain-map-matching \
     --enable-backscatter-map-matching \

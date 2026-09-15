@@ -25,17 +25,15 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    velocity, and pressure initializes depth. Absolute yaw and horizontal
    translation are explicitly fixed as local-frame gauge freedoms, not
    treated as measurements.
-4. One output-rate geometry update per integrated V2 ping. Each physical ping
+4. One geometry update per integrated V2 ping at 5 Hz. Each physical ping
    retains its eight simultaneous along-track rows; these rows are not treated
-   as eight temporal pings. The full-map preset uses an eight-physical-ping,
-   causal sliding source window at 5 Hz. At 1.5 m/s this combines the 1.2 m
-   within-ping footprint with seven 0.30 m inter-ping baselines for an
-   approximately 3.3 m motion-compensated aperture. After startup, every new
-   ping produces an update and only the oldest aligned ping is committed to
-   the frozen reference map, so a measurement never matches itself. Because
-   adjacent source windows reuse seven of eight acquisitions, the geometric
-   likelihood is continuously tempered by 1/8 rather than counting reused
-   returns as independent evidence.
+   as eight temporal pings, and the full-map preset no longer accumulates a
+   second eight-ping sliding observation. The current ping is registered once
+   against a causal 30 s fixed-lag surfel submap, then inserted only after the
+   update, so it cannot match itself. At 1.5 m/s that reference contains about
+   45 m of recent trajectory. Expired ping batches are subtracted exactly from
+   per-voxel sufficient statistics. Those statistics use a voxel-local origin,
+   avoiding cancellation at UTM-scale coordinates.
 5. An incremental voxel-surfel bathymetry map and iterated point-to-plane
    update. Each return uses polar range/angular uncertainty, surfel normal
    variance, and Huber weighting. Rotational and translational information
@@ -44,10 +42,17 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    smoothly, and observable terrain-normal directions are not suppressed by
    the weakest tangent. Hard-subspace and former whole-frame scalar modes
    remain available only for controlled ablation.
-   The complete historical voxel map is retained for revisits, while a
-   coarse spatial block index packs only the current sensor-reach window for
-   the exact Warp 27-neighbour association. The small double-precision
-   15-state solve remains on the CPU.
+   Adjacent pings advance 0.30 m within a 1.20 m footprint. All residuals are
+   retained, while their likelihood information is continuously multiplied by
+   the newly covered fraction (about 0.25); this is covariance accounting, not
+   a residual gate. The production single-ping correction is position-only:
+   one narrow acoustic strip is not permitted to train yaw, velocity, or IMU
+   biases. IMU/DVL/depth retain the local attitude/inertial states, while the
+   multi-ping Global bathymetry/backscatter matcher supplies absolute x/y/yaw.
+   Experimental pose, position+yaw, and full-state policies remain selectable
+   for controlled A/B tests. A coarse spatial block index packs only the
+   current sensor-reach window for the exact Warp 27-neighbour association.
+   The small double-precision 15-state solve remains on the CPU.
 6. A direct acoustic-intensity update using dense samples with an explicit
    sensor-frame XYZ coordinate for every backscatter value. No elevation angle
    is guessed from a side-scan slant-range bin. The eight co-registered rows in
@@ -60,12 +65,14 @@ The local front end in `isaacsim/oceansim/slam/` contains:
    return and that fitted surface continuously inflates its photometric
    variance, preventing an appearance look-alike on the wrong relief surface
    from receiving full weight without adding another accept/reject threshold.
-   Raw returns from one acoustic
-   footprint are correlated, so their aggregate local-filter weight is capped
-   at 96 independent-equivalent samples. A configurable causal separation
-   (one ping in the V2 live launcher), 45% map coverage, normalized-correlation, inlier-ratio,
-   planar-rank, view-direction, and two-sided support gates must all pass
-   before the strip can update x/y/world-yaw in the ESIKF. The reference map is
+   Raw returns from one acoustic footprint are correlated, so their aggregate
+   matcher weight is capped at a configured independent-equivalent sample
+   count. A configurable causal separation, map coverage,
+   normalized-correlation, inlier-ratio, planar-rank, view-direction, and
+   two-sided support checks must all pass before a strip can be exported as a
+   graph constraint. In the production full-map preset the same-ping intensity
+   match is non-committing: it does not write the Local ESIKF a second time,
+   but remains available to the Global graph and relocalizer. The reference map is
    partitioned by pose-graph anchor so one local intensity surface never mixes
    samples expressed under different global corrections. Without old spatial
    overlap, side-scan contributes to mapping and place recognition but not
@@ -197,14 +204,14 @@ waterfall is retained for display and place descriptors only; it is not
 back-projected into invented 3-D points. `--sonar-backend physx` retains the
 general collision-scene fallback.
 
-An accepted local intensity match updates the gated ESIKF. Only when its
-freshly re-associated measurement-only optimum also passes the graph-export
-checks does it produce an explicitly anchored x/y/yaw pose-graph factor with
-its own conservative information matrix; otherwise the local posterior enters
-the odometry chain once. The exported factor is derived after projecting out
-gain/offset, rather than from the filter's posterior covariance, and remains
-separate from the same interval's pre-image inertial/DVL/depth edge. A
-non-committing graph-seeded match is counted as
+The generic matcher can optionally update the ESIKF, but the formal full-map
+preset runs it non-committing because intensity and geometry come from the
+same echo. Only when its freshly re-associated measurement-only optimum also
+passes the graph-export checks does it produce an explicitly anchored x/y/yaw
+pose-graph factor with its own conservative information matrix. The exported
+factor is derived after projecting out gain/offset, rather than from the
+filter's posterior covariance, and remains separate from the same interval's
+pre-image inertial/DVL/depth edge. A non-committing graph-seeded match is counted as
 accepted only after that graph factor also passes the transactional
 compatibility gate. This architecture is implemented and its component gates
 are unit-tested, but
@@ -473,6 +480,60 @@ The joint-likelihood, rank-safe 3.3 km critical regression is recorded in
 [`demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md`](../../demo/large_scale_slam/mature_trn_fastlivo2_regression_20260913.md).
 The matched-seed 5 Hz causal acoustic front-end regression is recorded in
 [`demo/large_scale_slam/fast_sonar_frontend_5hz_regression_20260913.md`](../../demo/large_scale_slam/fast_sonar_frontend_5hz_regression_20260913.md).
+
+## Experimental MBES–SSS feature Local frontend
+
+`--local-frontend feature` replaces the direct point-to-self-built-map state
+write with a co-registered MBES–SSS feature observation. It does not treat one
+eight-row ping as a terrestrial camera frame. GFTT corners are followed between
+consecutive physical pings by pyramid KLT initialized from the complete
+IMU/DVL SE(3) motion. Forward/backward-consistent tracks are lifted to the exact
+MBES XYZ returns that generated their pixels, and deterministic consensus
+estimates an error about the propagated pose while preserving roll, pitch,
+pressure depth, and the sonar lever arm.
+
+The V2 aperture robustly observes row displacement but does not independently
+observe cross-track translation or yaw on a smooth seabed. Consequently the
+accepted side-scan factor enters the ESIKF as one scalar projection along the
+anchor sensor x axis. A state-space projector prevents incidental covariance
+from directly changing cross-track position, attitude, or depth. MBES remains
+active in the feature lift, local map, graph, and Global matcher, but its direct
+local-map ESIKF state write is off in feature mode: the kilometre ablation
+showed that this self-map correction eventually outweighed its short-term
+benefit. Pass `--feature-retain-direct-mbes-state-update` only to reproduce the
+hybrid ablation. DVL, IMU, and the pressure sensor retain their normal
+responsibilities. A continuous Cauchy consistency response reduces periodic-
+texture aliases without a hard state-innovation gate. Four distinct physical
+pings form one factor; no echo is counted as two simultaneous pings.
+
+`--feature-compute-backend cuda` evaluates all 256 prediction-centred RANSAC
+hypotheses as one float64 PyTorch CUDA batch. The final all-inlier refinement,
+information-eigenvalue observability check, covariance, and ESIKF write remain
+unchanged on CPU. GFTT and bidirectional KLT intentionally remain in OpenCV:
+on the 32 x 1024 canonical image they take about 0.4 and 4 ms per ping, so a
+host/device round trip would cost more than it saves. Explicit `cuda` fails
+loudly when unavailable, while `auto` records and permits a CPU fallback.
+Diagnostics and output metrics include the requested/active backend, device,
+GPU/CPU call counts, fallback count, and per-stage timing.
+
+The USGS backscatter supplied with the complete map is registered at 5 m,
+whereas the documented standard-mode row interval is 0.15 m. The optional
+`--subgrid-reflectivity-amplitude` therefore adds a deterministic world-fixed,
+band-limited unresolved-scattering field for sensor-resolution experiments.
+Zero preserves the measured mosaic exactly. A nonzero value retains the USGS
+data as its low-frequency envelope but is explicitly synthetic below the map
+cell size; metrics record that provenance. This option changes intensity only,
+never terrain, ray geometry, range, or the MBES/side-scan shared-return
+lineage.
+
+Run the candidate with `standalone/run_v2_feature_hybrid_slam_isaac.sh`.
+The cross-region tests, negative control, exact numbers, and limitations are
+recorded in
+[`feature_hybrid_frontend_validation_20260915.md`](../../demo/large_scale_slam/feature_hybrid_frontend_validation_20260915.md).
+The 1 km deterministic replay is complete, but the direct frontend remains the
+launcher default until a new Isaac integration smoke test and longer Global
+integration run complete. These simulation improvements are not presented as
+a full-route or sea-trial accuracy claim.
 
 ## Python sensor interface
 

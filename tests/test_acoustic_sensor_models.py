@@ -341,6 +341,48 @@ def test_integrated_sensor_uses_one_cast_and_preserves_pixel_lineage(monkeypatch
         )
 
 
+def test_integrated_sensor_can_resolve_world_fixed_spatial_reflectivity(
+    monkeypatch,
+):
+    core, _, _, IntegratedSensor = _load_sensor_classes(monkeypatch)
+    calls = []
+
+    def spatial_reflectivity(x, y):
+        calls.append((np.asarray(x).copy(), np.asarray(y).copy()))
+        return 1.0 + 0.02 * np.asarray(y)
+
+    def make_sensor(name, resolver):
+        return IntegratedSensor(
+            prim_path=f"/World/robot/{name}",
+            num_beams=8,
+            swath_width_deg=120.0,
+            imaging_rays_per_side=32,
+            range_bins=40,
+            min_range=0.5,
+            max_range=30.0,
+            range_noise_std=0.0,
+            multiplicative_noise_std=0.0,
+            additive_noise_std=0.0,
+            attenuation=0.0,
+            spatial_reflectivity_resolver=resolver,
+            raycast_backend=HorizontalPlaneBackend(core.RaycastBatch),
+        )
+
+    baseline = make_sensor("constant_reflectivity", None).scan(timestamp=1.0)
+    textured = make_sensor(
+        "spatial_reflectivity", spatial_reflectivity
+    ).scan(timestamp=1.0)
+
+    assert len(calls) == 1
+    assert calls[0][0].shape == calls[0][1].shape == (64,)
+    assert not np.array_equal(
+        baseline.imaging.intensities, textured.imaging.intensities
+    )
+    np.testing.assert_array_equal(
+        baseline.imaging.ranges, textured.imaging.ranges
+    )
+
+
 def test_integrated_sensor_emits_multibeam_sidescan_rows(monkeypatch):
     core, _, _, IntegratedSensor = _load_sensor_classes(monkeypatch)
     backend = HorizontalPlaneBackend(core.RaycastBatch)

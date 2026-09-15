@@ -177,6 +177,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--subgrid-reflectivity-amplitude",
+        type=float,
+        default=0.0,
+        help=(
+            "optional world-fixed unresolved seabed-scattering amplitude; "
+            "zero preserves the measured 5 m backscatter mosaic exactly"
+        ),
+    )
+    parser.add_argument(
         "--sonar-swath-width-deg",
         type=float,
         default=170.0,
@@ -231,6 +240,68 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--local-sonar-state-update-policy",
+        choices=("full", "pose", "position", "position-yaw"),
+        default="full",
+        help=(
+            "state subspace owned by local acoustic registration; "
+            "position is the production single-ping Schmidt update; "
+            "position-yaw is retained for observability experiments"
+        ),
+    )
+    parser.add_argument(
+        "--local-frontend",
+        choices=("direct", "feature"),
+        default="direct",
+        help=(
+            "Local acoustic frontend: direct uses the FAST-LIVO2-style "
+            "point/intensity-to-map update; feature uses motion-seeded KLT "
+            "side-scan tracks lifted into co-registered MBES XYZ and writes "
+            "only their observable along-track component"
+        ),
+    )
+    parser.add_argument(
+        "--feature-retain-direct-mbes-state-update",
+        action="store_true",
+        help=(
+            "hybrid ablation: in feature mode also retain the direct MBES "
+            "point-to-local-map ESIKF state write"
+        ),
+    )
+    parser.add_argument(
+        "--feature-subframe-pings",
+        type=int,
+        default=4,
+        help="distinct physical pings accumulated into one feature odometry factor",
+    )
+    parser.add_argument(
+        "--feature-maximum-features",
+        type=int,
+        default=900,
+        help="maximum texture features retained from one canonical sonar image",
+    )
+    parser.add_argument(
+        "--feature-minimum-matches",
+        type=int,
+        default=24,
+        help="minimum mutual image/XYZ correspondences for a relative factor",
+    )
+    parser.add_argument(
+        "--feature-ransac-residual-m",
+        type=float,
+        default=0.70,
+        help="3-D correspondence consensus scale for feature geometry",
+    )
+    parser.add_argument(
+        "--feature-compute-backend",
+        choices=("cpu", "cuda", "auto"),
+        default="cpu",
+        help=(
+            "feature geometry compute backend: cuda batches all RANSAC "
+            "hypotheses on GPU, auto permits a CPU fallback"
+        ),
+    )
+    parser.add_argument(
         "--mbes-group-pings",
         type=int,
         default=1,
@@ -246,6 +317,23 @@ def parse_args() -> argparse.Namespace:
             "treat --mbes-group-pings as a causal sliding local submap; "
             "after seeding, every physical ping produces one update while "
             "only the oldest aligned ping enters the frozen reference map"
+        ),
+    )
+    parser.add_argument(
+        "--local-map-history-s",
+        type=float,
+        default=0.0,
+        help=(
+            "temporal fixed lag of the causal local surfel reference; zero "
+            "keeps historical geometry indefinitely"
+        ),
+    )
+    parser.add_argument(
+        "--enable-mbes-footprint-overlap-weighting",
+        action="store_true",
+        help=(
+            "retain every single-ping residual once while scaling information "
+            "by the newly covered along-track footprint fraction"
         ),
     )
     parser.add_argument(
@@ -372,6 +460,14 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=10,
         help="optimize after this many accepted direct-intensity graph factors",
+    )
+    parser.add_argument(
+        "--disable-local-intensity-state-update",
+        action="store_true",
+        help=(
+            "run side-scan alignment non-committing for graph factors and "
+            "mapping, avoiding a second local-state update from the same echo"
+        ),
     )
     parser.add_argument(
         "--trajectory-sample-interval-s",
@@ -1020,6 +1116,14 @@ def parse_args() -> argparse.Namespace:
         )
         or args.local_intensity_surface_consistency_std_m <= 0.0
         or args.mbes_group_pings < 1
+        or args.feature_subframe_pings < 2
+        or args.feature_maximum_features < 16
+        or args.feature_minimum_matches < 3
+        or not math.isfinite(args.feature_ransac_residual_m)
+        or args.feature_ransac_residual_m <= 0.0
+        or not 0.0 <= args.subgrid_reflectivity_amplitude <= 0.75
+        or not math.isfinite(args.local_map_history_s)
+        or args.local_map_history_s < 0.0
         or args.association_map_half_extent_m < 0.0
         or 0.0 < args.association_map_half_extent_m < 150.0
         or args.slam_voxel_size_m <= 0.0
@@ -1210,6 +1314,21 @@ def parse_args() -> argparse.Namespace:
             "association half extent "
             "must be zero or at least 150 m; map/terrain strides and voxel "
             "sizes must be positive; progress distance must be positive"
+        )
+    if args.local_map_history_s > 0.0 and (
+        args.mbes_group_pings != 1 or args.enable_mbes_sliding_window
+    ):
+        parser.error(
+            "--local-map-history-s requires --mbes-group-pings 1 and a "
+            "non-sliding current observation"
+        )
+    if (
+        args.enable_mbes_footprint_overlap_weighting
+        and args.mbes_group_pings != 1
+    ):
+        parser.error(
+            "--enable-mbes-footprint-overlap-weighting requires "
+            "--mbes-group-pings 1"
         )
     if args.survey_pattern == "full-map-route" and not args.survey_route.is_file():
         parser.error(f"survey route does not exist: {args.survey_route}")
@@ -1406,6 +1525,7 @@ from isaacsim.oceansim.slam import (
     ESIKFConfig,
     FastSonarSLAM,
     FastSonarSLAMConfig,
+    FeatureSonarOdometryConfig,
     GlobalPoseEvidence,
     GlobalTerrainRelocalizer,
     GlobalTerrainRelocalizerConfig,
@@ -1436,6 +1556,7 @@ from isaacsim.oceansim.slam import (
 )
 from isaacsim.oceansim.slam.large_scale_sim import (
     LargeScaleSensorSimulator,
+    unresolved_reflectivity_multiplier,
 )
 from isaacsim.oceansim.slam.math3d import rotation_from_rpy, rpy_from_rotation
 from isaacsim.oceansim.slam.real_bathymetry import (
@@ -2400,6 +2521,20 @@ def main() -> int:
     slam_associator = _make_slam_associator()
     slam_association_label = _slam_association_label(slam_associator)
 
+    spatial_reflectivity_resolver = None
+    if ARGS.subgrid_reflectivity_amplitude > 0.0:
+        def spatial_reflectivity_resolver(x, y):
+            measured = np.asarray(
+                world_model.reflectivity(x, y, measured_only=True),
+                dtype=np.float64,
+            )
+            measured = np.nan_to_num(
+                measured, nan=0.0, posinf=0.0, neginf=0.0
+            )
+            return measured * unresolved_reflectivity_multiplier(
+                x, y, ARGS.subgrid_reflectivity_amplitude
+            )
+
     sonar = BathymetricSideScanSonarSensor(
         prim_path="/World/Vehicle/bathymetric_sidescan",
         name="Integrated bathymetric side-scan",
@@ -2426,6 +2561,7 @@ def main() -> int:
         # The V2 document does not state frequency. Zero is the existing
         # message-level sentinel for "unspecified", not a physical 0 Hz ping.
         center_frequency_hz=0.0,
+        spatial_reflectivity_resolver=spatial_reflectivity_resolver,
         range_noise_std=0.028,
         multiplicative_noise_std=0.04,
         additive_noise_std=0.008,
@@ -2481,6 +2617,17 @@ def main() -> int:
     )
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
+            local_frontend_mode=ARGS.local_frontend,
+            feature_retain_direct_mbes_state_update=(
+                ARGS.feature_retain_direct_mbes_state_update
+            ),
+            feature_odometry=FeatureSonarOdometryConfig(
+                subframe_pings=ARGS.feature_subframe_pings,
+                maximum_features=ARGS.feature_maximum_features,
+                minimum_matches=ARGS.feature_minimum_matches,
+                ransac_residual_m=ARGS.feature_ransac_residual_m,
+                compute_backend=ARGS.feature_compute_backend,
+            ),
             filter=ESIKFConfig(
                 gyro_bias_max_norm=imu_bias_limit,
                 sonar_max_points=ARGS.slam_max_points,
@@ -2501,6 +2648,9 @@ def main() -> int:
                 sonar_observable_subspace_projection=(
                     ARGS.local_observability_mode == "hard"
                 ),
+                sonar_state_update_policy=(
+                    ARGS.local_sonar_state_update_policy.replace("-", "_")
+                ),
             ),
             voxel_size=ARGS.slam_voxel_size_m,
             intensity_voxel_size=ARGS.intensity_voxel_size_m,
@@ -2511,6 +2661,10 @@ def main() -> int:
             ),
             mbes_group_pings=ARGS.mbes_group_pings,
             mbes_sliding_window_enabled=ARGS.enable_mbes_sliding_window,
+            local_map_history_duration_s=ARGS.local_map_history_s,
+            mbes_footprint_overlap_weighting_enabled=(
+                ARGS.enable_mbes_footprint_overlap_weighting
+            ),
             sidescan_min_range=0.0,
             sidescan_max_range=sonar_profile.maximum_range_m,
             intensity_min_separation_pings=(
@@ -2522,6 +2676,9 @@ def main() -> int:
                 ARGS.intensity_submap_anchor_interval_s
             ),
             intensity_updates_enabled=not ARGS.disable_intensity_updates,
+            intensity_local_state_update_enabled=(
+                not ARGS.disable_local_intensity_state_update
+            ),
             trajectory_sample_interval_s=ARGS.trajectory_sample_interval_s,
             map_to_odom_soft_correction_enabled=(
                 ARGS.enable_map_to_odom_soft_correction
@@ -5483,14 +5640,36 @@ def main() -> int:
             "[OceanSim SLAM] co-registered acoustic front end: "
             f"{raw_returns_per_ping} raw XYZ+intensity samples produce both "
             f"bathymetry and the 16-row side-scan image; "
+            f"Local mode {ARGS.local_frontend}; "
             f"{geometry_update_description}"
             f"{ARGS.intensity_group_pings} acquisition(s) per update at "
             f"{ARGS.ping_hz / ARGS.intensity_group_pings:g} Hz; "
             f"causal reference separation {ARGS.intensity_reference_delay_pings} "
             f"ping, registration cells {ARGS.intensity_voxel_size_m:g} m; "
-            f"local weak directions use {ARGS.local_observability_mode} weighting.",
+            f"local weak directions use {ARGS.local_observability_mode} weighting; "
+            f"acoustic state policy {ARGS.local_sonar_state_update_policy}; "
+            + (
+                f"historical surfel lag {ARGS.local_map_history_s:g} s; "
+                if ARGS.local_map_history_s > 0.0
+                else "unbounded historical surfel map; "
+            )
+            + (
+                "side-scan alignment is graph-only."
+                if ARGS.disable_local_intensity_state_update
+                else "side-scan alignment may update Local."
+            ),
             flush=True,
         )
+        if ARGS.local_frontend == "feature":
+            print(
+                "[OceanSim SLAM] feature compute: requested "
+                f"{ARGS.feature_compute_backend}, active "
+                f"{slam.feature_odometry.active_compute_backend} on "
+                f"{slam.feature_odometry.compute_device}; 256 motion "
+                "hypotheses are evaluated as one batched operation and the "
+                "selected consensus is refined in float64 on CPU.",
+                flush=True,
+            )
         print(
             f"[OceanSim] route envelope "
             f"{route_report.x_range_m[1] - route_report.x_range_m[0]:.0f} x "
@@ -8734,6 +8913,23 @@ def main() -> int:
                 ],
                 "new_dvl_residual_gate_added": False,
                 "posterior_covariance_retracted_after_state_injection": True,
+                "mbes_state_update_policy": (
+                    ARGS.local_sonar_state_update_policy
+                ),
+                # The acoustic residual Jacobian contains pose columns only.
+                # A full Kalman update may still change nuisance states via
+                # cross-covariance; that is indirect state inference.
+                "mbes_updates_velocity_or_bias_directly": False,
+                "mbes_allows_velocity_or_bias_cross_covariance_update": bool(
+                    ARGS.local_sonar_state_update_policy == "full"
+                ),
+                "mbes_world_yaw_not_frozen": bool(
+                    ARGS.local_sonar_state_update_policy
+                    in {"full", "pose", "position-yaw"}
+                ),
+                "same_ping_intensity_updates_local_state": bool(
+                    not ARGS.disable_local_intensity_state_update
+                ),
             },
             "algorithm": (
                 "OceanSim acoustic FAST-LIVO2 adaptation with joint "
@@ -8747,8 +8943,14 @@ def main() -> int:
                     "IMU propagation with DVL velocity and pressure depth"
                 ),
                 "local_acoustic_esikf": (
-                    "self-built surfel/intensity-map relative acoustic ESIKF; "
-                    "no prior-map correction"
+                    "single-current-ping to causal historical surfel-map "
+                    "relative acoustic ESIKF; side-scan alignment "
+                    + (
+                        "is non-committing and remains available to the graph; "
+                        if ARGS.disable_local_intensity_state_update
+                        else "may also update the local state; "
+                    )
+                    + "no prior-map correction"
                 ),
                 "online_global_slam": (
                     (
@@ -9094,6 +9296,17 @@ def main() -> int:
             "measured_backscatter_coverage_fraction": float(
                 world_model.backscatter_coverage_fraction
             ),
+            "subgrid_reflectivity_amplitude": float(
+                ARGS.subgrid_reflectivity_amplitude
+            ),
+            "reflectivity_provenance": (
+                "measured USGS 5 m mosaic only"
+                if ARGS.subgrid_reflectivity_amplitude == 0.0
+                else (
+                    "measured USGS 5 m envelope plus explicitly synthetic "
+                    "world-fixed unresolved scattering"
+                )
+            ),
             "bounds_utm_m": world_model.metadata.get("bounds_utm_m", {}),
             "vehicle": "LSTS/OceanScan LAUV",
             "sonar_profile": sonar_profile.to_metadata(),
@@ -9263,6 +9476,51 @@ def main() -> int:
                 ARGS.local_intensity_surface_consistency_std_m
             ),
             "local_observability_mode": ARGS.local_observability_mode,
+            "local_frontend": ARGS.local_frontend,
+            "feature_retain_direct_mbes_state_update": bool(
+                ARGS.feature_retain_direct_mbes_state_update
+            ),
+            "feature_subframe_pings": ARGS.feature_subframe_pings,
+            "feature_maximum_features": ARGS.feature_maximum_features,
+            "feature_minimum_matches": ARGS.feature_minimum_matches,
+            "feature_ransac_residual_m": (
+                ARGS.feature_ransac_residual_m
+            ),
+            "feature_compute_backend_requested": (
+                ARGS.feature_compute_backend
+            ),
+            "feature_compute_backend_active": (
+                slam.feature_odometry.active_compute_backend
+            ),
+            "feature_compute_device": slam.feature_odometry.compute_device,
+            "feature_association_method": (
+                slam.config.feature_odometry.association_method
+            ),
+            "feature_state_update_policy": (
+                slam.config.feature_odometry.state_update_policy
+            ),
+            "feature_along_track_noise_floor_m": (
+                slam.config.feature_odometry.position_noise_floor_m
+            ),
+            "feature_cross_track_noise_floor_m": (
+                slam.config.feature_odometry.cross_track_position_noise_floor_m
+            ),
+            "feature_yaw_noise_floor_deg": (
+                slam.config.feature_odometry.yaw_noise_floor_deg
+            ),
+            "feature_prediction_correction_scale_m": (
+                slam.config.feature_odometry.prediction_correction_scale_m
+            ),
+            "local_sonar_state_update_policy": (
+                ARGS.local_sonar_state_update_policy
+            ),
+            "local_map_history_s": ARGS.local_map_history_s,
+            "mbes_footprint_overlap_weighting_enabled": bool(
+                ARGS.enable_mbes_footprint_overlap_weighting
+            ),
+            "local_intensity_state_update_enabled": bool(
+                not ARGS.disable_local_intensity_state_update
+            ),
             "local_intensity_map_coregisters_surface_elevation": True,
             "intensity_min_singular_ratio": (
                 ARGS.intensity_min_singular_ratio
@@ -10195,6 +10453,18 @@ def main() -> int:
                 if ARGS.enable_mbes_sliding_window
                 else 1.0
             ),
+            "local_map_history_pings": diagnostics.local_map_history_pings,
+            "local_map_evicted_pings": diagnostics.local_map_evicted_pings,
+            "local_map_evicted_points": diagnostics.local_map_evicted_points,
+            "last_mbes_footprint_information_scale": (
+                diagnostics.last_mbes_footprint_information_scale
+            ),
+            "mean_mbes_footprint_information_scale": (
+                diagnostics.mean_mbes_footprint_information_scale
+            ),
+            "minimum_mbes_footprint_information_scale": (
+                diagnostics.minimum_mbes_footprint_information_scale
+            ),
             "association_map_half_extent_m": (
                 ARGS.association_map_half_extent_m
             ),
@@ -10261,6 +10531,59 @@ def main() -> int:
             ),
             "accepted_geometry_updates": diagnostics.accepted_sonar_updates,
             "rejected_geometry_updates": diagnostics.rejected_sonar_updates,
+            "feature_frames": diagnostics.feature_odometry.frames,
+            "feature_pair_attempts": (
+                diagnostics.feature_odometry.pair_attempts
+            ),
+            "feature_accepted_pairs": (
+                diagnostics.feature_odometry.accepted_pairs
+            ),
+            "feature_rejected_pairs": (
+                diagnostics.feature_odometry.rejected_pairs
+            ),
+            "feature_completed_subframes": (
+                diagnostics.feature_odometry.completed_subframes
+            ),
+            "feature_filter_updates": diagnostics.feature_filter_updates,
+            "feature_filter_update_failures": (
+                diagnostics.feature_filter_update_failures
+            ),
+            "feature_rejection_reasons": (
+                diagnostics.feature_odometry.rejection_reasons
+            ),
+            "feature_mean_pair_inlier_ratio": (
+                diagnostics.feature_odometry.mean_pair_inlier_ratio
+            ),
+            "feature_mean_pair_rmse_m": (
+                diagnostics.feature_odometry.mean_pair_rmse_m
+            ),
+            "feature_compute_backend_requested": (
+                diagnostics.feature_odometry.requested_compute_backend
+            ),
+            "feature_compute_backend_active": (
+                diagnostics.feature_odometry.active_compute_backend
+            ),
+            "feature_compute_device": (
+                diagnostics.feature_odometry.compute_device
+            ),
+            "feature_cuda_ransac_calls": (
+                diagnostics.feature_odometry.cuda_ransac_calls
+            ),
+            "feature_cpu_ransac_calls": (
+                diagnostics.feature_odometry.cpu_ransac_calls
+            ),
+            "feature_cuda_fallbacks": (
+                diagnostics.feature_odometry.cuda_fallbacks
+            ),
+            "feature_mean_frame_build_ms": (
+                diagnostics.feature_odometry.mean_frame_build_ms
+            ),
+            "feature_mean_pair_estimation_ms": (
+                diagnostics.feature_odometry.mean_pair_estimation_ms
+            ),
+            "feature_mean_ransac_ms": (
+                diagnostics.feature_odometry.mean_ransac_ms
+            ),
             "accepted_intensity_updates": diagnostics.accepted_intensity_updates,
             "accepted_local_intensity_updates": (
                 diagnostics.accepted_local_intensity_updates
@@ -10273,6 +10596,9 @@ def main() -> int:
             ),
             "accepted_graph_seeded_intensity_updates": (
                 diagnostics.accepted_graph_seeded_intensity_updates
+            ),
+            "accepted_graph_only_intensity_updates": (
+                diagnostics.accepted_graph_only_intensity_updates
             ),
             "rejected_intensity_updates": diagnostics.rejected_intensity_updates,
             "committed_geometry_groups": diagnostics.committed_geometry_groups,

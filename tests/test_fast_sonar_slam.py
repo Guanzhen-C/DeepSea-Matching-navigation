@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from pathlib import Path
 
 import numpy as np
@@ -254,6 +255,59 @@ def test_point_to_surfel_update_corrects_vertical_pose_error() -> None:
     assert abs(estimator.state.position[2]) < 0.08
 
 
+def test_position_yaw_sonar_update_does_not_train_inertial_nuisance_state() -> None:
+    surfels = SurfelVoxelMap(
+        voxel_size=1.5,
+        min_points=4,
+        max_planarity=0.2,
+        max_plane_distance=1.0,
+    )
+    grid_x, grid_y = np.meshgrid(
+        np.linspace(-8.0, 8.0, 40), np.linspace(-8.0, 8.0, 40)
+    )
+    map_points = np.column_stack(
+        (grid_x.ravel(), grid_y.ravel(), np.full(grid_x.size, -10.0))
+    )
+    surfels.add_points(map_points)
+    generator = np.random.default_rng(814)
+    root = generator.normal(size=(15, 15)) * 0.01
+    covariance = root @ root.T + np.eye(15) * 3.0e-4
+    estimator = AcousticESIKF(
+        ESIKFConfig(
+            sonar_state_update_policy="position_yaw",
+            sonar_noise_floor=0.05,
+            sonar_max_translation_step=0.5,
+            sonar_max_rotation_step_deg=2.0,
+            degeneracy_eigenvalue=1.0,
+        )
+    )
+    estimator.initialize(
+        0.0,
+        rotation=so3_exp(np.deg2rad([0.4, -0.3, 1.2])),
+        position=np.array([0.0, 0.0, 0.2]),
+        velocity=np.array([1.4, -0.2, 0.03]),
+        gyro_bias=np.array([1.0e-4, -2.0e-4, 3.0e-4]),
+        accel_bias=np.array([0.01, -0.02, 0.015]),
+        covariance=covariance,
+    )
+    before = estimator.state.copy()
+
+    result = estimator.update_sonar(map_points[::8], surfels)
+
+    assert result.accepted
+    assert result.rmse_after < result.rmse_before
+    assert abs(estimator.state.position[2]) < abs(before.position[2])
+    np.testing.assert_allclose(estimator.state.velocity, before.velocity, atol=0.0)
+    np.testing.assert_allclose(estimator.state.gyro_bias, before.gyro_bias, atol=0.0)
+    np.testing.assert_allclose(estimator.state.accel_bias, before.accel_bias, atol=0.0)
+    np.testing.assert_allclose(
+        estimator.state.covariance[6:15, 6:15],
+        before.covariance[6:15, 6:15],
+        rtol=2.0e-12,
+        atol=2.0e-13,
+    )
+
+
 def test_sonar_information_scale_tempers_overlapping_window_likelihood() -> None:
     surfels = SurfelVoxelMap(
         voxel_size=1.5,
@@ -310,6 +364,151 @@ def test_surfel_map_slides_without_leaving_stale_point_counts() -> None:
     assert surfels.point_count == 3
     assert len(surfels) == 1
     assert surfels.revision == revision + 1
+
+
+def test_surfel_map_exact_batch_removal_restores_surviving_statistics() -> None:
+    generator = np.random.default_rng(812)
+    first = generator.normal(size=(240, 3)) * np.array([2.0, 1.5, 0.08])
+    second = generator.normal(size=(180, 3)) * np.array([2.0, 1.5, 0.08])
+    first[:, 2] -= 12.0
+    second[:, 2] -= 12.0
+    first_intensity = generator.uniform(0.05, 0.9, first.shape[0])
+    second_intensity = generator.uniform(0.05, 0.9, second.shape[0])
+    actual = SurfelVoxelMap(
+        voxel_size=1.5, min_points=4, min_tangent_ratio=0.01
+    )
+    expected = SurfelVoxelMap(
+        voxel_size=1.5, min_points=4, min_tangent_ratio=0.01
+    )
+    actual.add_points(first, first_intensity)
+    actual.add_points(second, second_intensity)
+    expected.add_points(second, second_intensity)
+
+    removed = actual.remove_points(first, first_intensity)
+
+    assert removed == first.shape[0]
+    assert actual.point_count == expected.point_count
+    assert actual.mature_voxel_count == expected.mature_voxel_count
+    assert actual._voxels.keys() == expected._voxels.keys()
+    for key, actual_stats in actual._voxels.items():
+        expected_stats = expected._voxels[key]
+        assert actual_stats.count == expected_stats.count
+        np.testing.assert_allclose(
+            actual_stats.mean, expected_stats.mean, rtol=2.0e-12, atol=2.0e-12
+        )
+        np.testing.assert_allclose(
+            actual_stats.scatter,
+            expected_stats.scatter,
+            rtol=2.0e-10,
+            atol=2.0e-11,
+        )
+        assert actual_stats.intensity_sum == pytest.approx(
+            expected_stats.intensity_sum, rel=2.0e-12, abs=2.0e-12
+        )
+
+
+def test_surfel_map_fixed_lag_removal_is_stable_at_utm_coordinates() -> None:
+    """Sliding sufficient statistics must not lose precision in map CRS."""
+
+    generator = np.random.default_rng(815)
+    actual = SurfelVoxelMap(
+        voxel_size=1.5, min_points=4, min_tangent_ratio=0.01
+    )
+    history: deque[tuple[np.ndarray, np.ndarray]] = deque()
+    for ping_index in range(320):
+        along_track = 500_000.0 + 0.3 * ping_index
+        cross_track = np.linspace(4_100_000.0 - 45.0, 4_100_000.0 + 45.0, 233)
+        points = np.column_stack(
+            (
+                np.full(cross_track.size, along_track)
+                + generator.normal(0.0, 0.015, cross_track.size),
+                cross_track,
+                -80.0
+                + 0.7 * np.sin((cross_track - 4_100_000.0) / 18.0)
+                + generator.normal(0.0, 0.01, cross_track.size),
+            )
+        )
+        intensities = generator.uniform(0.05, 0.95, points.shape[0])
+        actual.add_points(points, intensities)
+        history.append((points, intensities))
+        if len(history) > 150:
+            retired_points, retired_intensities = history.popleft()
+            actual.remove_points(retired_points, retired_intensities)
+
+    expected = SurfelVoxelMap(
+        voxel_size=1.5, min_points=4, min_tangent_ratio=0.01
+    )
+    for points, intensities in history:
+        expected.add_points(points, intensities)
+
+    assert actual.point_count == expected.point_count
+    assert actual.mature_voxel_count == expected.mature_voxel_count
+    assert actual._voxels.keys() == expected._voxels.keys()
+    for key, actual_stats in actual._voxels.items():
+        expected_stats = expected._voxels[key]
+        assert actual_stats.count == expected_stats.count
+        np.testing.assert_allclose(
+            actual_stats.mean, expected_stats.mean, rtol=0.0, atol=2.0e-9
+        )
+        np.testing.assert_allclose(
+            actual_stats.scatter,
+            expected_stats.scatter,
+            rtol=2.0e-8,
+            atol=2.0e-8,
+        )
+
+
+def test_position_yaw_sonar_policy_owns_only_world_yaw_and_position() -> None:
+    estimator = AcousticESIKF(
+        ESIKFConfig(sonar_state_update_policy="position_yaw")
+    )
+    estimator.initialize(
+        0.0, rotation=so3_exp(np.deg2rad([9.0, -7.0, 31.0]))
+    )
+    projector = estimator._sonar_correction_projector(estimator.state)
+    yaw_axis = estimator.state.rotation.T @ np.array([0.0, 0.0, 1.0])
+    yaw_axis /= np.linalg.norm(yaw_axis)
+    tilt_axis = np.cross(yaw_axis, np.array([1.0, 0.0, 0.0]))
+    tilt_axis /= np.linalg.norm(tilt_axis)
+
+    np.testing.assert_allclose(projector[0:3, 0:3] @ yaw_axis, yaw_axis)
+    np.testing.assert_allclose(projector[0:3, 0:3] @ tilt_axis, 0.0, atol=1e-14)
+    np.testing.assert_allclose(projector[3:6, 3:6], np.eye(3))
+    np.testing.assert_allclose(projector[6:15], 0.0)
+
+
+def test_position_sonar_policy_excludes_attitude_and_inertial_states() -> None:
+    estimator = AcousticESIKF(ESIKFConfig(sonar_state_update_policy="position"))
+    estimator.initialize(
+        0.0, rotation=so3_exp(np.deg2rad([9.0, -7.0, 31.0]))
+    )
+
+    projector = estimator._sonar_correction_projector(estimator.state)
+
+    np.testing.assert_allclose(projector[0:3], 0.0)
+    np.testing.assert_allclose(projector[3:6, 3:6], np.eye(3))
+    np.testing.assert_allclose(projector[6:15], 0.0)
+
+
+def test_partial_sonar_covariance_preserves_excluded_state_blocks() -> None:
+    generator = np.random.default_rng(813)
+    root = generator.normal(size=(15, 15)) * 0.02
+    prior = root @ root.T + np.eye(15) * 4.0e-4
+    full_posterior = prior - 0.15 * (
+        prior @ np.linalg.pinv(prior, rcond=1.0e-12) @ prior
+    )
+    estimator = AcousticESIKF(
+        ESIKFConfig(sonar_state_update_policy="position_yaw")
+    )
+    estimator.initialize(0.0)
+    projector = estimator._sonar_correction_projector(estimator.state)
+
+    partial = estimator._partial_update_covariance(
+        prior, full_posterior, projector
+    )
+
+    np.testing.assert_allclose(partial[6:15, 6:15], prior[6:15, 6:15])
+    assert np.linalg.eigvalsh(partial)[0] > 0.0
 
 
 def test_surfel_association_box_preserves_revisitable_history() -> None:
@@ -1063,6 +1262,204 @@ def test_causal_sliding_mbes_window_updates_each_ping_without_self_insertion(
     assert len(slam._mbes_group) == 2
 
 
+@pytest.mark.parametrize(
+    ("retain_direct_update", "expected_update_calls"),
+    ((False, 0), (True, 2)),
+)
+def test_feature_frontend_direct_mbes_state_update_is_opt_in(
+    monkeypatch,
+    retain_direct_update: bool,
+    expected_update_calls: int,
+) -> None:
+    point_count = 96
+    cross_track = np.linspace(-12.0, 12.0, point_count)
+    points = np.column_stack(
+        (
+            0.1 * np.sin(cross_track),
+            cross_track,
+            -10.0 - 0.02 * cross_track,
+        )
+    )
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            local_frontend_mode="feature",
+            feature_retain_direct_mbes_state_update=retain_direct_update,
+            bootstrap_pings=1,
+            surfel_min_points=3,
+            mbes_group_pings=1,
+            intensity_updates_enabled=False,
+        )
+    )
+    slam.initialize(0.0)
+    update_calls = 0
+
+    def accepted_update(current_points, surfel_map, *, information_scale=1.0):
+        nonlocal update_calls
+        update_calls += 1
+        return SonarUpdateResult(
+            accepted=True,
+            correspondences=current_points.shape[0],
+            inliers=current_points.shape[0],
+            iterations=1,
+            rmse_before=0.2,
+            rmse_after=0.1,
+            minimum_translation_eigenvalue=1.0,
+            information_condition=2.0,
+            adaptive_weight=1.0,
+            rotation_observable_rank=3,
+            translation_observable_rank=3,
+            rotation_correction_deg=0.0,
+            translation_correction=0.0,
+            information_scale=information_scale,
+        )
+
+    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
+    for ping_index in range(1, 4):
+        slam.filter.state.timestamp = float(ping_index)
+        slam.filter.state.position[0] = 0.3 * float(ping_index - 1)
+        slam.process_mbes(points)
+
+    diagnostics = slam.diagnostics()
+    assert update_calls == expected_update_calls
+    assert diagnostics.accepted_sonar_updates == expected_update_calls
+    # Disabling the local state write never discards the MBES observations:
+    # they still populate the local map and backend products.
+    assert diagnostics.committed_geometry_groups == 3
+    assert diagnostics.map_points == 3 * point_count
+
+
+def test_single_ping_fixed_lag_uses_each_observation_once_and_only_as_history(
+    monkeypatch,
+) -> None:
+    point_count = 48
+    cross_track = np.linspace(-2.0, 2.0, point_count)
+    points = np.column_stack(
+        (
+            0.05 * np.sin(cross_track),
+            cross_track,
+            -10.0 - 0.02 * cross_track,
+        )
+    )
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            filter=ESIKFConfig(sonar_max_points=48),
+            bootstrap_pings=1,
+            surfel_min_points=3,
+            mbes_group_pings=1,
+            mbes_sliding_window_enabled=False,
+            local_map_history_duration_s=2.0,
+            intensity_updates_enabled=False,
+        )
+    )
+    slam.initialize(0.0)
+    update_sizes: list[int] = []
+    reference_sizes: list[int] = []
+
+    def accepted_update(current_points, surfel_map, *, information_scale=1.0):
+        update_sizes.append(int(current_points.shape[0]))
+        reference_sizes.append(int(surfel_map.point_count))
+        return SonarUpdateResult(
+            accepted=True,
+            correspondences=current_points.shape[0],
+            inliers=current_points.shape[0],
+            iterations=1,
+            rmse_before=0.2,
+            rmse_after=0.1,
+            minimum_translation_eigenvalue=1.0,
+            information_condition=2.0,
+            adaptive_weight=1.0,
+            rotation_observable_rank=3,
+            translation_observable_rank=3,
+            rotation_correction_deg=0.0,
+            translation_correction=0.0,
+            information_scale=information_scale,
+        )
+
+    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
+    for ping_index in range(1, 6):
+        slam.filter.state.timestamp = float(ping_index)
+        slam.filter.state.position[0] = 0.3 * float(ping_index - 1)
+        slam.process_mbes(points)
+
+    diagnostics = slam.diagnostics()
+    assert update_sizes == [point_count] * 4
+    # The current ping is committed only after its update. At a 2 s lag and
+    # 1 Hz synthetic cadence, timestamps on the lag boundary remain causal
+    # history, so at most two earlier pings are visible during an update.
+    assert reference_sizes == [point_count, 2 * point_count, 2 * point_count, 2 * point_count]
+    assert diagnostics.local_map_history_pings == 3
+    assert diagnostics.local_map_evicted_pings == 2
+    assert diagnostics.local_map_evicted_points == 2 * point_count
+    assert diagnostics.map_points == 3 * point_count
+    assert diagnostics.total_geometry_points_committed == 5 * point_count
+
+
+def test_single_ping_footprint_overlap_scales_information_not_update_count(
+    monkeypatch,
+) -> None:
+    point_count = 48
+    points = np.column_stack(
+        (
+            np.zeros(point_count),
+            np.linspace(-4.0, 4.0, point_count),
+            np.full(point_count, -10.0),
+        )
+    )
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            bootstrap_pings=1,
+            surfel_min_points=3,
+            mbes_group_pings=1,
+            mbes_footprint_overlap_weighting_enabled=True,
+            intensity_updates_enabled=False,
+        )
+    )
+    slam.initialize(0.0)
+    information_scales: list[float] = []
+
+    def accepted_update(current_points, surfel_map, *, information_scale=1.0):
+        information_scales.append(float(information_scale))
+        return SonarUpdateResult(
+            accepted=True,
+            correspondences=current_points.shape[0],
+            inliers=current_points.shape[0],
+            iterations=1,
+            rmse_before=0.2,
+            rmse_after=0.1,
+            minimum_translation_eigenvalue=1.0,
+            information_condition=2.0,
+            adaptive_weight=1.0,
+            rotation_observable_rank=3,
+            translation_observable_rank=3,
+            rotation_correction_deg=0.0,
+            translation_correction=0.0,
+            information_scale=information_scale,
+        )
+
+    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
+    for ping_index in range(1, 5):
+        slam.filter.state.timestamp = float(ping_index)
+        slam.filter.state.position[0] = 0.3 * float(ping_index - 1)
+        slam.process_mbes(points, direct_intensity_coverage_m=1.2)
+
+    assert information_scales == pytest.approx([0.25, 0.25, 0.25])
+    diagnostics = slam.diagnostics()
+    assert diagnostics.accepted_sonar_updates == 3
+    assert diagnostics.last_mbes_footprint_information_scale == pytest.approx(0.25)
+    assert diagnostics.minimum_mbes_footprint_information_scale == pytest.approx(0.25)
+
+
+def test_fixed_lag_mode_rejects_overlapping_current_ping_windows() -> None:
+    with pytest.raises(ValueError, match="one non-sliding MBES ping"):
+        FastSonarSLAM(
+            FastSonarSLAMConfig(
+                mbes_group_pings=8,
+                mbes_sliding_window_enabled=True,
+                local_map_history_duration_s=30.0,
+            )
+        )
+
+
 def test_single_v2_ping_uses_its_simultaneous_row_aperture() -> None:
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
@@ -1105,6 +1502,76 @@ def test_single_v2_ping_uses_its_simultaneous_row_aperture() -> None:
 
     diagnostics = slam.diagnostics()
     assert diagnostics.formed_intensity_strips == 1
+
+
+def test_same_ping_intensity_graph_only_mode_never_writes_local_state(
+    monkeypatch,
+) -> None:
+    point_count = 48
+    points = np.column_stack(
+        (
+            np.linspace(-0.5, 0.5, point_count),
+            np.linspace(-12.0, 12.0, point_count),
+            np.full(point_count, -10.0),
+        )
+    )
+    values = np.linspace(0.1, 0.9, point_count)
+    slam = FastSonarSLAM(
+        FastSonarSLAMConfig(
+            bootstrap_pings=100,
+            mbes_group_pings=1,
+            intensity_bootstrap_pings=0,
+            intensity_min_separation_pings=1,
+            intensity_group_pings=1,
+            intensity_min_group_span_m=1.0,
+            intensity_local_state_update_enabled=False,
+        )
+    )
+    slam.initialize(0.0)
+    slam.intensity_map.add_points(
+        points,
+        values,
+        heading_rad=0.0,
+        observation_id=0,
+        anchor_id=-1,
+    )
+    observed_commit_modes: list[bool] = []
+
+    def accepted_intensity(*args, commit_state=True, **kwargs):
+        observed_commit_modes.append(bool(commit_state))
+        if commit_state:
+            slam.filter.state.position[0] += 100.0
+        return IntensityUpdateResult(
+            accepted=True,
+            correspondences=point_count,
+            inliers=point_count,
+            iterations=1,
+            rmse_before=0.2,
+            rmse_after=0.1,
+            yaw_information=20.0,
+            overlap_ratio=0.8,
+            normalized_correlation=0.9,
+            planar_observable_rank=3,
+            gain=1.0,
+            offset=0.0,
+            rotation_correction_deg=0.1,
+            translation_correction=0.1,
+        )
+
+    monkeypatch.setattr(slam.filter, "update_intensity", accepted_intensity)
+    for ping_index in range(1, 3):
+        slam.filter.state.timestamp = float(ping_index)
+        slam.process_mbes(
+            points,
+            coregistered_backscatter=values,
+            direct_intensity_coverage_m=1.2,
+        )
+
+    assert observed_commit_modes == [False]
+    assert slam.state.position[0] == 0.0
+    diagnostics = slam.diagnostics()
+    assert diagnostics.accepted_graph_only_intensity_updates == 1
+    assert diagnostics.accepted_local_intensity_updates == 0
     assert diagnostics.skipped_intensity_strips == 0
     assert diagnostics.last_intensity_strip_span_m == pytest.approx(1.2)
     assert diagnostics.pending_intensity_batches == 1

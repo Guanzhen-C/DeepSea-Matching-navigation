@@ -15,7 +15,14 @@ import time
 import numpy as np
 
 from .intensity_map import AcousticIntensityMap
-from .math3d import project_to_so3, skew, so3_exp, transform_points
+from .math3d import (
+    project_to_so3,
+    rpy_from_rotation,
+    skew,
+    so3_exp,
+    transform_points,
+    wrap_angle,
+)
 from .surfel_map import SurfelAssociationBatch, SurfelVoxelMap
 
 
@@ -61,6 +68,11 @@ class ESIKFConfig:
     sonar_max_velocity_step: float = 0.08
     sonar_max_gyro_bias_step: float = 2.0e-5
     sonar_max_accel_bias_step: float = 0.002
+    # Ownership of one acoustic scan-to-map correction. ``position`` updates
+    # world position only; ``position_yaw`` additionally admits the world-yaw
+    # component. DVL/depth/IMU retain ownership of the excluded states. These
+    # are Schmidt-style partial updates, not residual gates.
+    sonar_state_update_policy: str = "full"
     intensity_noise_std: float = 0.09
     intensity_huber_delta: float = 0.14
     intensity_min_correspondences: int = 18
@@ -240,6 +252,16 @@ class AcousticESIKF:
         surfel_associator=None,
     ) -> None:
         self.config = config or ESIKFConfig()
+        if self.config.sonar_state_update_policy not in {
+            "full",
+            "pose",
+            "position",
+            "position_yaw",
+        }:
+            raise ValueError(
+                "sonar_state_update_policy must be full, pose, position, "
+                "or position_yaw"
+            )
         self.sensor_rotation_body = (
             np.eye(3, dtype=np.float64)
             if sensor_rotation_body is None
@@ -647,6 +669,62 @@ class AcousticESIKF:
         projector[3:6, 3:6] = 0.0
         return projector
 
+    @staticmethod
+    def _world_yaw_projector(state: InertialState) -> np.ndarray:
+        """Project a right/body attitude error onto world vertical yaw."""
+
+        yaw_axis_body = state.rotation.T @ np.array(
+            [0.0, 0.0, 1.0], dtype=np.float64
+        )
+        yaw_axis_body /= max(float(np.linalg.norm(yaw_axis_body)), 1.0e-12)
+        return np.outer(yaw_axis_body, yaw_axis_body)
+
+    def _sonar_correction_projector(
+        self, state: InertialState
+    ) -> np.ndarray:
+        """Return the state subspace owned by acoustic registration."""
+
+        policy = self.config.sonar_state_update_policy
+        if policy == "full":
+            return np.eye(15, dtype=np.float64)
+        projector = np.zeros((15, 15), dtype=np.float64)
+        projector[3:6, 3:6] = np.eye(3, dtype=np.float64)
+        if policy == "pose":
+            projector[0:3, 0:3] = np.eye(3, dtype=np.float64)
+        elif policy == "position_yaw":
+            projector[0:3, 0:3] = self._world_yaw_projector(state)
+        return projector
+
+    @staticmethod
+    def _partial_update_covariance(
+        prior_covariance: np.ndarray,
+        full_posterior_covariance: np.ndarray,
+        correction_projector: np.ndarray,
+    ) -> np.ndarray:
+        """Return Joseph-equivalent covariance for a projected Kalman gain.
+
+        With ``D = P- - P+`` for the full optimal update and correction
+        projector ``A``, the partial-update covariance is
+        ``P- - A D - D A.T + A D A.T``.  Excluded state blocks therefore do
+        not become spuriously overconfident through acoustic cross-covariance.
+        """
+
+        prior = np.asarray(prior_covariance, dtype=np.float64).reshape(15, 15)
+        posterior = np.asarray(
+            full_posterior_covariance, dtype=np.float64
+        ).reshape(15, 15)
+        projector = np.asarray(
+            correction_projector, dtype=np.float64
+        ).reshape(15, 15)
+        information_gain = prior - posterior
+        projected = (
+            prior
+            - projector @ information_gain
+            - information_gain @ projector.T
+            + projector @ information_gain @ projector.T
+        )
+        return 0.5 * (projected + projected.T)
+
     def _kalman_update(
         self,
         residual: np.ndarray,
@@ -792,6 +870,131 @@ class AcousticESIKF:
             jacobian,
             np.array([[measurement_variance]]),
             mahalanobis_limit=16.0,
+        )
+
+    def update_horizontal_position_along_axis(
+        self,
+        measured_projection_m: float,
+        axis_world_xy: np.ndarray,
+        variance: float,
+    ) -> bool:
+        """Fuse one observable horizontal position projection.
+
+        This is the appropriate measurement model for the V2 eight-row
+        side-scan KLT frontend: row flow observes displacement along the
+        vehicle-forward aperture, but it does not independently observe
+        cross-track position or heading.  A correction projector guarantees
+        that those unobserved pose components cannot move through incidental
+        state cross-covariance.
+        """
+
+        measurement = float(measured_projection_m)
+        direction_xy = np.asarray(axis_world_xy, dtype=np.float64).reshape(2)
+        measurement_variance = float(variance)
+        norm = float(np.linalg.norm(direction_xy))
+        if (
+            not np.isfinite(measurement)
+            or not np.isfinite(direction_xy).all()
+            or norm <= 1.0e-12
+            or not np.isfinite(measurement_variance)
+            or measurement_variance <= 0.0
+        ):
+            return False
+        direction_xy /= norm
+        direction_world = np.array(
+            [direction_xy[0], direction_xy[1], 0.0], dtype=np.float64
+        )
+        predicted = float(direction_xy @ self.state.position[:2])
+        jacobian = np.zeros((1, 15), dtype=np.float64)
+        jacobian[0, 3:5] = direction_xy
+
+        correction_projector = np.zeros((15, 15), dtype=np.float64)
+        world_projector = np.outer(direction_world, direction_world)
+        correction_projector[3:6, 3:6] = world_projector
+        correction_projector[6:9, 6:9] = world_projector
+        body_direction = self.state.rotation.T @ direction_world
+        body_direction /= max(float(np.linalg.norm(body_direction)), 1.0e-12)
+        correction_projector[12:15, 12:15] = np.outer(
+            body_direction, body_direction
+        )
+        return self._kalman_update(
+            np.array([measurement - predicted], dtype=np.float64),
+            jacobian,
+            np.array(
+                [[max(measurement_variance, self.config.covariance_floor)]],
+                dtype=np.float64,
+            ),
+            correction_projector=correction_projector,
+        )
+
+    def update_planar_pose(
+        self,
+        position_xy_world: np.ndarray,
+        yaw_world_rad: float,
+        covariance: np.ndarray,
+    ) -> bool:
+        """Fuse a relative-odometry-derived x/y/world-yaw observation.
+
+        The caller owns temporal correlation with the past anchor and must
+        include that anchor uncertainty in ``covariance``.  This method adds
+        no innovation gate: feature consensus and observability are decided
+        by the frontend that generated the measurement.  Depth remains owned
+        by the pressure sensor, while ordinary cross-covariance is allowed to
+        correct velocity and IMU biases as in a visual-inertial update.
+        """
+
+        position = np.asarray(position_xy_world, dtype=np.float64).reshape(2)
+        yaw = float(yaw_world_rad)
+        measurement_covariance = np.asarray(
+            covariance, dtype=np.float64
+        ).reshape(3, 3)
+        if (
+            not np.isfinite(position).all()
+            or not np.isfinite(yaw)
+            or not np.isfinite(measurement_covariance).all()
+        ):
+            return False
+        measurement_covariance = 0.5 * (
+            measurement_covariance + measurement_covariance.T
+        )
+        try:
+            eigenvalues, eigenvectors = np.linalg.eigh(
+                measurement_covariance
+            )
+        except np.linalg.LinAlgError:
+            return False
+        eigenvalues = np.maximum(eigenvalues, self.config.covariance_floor)
+        measurement_covariance = (
+            eigenvectors * eigenvalues
+        ) @ eigenvectors.T
+
+        predicted_yaw = float(rpy_from_rotation(self.state.rotation)[2])
+        residual = np.array(
+            [
+                position[0] - self.state.position[0],
+                position[1] - self.state.position[1],
+                float(wrap_angle(yaw - predicted_yaw)),
+            ],
+            dtype=np.float64,
+        )
+        jacobian = np.zeros((3, 15), dtype=np.float64)
+        jacobian[0:2, 3:5] = np.eye(2, dtype=np.float64)
+        yaw_axis_body = self.state.rotation.T @ np.array(
+            [0.0, 0.0, 1.0], dtype=np.float64
+        )
+        yaw_axis_body /= max(float(np.linalg.norm(yaw_axis_body)), 1.0e-12)
+        jacobian[2, 0:3] = yaw_axis_body
+
+        correction_projector = np.eye(15, dtype=np.float64)
+        correction_projector[0:3, 0:3] = np.outer(
+            yaw_axis_body, yaw_axis_body
+        )
+        correction_projector[3:6, 3:6] = np.diag([1.0, 1.0, 0.0])
+        return self._kalman_update(
+            residual,
+            jacobian,
+            measurement_covariance,
+            correction_projector=correction_projector,
         )
 
     def points_sensor_to_world(
@@ -965,6 +1168,7 @@ class AcousticESIKF:
         base = self.state.copy()
         prior_covariance = self._regularize_covariance(base.covariance)
         prior_information = np.linalg.pinv(prior_covariance, rcond=1.0e-10)
+        correction_projector = self._sonar_correction_projector(base)
         correction = np.zeros(15, dtype=np.float64)
         rmse_before = np.nan
         adaptive_weight = 1.0
@@ -1125,6 +1329,7 @@ class AcousticESIKF:
                 step = np.linalg.lstsq(
                     system, right_hand_side, rcond=1.0e-10
                 )[0]
+            step = correction_projector @ step
 
             max_rotation = np.deg2rad(
                 self.config.sonar_max_rotation_step_deg
@@ -1281,6 +1486,12 @@ class AcousticESIKF:
             final_covariance = np.linalg.inv(final_information)
         except np.linalg.LinAlgError:
             final_covariance = np.linalg.pinv(final_information, rcond=1.0e-10)
+        if self.config.sonar_state_update_policy != "full":
+            final_covariance = self._partial_update_covariance(
+                prior_covariance,
+                final_covariance,
+                correction_projector,
+            )
         reset = self._error_reset_jacobian(correction)
         final_state.covariance = self._regularize_covariance(
             reset @ final_covariance @ reset.T

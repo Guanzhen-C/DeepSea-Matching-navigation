@@ -1,5 +1,44 @@
 # Changelog
 
+- Added an optional CUDA compute backend for the feature Local frontend. The
+  256 prediction-centred RANSAC hypotheses are evaluated in one PyTorch CUDA
+  batch in float64; the selected consensus, observability test, covariance,
+  and filter update retain the CPU implementation. Canonical shared-return
+  raster construction was also vectorized without changing pixel-to-XYZ
+  ownership. A 60 m matched-seed replay produced bit-identical sampled
+  trajectories with zero fallbacks, reduced mean RANSAC time from 54.25 to
+  6.42 ms, and reduced the complete replay from 24.78 to 15.29 s. Explicit
+  `cuda` fails if unavailable; `auto` records and permits a CPU fallback.
+- Added an experimental water-adapted MBES–SSS feature-hybrid Local frontend.
+  Motion-seeded pyramid KLT follows GFTT side-scan features across the eight
+  simultaneous V2 rows and lifts tracks back to their co-registered XYZ
+  returns. The estimator preserves the propagated full SE(3) motion and fuses
+  only the physically supported along-track scalar; a state projector prevents
+  the side-scan observation from directly changing cross-track position,
+  attitude, or depth. In feature mode, direct point-to-self-built-map MBES
+  state writes are now opt-in: the returns remain in feature lifting, mapping,
+  graph, and Global, but a 1 km ablation showed that their Local correction
+  eventually reinforced strip-map deformation. Added a deterministic replay
+  A/B runner, a dedicated Isaac launcher, and an opt-in world-fixed unresolved-
+  scattering model for the 0.15 m sensor/5 m public-raster resolution gap. The
+  model is explicitly reported as synthetic and zero preserves the measured
+  map. Seven 60 m cross-region/seed runs reduced mean RMSE from 0.403 m DR and
+  0.439 m direct MBES to 0.356 m, winning all seven RMSE comparisons. The 1 km
+  run reduced RMSE from 4.390/5.374 m to 3.788 m; retaining both Local state
+  writes produced 4.773 m. These are simulation regressions, not full-route or
+  sea-trial claims.
+- Replaced the formal front end's overlapping eight-physical-ping source
+  window with one current integrated ping per 5 Hz geometry update. The
+  current ping is matched exactly once against an older 30 s fixed-lag surfel
+  submap and inserted only after convergence. Per-voxel removable sufficient
+  statistics now use voxel-local coordinates, making repeated retirement
+  stable on UTM maps. Adjacent 1.2 m footprints retain every residual but
+  receive continuous information weighting from their approximately 25% new
+  coverage. The production Local correction is position-only; single-ping
+  MBES does not write yaw/velocity/IMU biases, while multi-ping Global
+  bathymetry/backscatter matching continues to estimate absolute x/y/yaw.
+  Same-ping side-scan alignment remains available to the graph without a
+  second Local-state write. No new residual or truth-dependent gate was added.
 - Changed both V2 Isaac Sim presets to one physically shared 5 Hz MBES +
   side-scan acquisition clock. At 1.5 m/s, adjacent 1.2 m footprints advance
   0.30 m and overlap by 0.90 m. The 250 m full-map preset explicitly allows
