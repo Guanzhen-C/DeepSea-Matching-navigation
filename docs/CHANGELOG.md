@@ -1,5 +1,11 @@
 # Changelog
 
+- Changed the production terrain-navigation output policy to graph-only.
+  Particle cohorts and whole-map candidates are still propagated, scored, and
+  independently confirmed, but an unconfirmed MAP alias can no longer replace
+  the published GTSAM pose. Confirmed, graph-ready acquisitions retain the
+  existing robust factor/reseeding path. The former `multimodal-map` behavior
+  remains an explicit diagnostic ablation.
 - Added an optional CUDA compute backend for the feature Local frontend. The
   256 prediction-centred RANSAC hypotheses are evaluated in one PyTorch CUDA
   batch in float64; the selected consensus, observability test, covariance,

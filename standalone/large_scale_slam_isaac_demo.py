@@ -796,10 +796,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--terrain-particle-online-output",
         choices=("graph", "multimodal-map", "always-map"),
-        default="multimodal-map",
+        default="graph",
         help=(
             "published online map-pose source when the ordinary terrain "
-            "particle backend is enabled: graph only, particle MAP only "
+            "particle backend is enabled (default: graph): graph only, "
+            "particle MAP only "
             "while multiple ordinary modes or active whole-map recovery "
             "modes exist, or ordinary particle MAP whenever a spatial "
             "hypothesis beats the explicit null state"
@@ -1549,6 +1550,7 @@ from isaacsim.oceansim.slam import (
     make_terrain_recovery_config,
     motion_compensate_to_body,
     sanitize_for_strict_json,
+    select_terrain_navigation_output_source,
     se3_relative_pose_error_by_distance,
     terrain_prior_prefit_bypass_allowed,
     voxel_average_backscatter_patch,
@@ -4992,14 +4994,27 @@ def main() -> int:
         become a graph factor.
         """
 
+        global_active_cohorts = (
+            0
+            if global_cohort_tracker is None
+            else global_cohort_tracker.active_cohort_count
+        )
+        ordinary_active_cohorts = (
+            0
+            if terrain_backend_particle_tracker is None
+            else terrain_backend_particle_tracker.active_cohort_count
+        )
+        preferred_source = select_terrain_navigation_output_source(
+            ARGS.terrain_particle_online_output,
+            global_active_cohorts=global_active_cohorts,
+            ordinary_active_cohorts=ordinary_active_cohorts,
+        )
         particle_map_pose2 = None
         particle_map_source = None
-        use_global_particle_map = bool(
-            global_cohort_tracker is not None
-            and ARGS.terrain_particle_online_output != "graph"
-            and global_cohort_tracker.active_cohort_count > 0
-        )
-        if use_global_particle_map:
+        if (
+            preferred_source == "global_terrain_particle_map"
+            and global_cohort_tracker is not None
+        ):
             local_pose2 = np.array(
                 [
                     slam.state.position[0],
@@ -5013,17 +5028,10 @@ def main() -> int:
             )
             if particle_map_pose2 is not None:
                 particle_map_source = "global_terrain_particle_map"
-        use_ordinary_particle_map = bool(
-            particle_map_pose2 is None
-            and not use_global_particle_map
+        if (
+            preferred_source == "ordinary_terrain_particle_map"
             and terrain_backend_particle_tracker is not None
-            and ARGS.terrain_particle_online_output != "graph"
-            and (
-                ARGS.terrain_particle_online_output == "always-map"
-                or terrain_backend_particle_tracker.active_cohort_count > 1
-            )
-        )
-        if use_ordinary_particle_map:
+        ):
             local_pose2 = np.array(
                 [
                     slam.state.position[0],
@@ -8362,6 +8370,33 @@ def main() -> int:
                                 0
                                 if global_cohort_tracker is None
                                 else int(global_cohort_tracker.confirmations)
+                            ),
+                            "terrain_backend_active_cohorts": (
+                                0
+                                if terrain_backend_particle_tracker is None
+                                else int(
+                                    terrain_backend_particle_tracker
+                                    .active_cohort_count
+                                )
+                            ),
+                            "terrain_backend_cohort_confirmations": (
+                                0
+                                if terrain_backend_particle_tracker is None
+                                else int(
+                                    terrain_backend_particle_tracker
+                                    .confirmations
+                                )
+                            ),
+                            "terrain_navigation_output_policy": (
+                                ARGS.terrain_particle_online_output
+                            ),
+                            "terrain_navigation_output_source": (
+                                terrain_navigation_output_stats["last_source"]
+                            ),
+                            "terrain_navigation_particle_map_updates": int(
+                                terrain_navigation_output_stats[
+                                    "particle_map_updates"
+                                ]
                             ),
                             "terrain_consecutive_failed_observations": (
                                 terrain_recovery.consecutive_failed_observations

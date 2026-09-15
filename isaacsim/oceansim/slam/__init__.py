@@ -59,6 +59,7 @@ from .global_tracking import (
     ParticleLikelihoodObservation,
     TerrainNavigationFilter,
     TerrainNavigationFilterConfig,
+    select_terrain_navigation_output_source,
 )
 from .terrain_particle_likelihood import (
     AcousticTerrainParticleLikelihood,
@@ -147,6 +148,7 @@ __all__ = [
     "ParticleLikelihoodObservation",
     "TerrainNavigationFilter",
     "TerrainNavigationFilterConfig",
+    "select_terrain_navigation_output_source",
     "InertialState",
     "IntensityMapSample",
     "IntensityUpdateResult",

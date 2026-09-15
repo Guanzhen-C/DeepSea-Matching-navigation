@@ -388,18 +388,13 @@ into a pose-graph factor. The recovery chain is:
    but formerly confident false mode. Overlapping windows receive discounted
    weight, and three non-overlapping ping/time windows must support the same
    cohort before confirmation.
-5. The default `multimodal-map` output policy uses the GTSAM estimate while
-   the posterior has one spatial mode. When two or more separated modes exist,
-   GTSAM cannot represent that discrete ambiguity, so the most-probable valid
-   cohort is propagated by every new local odometry pose and supplies the
-   provisional online `map -> odom` target. This is output-only: it never
-   writes into the local 15-state ESIKF and does not by itself create a graph
-   constraint. Only a confirmed cohort re-seeds an outage segment and
-   authorizes a robust Cauchy x/y/yaw factor for GTSAM. Time and rate limits
-   keep changes continuous, and all matchers continue to use the unsmoothed
-   graph pose. While whole-map recovery is active, its global cohort MAP takes
-   priority over the ordinary bounded tracker until confirmation or rejection.
-   `graph` and `always-map` policies remain available for A/B.
+5. The production `graph` output policy always publishes the GTSAM estimate.
+   Particle cohorts remain internal while terrain is ambiguous; only a cohort
+   confirmed by independent acquisition windows can re-seed an outage segment
+   and authorize a robust Cauchy x/y/yaw factor for GTSAM. This prevents a
+   plausible but unconfirmed whole-map alias from causing a temporary Global
+   pose jump. The former provisional `multimodal-map` behavior and the more
+   aggressive `always-map` behavior remain explicit diagnostic A/B modes.
 
 With `--enable-terrain-cohort-particle-backend`, the same particle policy also
 sits in front of ordinary bounded terrain factors. Persistent proposals retain
@@ -410,8 +405,8 @@ three non-overlapping observations must support the same propagated mode
 before GTSAM authorization.
 
 The graph never receives the recursive particle posterior as if it were a new
-sensor measurement, although its MAP mode is the provisional online output
-during multimodal tracking.
+sensor measurement, and the production online output does not publish an
+unconfirmed MAP mode.
 For every independent 300-ping window, the confirmed
 cohort selects only a local basin. A deterministic search and finite-
 difference Laplace approximation then derive the pose and information matrix

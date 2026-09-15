@@ -167,7 +167,9 @@ standalone/run_v2_feature_hybrid_slam_isaac.sh
 ```
 
 该启动器使用 GTSAM 增量固定滞后图、cohort 粒子地形跟踪、3-D BBS
-验证和 `map -> odom` 软输出校正；可追加 `--headless`。在现有旧版
+验证和 `map -> odom` 软输出校正；正式输出采用 graph-only 策略，未确认
+粒子只在内部保留，经过独立观测确认后才可通过因子影响 GTSAM。可追加
+`--headless`。在现有旧版
 长程 Isaac 进程结束前，不并发启动第二实例，以避免内存/显存争用造成
 “Isaac Sim Python 无响应”。为与上述前端实验一致，启动器从路线 30 km
 处开始并使用仿真真值初始化；这只用于评估相对里程计，不是可部署初始
@@ -176,7 +178,7 @@ standalone/run_v2_feature_hybrid_slam_isaac.sh
 ## 自动测试
 
 ```text
-371 passed, 1 warning in 8.21s
+378 passed, 1 warning in 8.56s
 ```
 
 唯一警告来自 SciPy 对当前 NumPy 版本范围的提示，与本前端测试无关。

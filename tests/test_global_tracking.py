@@ -9,6 +9,7 @@ from oceansim.slam import (
     GlobalPoseEvidence,
     ParticleLikelihoodObservation,
     reporting_covariance_from_information,
+    select_terrain_navigation_output_source,
 )
 
 
@@ -83,6 +84,67 @@ def _particle_observation(
         patch_end_timestamp_s=float(end_id),
         patch_start_observation_id=start_id,
         patch_end_observation_id=end_id,
+    )
+
+
+@pytest.mark.parametrize(
+    ("policy", "global_count", "ordinary_count", "expected"),
+    [
+        ("graph", 3, 4, "pose_graph"),
+        ("multimodal-map", 2, 4, "global_terrain_particle_map"),
+        ("multimodal-map", 0, 2, "ordinary_terrain_particle_map"),
+        ("multimodal-map", 0, 1, "pose_graph"),
+        ("always-map", 0, 1, "ordinary_terrain_particle_map"),
+        ("always-map", 0, 0, "pose_graph"),
+    ],
+)
+def test_online_output_source_policy(
+    policy, global_count, ordinary_count, expected
+) -> None:
+    assert (
+        select_terrain_navigation_output_source(
+            policy,
+            global_active_cohorts=global_count,
+            ordinary_active_cohorts=ordinary_count,
+        )
+        == expected
+    )
+
+
+def test_graph_output_keeps_unconfirmed_wrong_cohort_internal() -> None:
+    """A plausible but unconfirmed global alias must not become navigation."""
+
+    tracker = GlobalCohortTracker(_permissive_config(random_seed=41))
+    decision = tracker.update(
+        timestamp_s=1.0,
+        raw_pose2=np.zeros(3),
+        evidences=[
+            _evidence(
+                (45.0, -20.0, 0.2),
+                source_index=0,
+                start_id=0,
+                end_id=20,
+            )
+        ],
+    )
+
+    assert not decision.confirmed
+    assert tracker.maximum_a_posteriori_pose(np.zeros(3)) is not None
+    assert (
+        select_terrain_navigation_output_source(
+            "multimodal-map",
+            global_active_cohorts=tracker.active_cohort_count,
+            ordinary_active_cohorts=0,
+        )
+        == "global_terrain_particle_map"
+    )
+    assert (
+        select_terrain_navigation_output_source(
+            "graph",
+            global_active_cohorts=tracker.active_cohort_count,
+            ordinary_active_cohorts=0,
+        )
+        == "pose_graph"
     )
 
 
