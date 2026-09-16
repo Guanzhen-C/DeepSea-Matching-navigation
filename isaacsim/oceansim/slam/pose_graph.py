@@ -7,9 +7,9 @@ recognition, geometric MBES verification, and a robust planar pose graph.
 
 Survey AUVs are normally roll/pitch stabilised and have pressure depth, so the
 graph optimises the weakly drifting ``x, y, yaw`` states while the filter
-continues to own roll, pitch, depth, velocity, and IMU biases.  The historical
-NumPy batch solver remains the default reference, while a selectable GTSAM
-iSAM2 incremental fixed-lag backend supports controlled A/B experiments.
+continues to own roll, pitch, depth, velocity, and IMU biases. The production
+implementation is GTSAM iSAM2 with an incremental fixed-lag live window and a
+full-history diagnostic graph.
 """
 
 from __future__ import annotations
@@ -125,12 +125,7 @@ class PoseGraphConfig:
     intensity_seed_search_radius_m: float = 15.0
     intensity_seed_max_yaw_difference_deg: float = 25.0
     intensity_seed_max_candidates: int = 6
-    optimizer_iterations: int = 12
     sidescan_descriptor_bins: int = 32
-    # The solver is explicit so a run can change only the back end while
-    # preserving the acoustic front end and every generated factor.  NumPy is
-    # kept as the historical default; the GTSAM candidate must be requested.
-    optimizer_backend: str = "numpy_batch"
     fixed_lag_seconds: float = 180.0
     isam_relinearize_threshold: float = 0.01
     isam_relinearize_skip: int = 1
@@ -236,7 +231,7 @@ class PoseGraphDiagnostics:
     last_terrain_relocalization_translation_m: float = 0.0
     last_terrain_relocalization_yaw_deg: float = 0.0
     last_terrain_relocalization_anchor_index: int | None = None
-    optimizer_backend: str = "numpy_batch"
+    optimizer_backend: str = "gtsam_isam2_incremental_fixed_lag"
     isam_updates: int = 0
     fixed_lag_updates: int = 0
     fixed_lag_active_variables: int = 0
@@ -354,8 +349,8 @@ def _validated_psd_information(information: np.ndarray) -> np.ndarray:
     return 0.5 * (validated + validated.T)
 
 
-class PlanarPoseGraph:
-    """Small dense Gauss-Newton graph suitable for hundreds of keyframes."""
+class _PoseGraphFactorStore:
+    """Validated planar factor storage shared by the GTSAM solvers."""
 
     def __init__(self, config: PoseGraphConfig | None = None) -> None:
         self.config = config or PoseGraphConfig()
@@ -388,7 +383,7 @@ class PlanarPoseGraph:
 
     @property
     def backend_name(self) -> str:
-        return "numpy_batch"
+        raise NotImplementedError
 
     def add_pose(
         self, pose: np.ndarray, *, timestamp: float | None = None
@@ -507,7 +502,6 @@ class PlanarPoseGraph:
                 "robust_intensity_delta": float(
                     self.config.robust_intensity_delta
                 ),
-                "optimizer_iterations": int(self.config.optimizer_iterations),
                 "fixed_lag_seconds": float(self.config.fixed_lag_seconds),
                 "isam_relinearize_threshold": float(
                     self.config.isam_relinearize_threshold
@@ -653,105 +647,7 @@ class PlanarPoseGraph:
             cost += squared
         return cost
 
-    def optimize(self) -> np.ndarray:
-        count = self.poses.shape[0]
-        if count < 2 or (not self.edges and not self.priors):
-            return self.poses.copy()
-        poses = self.poses.copy()
-        self.initial_cost = self._cost(poses)
-        variable_count = 3 * (count - 1)  # Pose zero is the gauge anchor.
-        for _ in range(self.config.optimizer_iterations):
-            hessian = np.eye(variable_count, dtype=np.float64) * 1.0e-8
-            gradient = np.zeros(variable_count, dtype=np.float64)
-            for edge in self.edges:
-                error, jacobian_a, jacobian_b = _edge_error_and_jacobians(
-                    poses[edge.source], poses[edge.target], edge.measurement
-                )
-                information = edge.information
-                if edge.kind in ("loop", "intensity"):
-                    whitened_norm = np.sqrt(
-                        max(float(error @ information @ error), 0.0)
-                    )
-                    robust_delta = (
-                        self.config.robust_loop_delta
-                        if edge.kind == "loop"
-                        else self.config.robust_intensity_delta
-                    )
-                    if whitened_norm > robust_delta:
-                        information = information * (
-                            robust_delta / whitened_norm
-                        )
-
-                blocks = ((edge.source, jacobian_a), (edge.target, jacobian_b))
-                for node_i, jacobian_i in blocks:
-                    if node_i == 0:
-                        continue
-                    slice_i = slice(3 * (node_i - 1), 3 * node_i)
-                    gradient[slice_i] += jacobian_i.T @ information @ error
-                    for node_j, jacobian_j in blocks:
-                        if node_j == 0:
-                            continue
-                        slice_j = slice(3 * (node_j - 1), 3 * node_j)
-                        hessian[slice_i, slice_j] += (
-                            jacobian_i.T @ information @ jacobian_j
-                        )
-            for prior in self.priors:
-                # Pose zero is deliberately fixed even when an absolute
-                # observation is attached to it.
-                if prior.target == 0:
-                    continue
-                error = _prior_error(poses[prior.target], prior.measurement)
-                information = prior.information
-                if prior.robust:
-                    whitened_squared = max(
-                        float(error @ information @ error), 0.0
-                    )
-                    whitened_norm = np.sqrt(whitened_squared)
-                    robust_kernel, configured_delta = (
-                        self._prior_robust_policy(prior)
-                    )
-                    robust_delta = max(float(configured_delta), 1.0e-12)
-                    if robust_kernel == "huber":
-                        if whitened_norm > robust_delta:
-                            information = information * (
-                                robust_delta / whitened_norm
-                            )
-                    else:
-                        information = information * (
-                            1.0
-                            / (
-                                1.0
-                                + whitened_squared
-                                / (robust_delta * robust_delta)
-                            )
-                        )
-                target_slice = slice(
-                    3 * (prior.target - 1), 3 * prior.target
-                )
-                # The unary residual Jacobian is identity in world-frame
-                # pose coordinates (with yaw locally linear after wrapping).
-                gradient[target_slice] += information @ error
-                hessian[target_slice, target_slice] += information
-            try:
-                step = np.linalg.solve(hessian, -gradient)
-            except np.linalg.LinAlgError:
-                step = np.linalg.lstsq(hessian, -gradient, rcond=1.0e-10)[0]
-            if not np.isfinite(step).all():
-                break
-            poses[1:, :] += step.reshape(-1, 3)
-            poses[:, 2] = wrap_angle(poses[:, 2])
-            if float(np.max(np.abs(step))) < 1.0e-5:
-                break
-        self.poses = poses
-        self.final_cost = self._cost(poses)
-        self.optimization_runs += 1
-        self.optimization_boundaries.append(
-            (self.poses.shape[0], len(self.edges), len(self.priors))
-        )
-        return poses.copy()
-
-
-class GTSAMPlanarPoseGraph(PlanarPoseGraph):
+class GTSAMPlanarPoseGraph(_PoseGraphFactorStore):
     """Incremental GTSAM backend with a fixed-lag and a global iSAM2 graph.
 
     The fixed-lag smoother is the bounded real-time estimator and supplies the
@@ -1367,18 +1263,6 @@ class GTSAMPlanarPoseGraph(PlanarPoseGraph):
         return self.poses.copy()
 
 
-def _make_planar_pose_graph(config: PoseGraphConfig) -> PlanarPoseGraph:
-    backend = str(config.optimizer_backend).strip().lower()
-    if backend == "numpy_batch":
-        return PlanarPoseGraph(config)
-    if backend == "gtsam_fixed_lag_isam2":
-        return GTSAMPlanarPoseGraph(config)
-    raise ValueError(
-        "optimizer_backend must be 'numpy_batch' or "
-        "'gtsam_fixed_lag_isam2'"
-    )
-
-
 def acoustic_descriptor(
     points_body: np.ndarray,
     intensities: np.ndarray | None,
@@ -1641,7 +1525,7 @@ class AcousticPoseGraph:
 
     def __init__(self, config: PoseGraphConfig | None = None) -> None:
         self.config = config or PoseGraphConfig()
-        self.graph = _make_planar_pose_graph(self.config)
+        self.graph = GTSAMPlanarPoseGraph(self.config)
         self.keyframes: list[AcousticKeyframe] = []
         self.loop_edges: list[PoseGraphEdge] = []
         self._pending_loops: list[PoseGraphEdge] = []
@@ -1671,7 +1555,7 @@ class AcousticPoseGraph:
         self._geometry_keyframe_count = 0
 
     def reset(self) -> None:
-        self.graph = _make_planar_pose_graph(self.config)
+        self.graph = GTSAMPlanarPoseGraph(self.config)
         self.keyframes.clear()
         self.loop_edges.clear()
         self._pending_loops.clear()

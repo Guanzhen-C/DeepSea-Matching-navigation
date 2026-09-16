@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from oceansim.slam import AcousticPoseGraph, PlanarPoseGraph, PoseGraphConfig
+from oceansim.slam import (
+    AcousticPoseGraph,
+    GTSAMPlanarPoseGraph,
+    PoseGraphConfig,
+)
 from oceansim.slam.math3d import rotation_from_rpy, wrap_angle
 
 
@@ -48,7 +52,7 @@ def test_odometry_random_walk_information_is_invariant_to_keyframe_cadence() -> 
 
 
 def test_absolute_terrain_prior_corrects_planar_odometry_drift() -> None:
-    graph = PlanarPoseGraph(PoseGraphConfig(optimizer_iterations=30))
+    graph = GTSAMPlanarPoseGraph(PoseGraphConfig())
     graph.add_pose(np.array([0.0, 0.0, 0.0]))
     graph.add_pose(np.array([10.1, -0.05, 0.01]))
     graph.add_pose(np.array([20.2, -0.1, 0.02]))
@@ -86,9 +90,8 @@ def test_cauchy_terrain_kernel_bounds_a_gross_alias_more_than_huber() -> None:
     """A redescending loss should suppress a map alias, not delete its factor."""
 
     def optimized_endpoint(kernel: str) -> float:
-        graph = PlanarPoseGraph(
+        graph = GTSAMPlanarPoseGraph(
             PoseGraphConfig(
-                optimizer_iterations=50,
                 terrain_prior_robust_kernel=kernel,
                 robust_terrain_prior_delta=2.5,
             )
@@ -117,18 +120,20 @@ def test_cauchy_terrain_kernel_bounds_a_gross_alias_more_than_huber() -> None:
 
 def test_invalid_terrain_robust_kernel_is_rejected() -> None:
     with pytest.raises(ValueError, match="terrain_prior_robust_kernel"):
-        PlanarPoseGraph(PoseGraphConfig(terrain_prior_robust_kernel="invalid"))
+        GTSAMPlanarPoseGraph(
+            PoseGraphConfig(terrain_prior_robust_kernel="invalid")
+        )
 
     with pytest.raises(
         ValueError, match="relocalization_prior_robust_kernel"
     ):
-        PlanarPoseGraph(
+        GTSAMPlanarPoseGraph(
             PoseGraphConfig(relocalization_prior_robust_kernel="invalid")
         )
 
 
 def test_absolute_terrain_prior_wraps_yaw_at_pi() -> None:
-    graph = PlanarPoseGraph(PoseGraphConfig(optimizer_iterations=30))
+    graph = GTSAMPlanarPoseGraph(PoseGraphConfig())
     initial_yaw = -np.pi + 0.02
     matched_yaw = np.pi - 0.02
     graph.add_pose(np.zeros(3))
@@ -153,9 +158,8 @@ def test_absolute_terrain_prior_wraps_yaw_at_pi() -> None:
 
 
 def test_terrain_prior_robust_kernel_limits_a_large_outlier() -> None:
-    graph = PlanarPoseGraph(
+    graph = GTSAMPlanarPoseGraph(
         PoseGraphConfig(
-            optimizer_iterations=40,
             robust_terrain_prior_delta=2.5,
         )
     )
@@ -189,7 +193,6 @@ def test_confirmed_terrain_relocalization_rebases_an_unknown_initial_gauge() -> 
 
     backend = AcousticPoseGraph(
         PoseGraphConfig(
-            optimizer_iterations=30,
             terrain_prior_optimize_interval=1,
         )
     )
@@ -281,7 +284,7 @@ def test_cohort_confirmed_relocalization_keeps_bounded_influence_after_reseed() 
 
 
 def test_ordinary_and_relocalization_priors_use_separate_robust_policies() -> None:
-    graph = PlanarPoseGraph(
+    graph = GTSAMPlanarPoseGraph(
         PoseGraphConfig(
             terrain_prior_robust_kernel="huber",
             robust_terrain_prior_delta=2.5,
@@ -340,7 +343,6 @@ def test_confirmed_relocalization_can_cross_a_distant_graph_basin() -> None:
 
     backend = AcousticPoseGraph(
         PoseGraphConfig(
-            optimizer_iterations=30,
             terrain_prior_optimize_interval=1,
         )
     )
@@ -383,7 +385,6 @@ def test_confirmed_relocalization_starts_after_latest_absolute_anchor() -> None:
 
     backend = AcousticPoseGraph(
         PoseGraphConfig(
-            optimizer_iterations=50,
             terrain_prior_optimize_interval=100,
         )
     )

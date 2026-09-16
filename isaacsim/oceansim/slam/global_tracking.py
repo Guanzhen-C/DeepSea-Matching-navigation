@@ -37,35 +37,19 @@ from typing import Callable, Iterable
 import numpy as np
 
 
-_TERRAIN_NAVIGATION_OUTPUT_POLICIES = frozenset(
-    {"graph", "multimodal-map", "always-map"}
-)
-
-
 def select_terrain_navigation_output_source(
-    policy: str,
     *,
     global_active_cohorts: int,
     ordinary_active_cohorts: int,
 ) -> str:
-    """Select the preferred online map-pose source without inspecting truth.
+    """Select the validated online pose source without inspecting truth.
 
-    ``graph`` is the conservative navigation policy: particle cohorts may be
-    propagated and confirmed, but an unconfirmed MAP hypothesis is never
-    published as the vehicle pose. Once a cohort is independently confirmed,
-    the existing factor-authorization path can still re-anchor GTSAM.
-
-    The two MAP policies are retained as explicit diagnostic/ablation modes.
-    A selected particle tracker may still return no pose when its explicit
-    null hypothesis wins; callers must then fall back to ``pose_graph``.
+    Whole-map recovery hypotheses have priority. Multiple ordinary terrain
+    modes temporarily publish their particle MAP; once the posterior is
+    unimodal, GTSAM again supplies the public pose. A selected particle
+    tracker may still return no pose when its explicit null hypothesis wins,
+    in which case the caller falls back to GTSAM.
     """
-
-    normalized_policy = str(policy)
-    if normalized_policy not in _TERRAIN_NAVIGATION_OUTPUT_POLICIES:
-        raise ValueError(
-            "terrain navigation output policy must be one of "
-            f"{sorted(_TERRAIN_NAVIGATION_OUTPUT_POLICIES)}"
-        )
     counts = {
         "global_active_cohorts": global_active_cohorts,
         "ordinary_active_cohorts": ordinary_active_cohorts,
@@ -74,17 +58,9 @@ def select_terrain_navigation_output_source(
         if isinstance(value, bool) or int(value) != value or int(value) < 0:
             raise ValueError(f"{name} must be a nonnegative integer")
 
-    if normalized_policy == "graph":
-        return "pose_graph"
     if int(global_active_cohorts) > 0:
         return "global_terrain_particle_map"
-    if (
-        normalized_policy == "always-map"
-        and int(ordinary_active_cohorts) > 0
-    ) or (
-        normalized_policy == "multimodal-map"
-        and int(ordinary_active_cohorts) > 1
-    ):
+    if int(ordinary_active_cohorts) > 1:
         return "ordinary_terrain_particle_map"
     return "pose_graph"
 

@@ -20,6 +20,17 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# The full-map executable intentionally exposes one validated estimator
+# topology.  Numerical tuning remains configurable, but obsolete algorithm
+# switches are not: Local is the CUDA-capable feature/MBES frontend, Global is
+# cohort particle terrain tracking plus the GTSAM fixed-lag graph, and the
+# published map->odom transform follows the validated multimodal policy.
+LOCAL_FRONTEND = "feature"
+LOCAL_INTENSITY_STATE_UPDATE_ENABLED = False
+POSE_GRAPH_BACKEND = "gtsam-fixed-lag-isam2"
+TERRAIN_PARTICLE_ONLINE_OUTPUT = "multimodal-map"
+MAP_TO_ODOM_SOFT_CORRECTION_ENABLED = True
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -195,22 +206,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--slam-max-points",
-        type=int,
-        default=384,
-        help="maximum motion-compensated MBES points in each ESIKF update",
-    )
-    parser.add_argument(
-        "--local-sonar-noise-floor-m",
-        type=float,
-        default=0.30,
-        help=(
-            "continuous point-to-surfel model standard deviation used by the "
-            "local acoustic ESIKF; this is a covariance weight, not an "
-            "accept/reject threshold"
-        ),
-    )
-    parser.add_argument(
         "--local-intensity-noise-std",
         type=float,
         default=0.09,
@@ -227,45 +222,6 @@ def parse_args() -> argparse.Namespace:
             "Cauchy scale for disagreement between a direct side-scan "
             "sample and its co-registered local bathymetric surface; this "
             "continuously changes covariance and is not a rejection gate"
-        ),
-    )
-    parser.add_argument(
-        "--local-observability-mode",
-        choices=("continuous", "hard", "legacy"),
-        default="continuous",
-        help=(
-            "weak-direction handling for the local MBES ESIKF: continuous "
-            "spectral weighting is the production mode; hard projection and "
-            "the former whole-frame scalar weighting are reproducible ablations"
-        ),
-    )
-    parser.add_argument(
-        "--local-sonar-state-update-policy",
-        choices=("full", "pose", "position", "position-yaw"),
-        default="full",
-        help=(
-            "state subspace owned by local acoustic registration; "
-            "position is the production single-ping Schmidt update; "
-            "position-yaw is retained for observability experiments"
-        ),
-    )
-    parser.add_argument(
-        "--local-frontend",
-        choices=("direct", "feature"),
-        default="direct",
-        help=(
-            "Local acoustic frontend: direct uses the FAST-LIVO2-style "
-            "point/intensity-to-map update; feature uses motion-seeded KLT "
-            "side-scan tracks lifted into co-registered MBES XYZ and writes "
-            "only their observable along-track component"
-        ),
-    )
-    parser.add_argument(
-        "--feature-retain-direct-mbes-state-update",
-        action="store_true",
-        help=(
-            "hybrid ablation: in feature mode also retain the direct MBES "
-            "point-to-local-map ESIKF state write"
         ),
     )
     parser.add_argument(
@@ -326,14 +282,6 @@ def parse_args() -> argparse.Namespace:
         help=(
             "temporal fixed lag of the causal local surfel reference; zero "
             "keeps historical geometry indefinitely"
-        ),
-    )
-    parser.add_argument(
-        "--enable-mbes-footprint-overlap-weighting",
-        action="store_true",
-        help=(
-            "retain every single-ping residual once while scaling information "
-            "by the newly covered along-track footprint fraction"
         ),
     )
     parser.add_argument(
@@ -460,14 +408,6 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=10,
         help="optimize after this many accepted direct-intensity graph factors",
-    )
-    parser.add_argument(
-        "--disable-local-intensity-state-update",
-        action="store_true",
-        help=(
-            "run side-scan alignment non-committing for graph factors and "
-            "mapping, avoiding a second local-state update from the same echo"
-        ),
     )
     parser.add_argument(
         "--trajectory-sample-interval-s",
@@ -776,37 +716,6 @@ def parse_args() -> argparse.Namespace:
         help="minimum best-versus-second spatial-basin proposal score gap",
     )
     parser.add_argument(
-        "--enable-global-cohort-tracking",
-        action="store_true",
-        help=(
-            "retain every separated whole-map candidate across sonar epochs "
-            "with an explicit null hypothesis; only a dominant cohort "
-            "supported by independent ping windows may enter local refinement"
-        ),
-    )
-    parser.add_argument(
-        "--enable-terrain-cohort-particle-backend",
-        action="store_true",
-        help=(
-            "filter ordinary bathymetry/side-scan absolute matches through a "
-            "joint point-mass/cohort terrain-navigation filter before GTSAM "
-            "insertion"
-        ),
-    )
-    parser.add_argument(
-        "--terrain-particle-online-output",
-        choices=("graph", "multimodal-map", "always-map"),
-        default="graph",
-        help=(
-            "published online map-pose source when the ordinary terrain "
-            "particle backend is enabled (default: graph): graph only, "
-            "particle MAP only "
-            "while multiple ordinary modes or active whole-map recovery "
-            "modes exist, or ordinary particle MAP whenever a spatial "
-            "hypothesis beats the explicit null state"
-        ),
-    )
-    parser.add_argument(
         "--terrain-global-maximum-cohorts",
         type=int,
         default=48,
@@ -850,15 +759,6 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=20.0,
         help="minimum leading-cohort odds over the runner-up or null state",
-    )
-    parser.add_argument(
-        "--enable-bbs3d-global-verification",
-        action="store_true",
-        help=(
-            "verify every persistent whole-map candidate with the pinned "
-            "official 3D-BBS GPU implementation while holding pressure "
-            "depth and IMU roll/pitch fixed"
-        ),
     )
     parser.add_argument(
         "--bbs3d-global-translation-window-m",
@@ -927,8 +827,8 @@ def parse_args() -> argparse.Namespace:
         "--disable-intensity-updates",
         action="store_true",
         help=(
-            "build the acoustic appearance map but disable its ESIKF state "
-            "update for a geometry-only ablation"
+            "build the acoustic appearance map but disable non-committing "
+            "side-scan alignment and its GTSAM factors"
         ),
     )
     parser.add_argument(
@@ -944,16 +844,6 @@ def parse_args() -> argparse.Namespace:
         "--verify-sonar-backend",
         action="store_true",
         help="compare Warp ray ranges with the exact PhysX collision mesh at startup",
-    )
-    parser.add_argument(
-        "--slam-association-backend",
-        choices=("auto", "warp-cuda", "warp-cpu", "cpu"),
-        default="auto",
-        help=(
-            "point-to-surfel data association backend; auto uses exact Warp "
-            "CUDA lookup for batches >=256 when available and otherwise uses "
-            "the Python voxel map"
-        ),
     )
     parser.add_argument(
         "--bathymetry",
@@ -1020,15 +910,6 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--pose-graph-backend",
-        choices=("numpy-batch", "gtsam-fixed-lag-isam2"),
-        default="numpy-batch",
-        help=(
-            "planar pose-graph solver; selecting GTSAM changes only the "
-            "optimizer and preserves front-end states, factors, and matchers"
-        ),
-    )
-    parser.add_argument(
         "--pose-graph-fixed-lag-s",
         type=float,
         default=180.0,
@@ -1043,17 +924,6 @@ def parse_args() -> argparse.Namespace:
         "--pose-graph-isam-relinearize-skip",
         type=int,
         default=1,
-    )
-    parser.add_argument(
-        "--enable-map-to-odom-soft-correction",
-        "--enable-map-to-odom-soft-feedback",
-        dest="enable_map_to_odom_soft_correction",
-        action="store_true",
-        help=(
-            "continuously follow pose-graph corrections in the published "
-            "map->odom transform; the local ESIKF and matcher seed remain "
-            "unchanged"
-        ),
     )
     parser.add_argument(
         "--map-to-odom-translation-time-constant-s",
@@ -1107,9 +977,6 @@ def parse_args() -> argparse.Namespace:
         or args.ui_sonar_refresh_hz < 0.0
         or args.ping_hz <= 0.0
         or args.sonar_pings_in_water < 1
-        or args.slam_max_points < 32
-        or not math.isfinite(args.local_sonar_noise_floor_m)
-        or args.local_sonar_noise_floor_m <= 0.0
         or not math.isfinite(args.local_intensity_noise_std)
         or args.local_intensity_noise_std <= 0.0
         or not math.isfinite(
@@ -1306,7 +1173,7 @@ def parse_args() -> argparse.Namespace:
     ):
         parser.error(
             "duration must be non-negative; rates must be positive; "
-            "--slam-max-points must be >= 32; ping groups must be >= 1; "
+            "ping groups must be >= 1; "
             "--sonar-beams must be an even integer >= 32; "
             "--sonar-pings-in-water must be >= 1; "
             "--sidescan-imaging-rays-per-side must be >= 16; "
@@ -1322,14 +1189,6 @@ def parse_args() -> argparse.Namespace:
         parser.error(
             "--local-map-history-s requires --mbes-group-pings 1 and a "
             "non-sliding current observation"
-        )
-    if (
-        args.enable_mbes_footprint_overlap_weighting
-        and args.mbes_group_pings != 1
-    ):
-        parser.error(
-            "--enable-mbes-footprint-overlap-weighting requires "
-            "--mbes-group-pings 1"
         )
     if args.survey_pattern == "full-map-route" and not args.survey_route.is_file():
         parser.error(f"survey route does not exist: {args.survey_route}")
@@ -1390,14 +1249,6 @@ def parse_args() -> argparse.Namespace:
             "--enable-backscatter-map-matching requires "
             "--enable-terrain-map-matching"
         )
-    if (
-        args.enable_terrain_cohort_particle_backend
-        and not args.enable_terrain_map_matching
-    ):
-        parser.error(
-            "--enable-terrain-cohort-particle-backend requires "
-            "--enable-terrain-map-matching"
-        )
     if args.terrain_confirm_every_prior:
         if not args.enable_terrain_map_matching:
             parser.error(
@@ -1444,21 +1295,15 @@ def parse_args() -> argparse.Namespace:
                 "--terrain-global-window-pings must exceed the ordinary "
                 "terrain-matching window"
             )
-    if (
-        args.enable_global_cohort_tracking
-        and not args.enable_global_terrain_relocalization
-    ):
+    if not args.enable_global_terrain_relocalization:
         parser.error(
-            "--enable-global-cohort-tracking requires "
+            "the production Global tracker requires "
             "--enable-global-terrain-relocalization"
         )
-    if (
-        args.enable_bbs3d_global_verification
-        and not args.enable_global_cohort_tracking
-    ):
+    if not args.enable_terrain_map_matching:
         parser.error(
-            "--enable-bbs3d-global-verification requires "
-            "--enable-global-cohort-tracking"
+            "the production cohort backend requires "
+            "--enable-terrain-map-matching"
         )
     sys.argv = [sys.argv[0], *kit_args]
     return args
@@ -1725,62 +1570,6 @@ def _acoustic_backend_label(backend) -> str:
     if not getattr(backend, "is_cuda", False):
         return backend.execution_provider
     return f"{backend.execution_provider} ({backend.device_name})"
-
-
-def _make_slam_associator():
-    """Create the exact point-to-surfel lookup backend for the ESIKF."""
-
-    if ARGS.slam_association_backend == "cpu":
-        carb.log_info("[OceanSim SLAM] using Python CPU voxel association")
-        return None
-    if (
-        ARGS.slam_association_backend == "auto"
-        and ARGS.slam_max_points < 256
-    ):
-        carb.log_info(
-            "[OceanSim SLAM] retaining Python CPU association below 256 "
-            "points per update (measured launch/transfer crossover)"
-        )
-        return None
-
-    from isaacsim.oceansim.slam.warp_surfel_association import (
-        WarpSurfelAssociator,
-    )
-
-    if ARGS.slam_association_backend in ("auto", "warp-cuda"):
-        if not WarpSurfelAssociator.cuda_available():
-            if ARGS.slam_association_backend == "warp-cuda":
-                raise RuntimeError(
-                    "--slam-association-backend warp-cuda was requested but "
-                    "Warp cannot access a CUDA device"
-                )
-            carb.log_warn(
-                "[OceanSim SLAM] Warp CUDA unavailable; retaining Python CPU "
-                "voxel association"
-            )
-            return None
-        device = "cuda:0"
-        minimum_surfels = 0
-    else:
-        device = "cpu"
-        minimum_surfels = 0
-
-    associator = WarpSurfelAssociator(
-        device=device,
-        minimum_gpu_surfels=minimum_surfels,
-    )
-    warmup_ms = associator.warm_up()
-    carb.log_info(
-        f"[OceanSim SLAM] {associator.execution_provider} exact 27-neighbour "
-        f"association on {associator.device_name}; warm-up {warmup_ms:.1f} ms"
-    )
-    return associator
-
-
-def _slam_association_label(associator) -> str:
-    if associator is None:
-        return "Python CPU"
-    return f"{associator.execution_provider} ({associator.device_name})"
 
 
 def _finite_float_or_none(value) -> float | None:
@@ -2520,8 +2309,6 @@ def main() -> int:
     )
     acoustic_backend = _make_acoustic_backend(world_model)
     acoustic_backend_label = _acoustic_backend_label(acoustic_backend)
-    slam_associator = _make_slam_associator()
-    slam_association_label = _slam_association_label(slam_associator)
 
     spatial_reflectivity_resolver = None
     if ARGS.subgrid_reflectivity_amplitude > 0.0:
@@ -2619,10 +2406,6 @@ def main() -> int:
     )
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
-            local_frontend_mode=ARGS.local_frontend,
-            feature_retain_direct_mbes_state_update=(
-                ARGS.feature_retain_direct_mbes_state_update
-            ),
             feature_odometry=FeatureSonarOdometryConfig(
                 subframe_pings=ARGS.feature_subframe_pings,
                 maximum_features=ARGS.feature_maximum_features,
@@ -2632,8 +2415,6 @@ def main() -> int:
             ),
             filter=ESIKFConfig(
                 gyro_bias_max_norm=imu_bias_limit,
-                sonar_max_points=ARGS.slam_max_points,
-                sonar_noise_floor=ARGS.local_sonar_noise_floor_m,
                 intensity_noise_std=ARGS.local_intensity_noise_std,
                 intensity_surface_consistency_std=(
                     ARGS.local_intensity_surface_consistency_std_m
@@ -2643,15 +2424,6 @@ def main() -> int:
                 ),
                 intensity_min_singular_ratio=(
                     ARGS.intensity_min_singular_ratio
-                ),
-                sonar_continuous_observability_weighting=(
-                    ARGS.local_observability_mode == "continuous"
-                ),
-                sonar_observable_subspace_projection=(
-                    ARGS.local_observability_mode == "hard"
-                ),
-                sonar_state_update_policy=(
-                    ARGS.local_sonar_state_update_policy.replace("-", "_")
                 ),
             ),
             voxel_size=ARGS.slam_voxel_size_m,
@@ -2664,9 +2436,6 @@ def main() -> int:
             mbes_group_pings=ARGS.mbes_group_pings,
             mbes_sliding_window_enabled=ARGS.enable_mbes_sliding_window,
             local_map_history_duration_s=ARGS.local_map_history_s,
-            mbes_footprint_overlap_weighting_enabled=(
-                ARGS.enable_mbes_footprint_overlap_weighting
-            ),
             sidescan_min_range=0.0,
             sidescan_max_range=sonar_profile.maximum_range_m,
             intensity_min_separation_pings=(
@@ -2678,12 +2447,9 @@ def main() -> int:
                 ARGS.intensity_submap_anchor_interval_s
             ),
             intensity_updates_enabled=not ARGS.disable_intensity_updates,
-            intensity_local_state_update_enabled=(
-                not ARGS.disable_local_intensity_state_update
-            ),
             trajectory_sample_interval_s=ARGS.trajectory_sample_interval_s,
             map_to_odom_soft_correction_enabled=(
-                ARGS.enable_map_to_odom_soft_correction
+                MAP_TO_ODOM_SOFT_CORRECTION_ENABLED
             ),
             map_to_odom_translation_time_constant_s=(
                 ARGS.map_to_odom_translation_time_constant_s
@@ -2698,7 +2464,6 @@ def main() -> int:
                 ARGS.map_to_odom_maximum_yaw_rate_deg_s
             ),
             pose_graph=PoseGraphConfig(
-                optimizer_backend=ARGS.pose_graph_backend.replace("-", "_"),
                 fixed_lag_seconds=ARGS.pose_graph_fixed_lag_s,
                 isam_relinearize_threshold=(
                     ARGS.pose_graph_isam_relinearize_threshold
@@ -2739,7 +2504,6 @@ def main() -> int:
             ),
         ),
         sensor_translation_body=np.array([0.10, 0.0, -0.15]),
-        surfel_associator=slam_associator,
     )
     slam.initialize(
         0.0,
@@ -2963,9 +2727,8 @@ def main() -> int:
             768, ARGS.backscatter_match_maximum_points
         ),
     )
-    global_cohort_tracker = (
-        TerrainNavigationFilter(
-            TerrainNavigationFilterConfig(
+    global_cohort_tracker = TerrainNavigationFilter(
+        TerrainNavigationFilterConfig(
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -2989,14 +2752,10 @@ def main() -> int:
                 confirmation_odds_over_second=(
                     ARGS.terrain_global_cohort_confirmation_odds
                 ),
-            )
         )
-        if ARGS.enable_global_cohort_tracking
-        else None
     )
-    terrain_backend_particle_tracker = (
-        TerrainNavigationFilter(
-            TerrainNavigationFilterConfig(
+    terrain_backend_particle_tracker = TerrainNavigationFilter(
+        TerrainNavigationFilterConfig(
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -3020,15 +2779,11 @@ def main() -> int:
                 confirmation_odds_over_second=(
                     ARGS.terrain_global_cohort_confirmation_odds
                 ),
-            )
         )
-        if ARGS.enable_terrain_cohort_particle_backend
-        else None
     )
-    bbs3d_candidate_verifier = (
-        BBS3DCandidateVerifier(
-            world_model,
-            BBS3DVerifierConfig(
+    bbs3d_candidate_verifier = BBS3DCandidateVerifier(
+        world_model,
+        BBS3DVerifierConfig(
                 minimum_level_resolution_m=world_model.resolution_m,
                 maximum_level=3,
                 maximum_translation_m=(
@@ -3045,11 +2800,8 @@ def main() -> int:
                     8_192, 4 * ARGS.terrain_match_maximum_points
                 ),
                 timeout_milliseconds=ARGS.bbs3d_global_timeout_ms,
-            ),
-            require_native=True,
-        )
-        if ARGS.enable_bbs3d_global_verification
-        else None
+        ),
+        require_native=True,
     )
     terrain_recovery = TerrainRecoveryController(
         enabled=terrain_recovery_matcher is not None,
@@ -3123,7 +2875,7 @@ def main() -> int:
     terrain_backend_particle_records: list[dict] = []
     terrain_backend_particle_last_patch_end_observation_id = -1
     terrain_navigation_output_stats = {
-        "policy": ARGS.terrain_particle_online_output,
+        "policy": TERRAIN_PARTICLE_ONLINE_OUTPUT,
         "particle_map_updates": 0,
         "ordinary_particle_map_updates": 0,
         "global_particle_map_updates": 0,
@@ -5005,7 +4757,6 @@ def main() -> int:
             else terrain_backend_particle_tracker.active_cohort_count
         )
         preferred_source = select_terrain_navigation_output_source(
-            ARGS.terrain_particle_online_output,
             global_active_cohorts=global_active_cohorts,
             ordinary_active_cohorts=ordinary_active_cohorts,
         )
@@ -5588,8 +5339,7 @@ def main() -> int:
             f"measured backscatter coverage "
             f"{100.0 * world_model.backscatter_coverage_fraction:.2f}%; "
             f"target time scale {ARGS.time_scale:.1f}x; "
-            f"sonar backend {acoustic_backend_label}; "
-            f"SLAM association {slam_association_label}.",
+            f"sonar backend {acoustic_backend_label}.",
             flush=True,
         )
         if not ARGS.headless:
@@ -5635,49 +5385,38 @@ def main() -> int:
             * sonar_profile.rows_per_side_per_ping
             * ARGS.sidescan_imaging_rays_per_side
         )
-        geometry_update_description = (
-            f"{ARGS.mbes_group_pings}-ping causal sliding geometry "
-            "window updates at the native ping rate; "
-            if ARGS.enable_mbes_sliding_window
-            else (
-                f"{ARGS.mbes_group_pings} acquisition(s) per geometry "
-                "update; "
-            )
-        )
         print(
             "[OceanSim SLAM] co-registered acoustic front end: "
             f"{raw_returns_per_ping} raw XYZ+intensity samples produce both "
             f"bathymetry and the 16-row side-scan image; "
-            f"Local mode {ARGS.local_frontend}; "
-            f"{geometry_update_description}"
+            f"Local mode {LOCAL_FRONTEND}; "
+            f"{ARGS.feature_subframe_pings} physical pings per feature factor; "
             f"{ARGS.intensity_group_pings} acquisition(s) per update at "
             f"{ARGS.ping_hz / ARGS.intensity_group_pings:g} Hz; "
             f"causal reference separation {ARGS.intensity_reference_delay_pings} "
             f"ping, registration cells {ARGS.intensity_voxel_size_m:g} m; "
-            f"local weak directions use {ARGS.local_observability_mode} weighting; "
-            f"acoustic state policy {ARGS.local_sonar_state_update_policy}; "
+            "only the observable along-track feature projection writes Local; "
             + (
                 f"historical surfel lag {ARGS.local_map_history_s:g} s; "
                 if ARGS.local_map_history_s > 0.0
                 else "unbounded historical surfel map; "
             )
             + (
-                "side-scan alignment is graph-only."
-                if ARGS.disable_local_intensity_state_update
+                "side-scan alignment is non-committing and may form a GTSAM factor."
+                if not LOCAL_INTENSITY_STATE_UPDATE_ENABLED
                 else "side-scan alignment may update Local."
             ),
             flush=True,
         )
-        if ARGS.local_frontend == "feature":
-            print(
-                "[OceanSim SLAM] feature compute: requested "
-                f"{ARGS.feature_compute_backend}, active "
-                f"{slam.feature_odometry.active_compute_backend} on "
-                f"{slam.feature_odometry.compute_device}; 256 motion "
-                "hypotheses are evaluated as one batched operation and the "
-                "selected consensus is refined in float64 on CPU.",
-                flush=True,
-            )
+        print(
+            "[OceanSim SLAM] feature compute: requested "
+            f"{ARGS.feature_compute_backend}, active "
+            f"{slam.feature_odometry.active_compute_backend} on "
+            f"{slam.feature_odometry.compute_device}; 256 motion "
+            "hypotheses are evaluated as one batched operation and the "
+            "selected consensus is refined in float64 on CPU.",
+            flush=True,
+        )
         print(
             f"[OceanSim] route envelope "
             f"{route_report.x_range_m[1] - route_report.x_range_m[0]:.0f} x "
@@ -5709,7 +5448,7 @@ def main() -> int:
                     "SE(2) particles/cohort, explicit null hypothesis, "
                     f"{terrain_backend_particle_tracker.config.minimum_independent_evidence} "
                     "nonoverlapping observations before GTSAM authorization; "
-                    f"online output policy {ARGS.terrain_particle_online_output}; "
+                    f"online output policy {TERRAIN_PARTICLE_ONLINE_OUTPUT}; "
                     "particle output never authorizes a graph factor by itself.",
                     flush=True,
                 )
@@ -8388,7 +8127,7 @@ def main() -> int:
                                 )
                             ),
                             "terrain_navigation_output_policy": (
-                                ARGS.terrain_particle_online_output
+                                TERRAIN_PARTICLE_ONLINE_OUTPUT
                             ),
                             "terrain_navigation_output_source": (
                                 terrain_navigation_output_stats["last_source"]
@@ -8462,12 +8201,10 @@ def main() -> int:
                             )
                         )
                         status_label.text = (
-                            "ACOUSTIC FAST-LIVO2 | IMU + DVL + DEPTH + "
+                            "FEATURE ACOUSTIC-INERTIAL SLAM | IMU + DVL + DEPTH + "
                             "INTEGRATED BATHYMETRIC SIDE-SCAN\n"
                             f"SONAR {acoustic_backend_label} | "
                             f"cast {getattr(acoustic_backend, 'last_cast_ms', 0.0):.2f} ms\n"
-                            f"SLAM ASSOC {slam_association_label} | "
-                            f"{slam.filter.last_association_ms:.2f} ms\n"
                             "COMPLETE USGS MONTEREY 5 m + MEASURED BACKSCATTER\n"
                             f"sim {sim_time:6.1f}s (target {ARGS.time_scale:.1f}x, "
                             f"achieved {sim_time / max(time.monotonic() - started, 1.0e-12):.2f}x)  "
@@ -8491,12 +8228,13 @@ def main() -> int:
                             f"raw {raw_acoustic_points.shape[0]:05d}/"
                             f"{2 * sonar_profile.rows_per_side_per_ping * ARGS.sidescan_imaging_rays_per_side:05d}   "
                             f"SLAM {slam_acoustic_points.shape[0]:04d}\n"
-                            f"ESIKF <= {ARGS.slam_max_points:03d} pts   "
+                            f"feature pairs {diagnostics.feature_odometry.accepted_pairs:04d}/"
+                            f"{diagnostics.feature_odometry.rejected_pairs:04d}   "
                             f"map {diagnostics.map_points:7d} pts   "
                             f"KF {diagnostics.pose_graph.keyframes:03d}   "
                             f"loops {diagnostics.pose_graph.loop_edges:03d}\n"
-                            f"geometry {diagnostics.accepted_sonar_updates:04d}/"
-                            f"{diagnostics.rejected_sonar_updates:04d}   "
+                            f"Local writes {diagnostics.feature_filter_updates:04d}/"
+                            f"{diagnostics.feature_filter_update_failures:04d}   "
                             f"intensity {diagnostics.accepted_intensity_updates:04d}/"
                             f"{diagnostics.rejected_intensity_updates:04d}   "
                             f"terrain {terrain_prior_accepts:04d}/"
@@ -8934,7 +8672,7 @@ def main() -> int:
             "requested_survey_segment_distance_m": float(
                 ARGS.survey_segment_distance_m
             ),
-            "frontend_observability_handling": {
+            "frontend_state_ownership": {
                 "dvl_preserves_accumulated_position": bool(
                     slam.filter.config.dvl_preserve_pose_gauge
                 ),
@@ -8948,101 +8686,48 @@ def main() -> int:
                 ],
                 "new_dvl_residual_gate_added": False,
                 "posterior_covariance_retracted_after_state_injection": True,
-                "mbes_state_update_policy": (
-                    ARGS.local_sonar_state_update_policy
+                "feature_update_policy": (
+                    slam.config.feature_odometry.state_update_policy
                 ),
-                # The acoustic residual Jacobian contains pose columns only.
-                # A full Kalman update may still change nuisance states via
-                # cross-covariance; that is indirect state inference.
-                "mbes_updates_velocity_or_bias_directly": False,
-                "mbes_allows_velocity_or_bias_cross_covariance_update": bool(
-                    ARGS.local_sonar_state_update_policy == "full"
-                ),
-                "mbes_world_yaw_not_frozen": bool(
-                    ARGS.local_sonar_state_update_policy
-                    in {"full", "pose", "position-yaw"}
-                ),
+                "feature_updates_only_observable_along_track_projection": True,
+                "direct_mbes_esikf_state_write": False,
+                "feature_updates_cross_track_attitude_depth_or_bias": False,
                 "same_ping_intensity_updates_local_state": bool(
-                    not ARGS.disable_local_intensity_state_update
+                    LOCAL_INTENSITY_STATE_UPDATE_ENABLED
                 ),
             },
             "algorithm": (
-                "OceanSim acoustic FAST-LIVO2 adaptation with joint "
-                "point-mass/cohort particle terrain navigation and "
-                "rank-aware absolute bathymetry/backscatter factors"
-                if terrain_matcher is not None
-                else "OceanSim acoustic FAST-LIVO2 adaptation"
+                "OceanSim co-registered MBES/side-scan feature odometry with "
+                "joint point-mass/cohort particle terrain navigation and "
+                "rank-aware GTSAM bathymetry/backscatter factors"
             ),
             "algorithm_tracks": {
                 "dead_reckoning_imu_dvl_depth": (
                     "IMU propagation with DVL velocity and pressure depth"
                 ),
                 "local_acoustic_esikf": (
-                    "single-current-ping to causal historical surfel-map "
-                    "relative acoustic ESIKF; side-scan alignment "
-                    + (
-                        "is non-committing and remains available to the graph; "
-                        if ARGS.disable_local_intensity_state_update
-                        else "may also update the local state; "
-                    )
-                    + "no prior-map correction"
+                    "IMU/DVL-seeded side-scan feature tracks lifted through "
+                    "co-registered MBES XYZ; observable along-track update, "
+                    "non-committing intensity alignment, and no prior-map "
+                    "correction"
                 ),
                 "online_global_slam": (
-                    (
-                        "GTSAM IncrementalFixedLagSmoother active-window "
-                        "estimate; marginalized poses retain their last "
-                        "online value, while confirmed cross-window factors "
-                        "supply a rigid global map anchor"
-                        + (
-                            "; while multiple spatial modes exist, the "
-                            "terrain-particle MAP drives the provisional "
-                            "online target, while single-mode output uses "
-                            "the graph and independent confirmation still "
-                            "protects factor insertion; active whole-map "
-                            "relocalization cohorts take output priority"
-                            if terrain_backend_particle_tracker is not None
-                            else ""
-                        )
-                        + (
-                            "; the published map->odom transform follows "
-                            "that target continuously with bounded rates"
-                            if ARGS.enable_map_to_odom_soft_correction
-                            else ""
-                        )
-                    )
-                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
-                    else (
-                        "online NumPy batch pose graph including accepted "
-                        "loop, intensity, and absolute terrain factors"
-                        + (
-                            "; the published map->odom transform follows "
-                            "that target continuously with bounded rates"
-                            if ARGS.enable_map_to_odom_soft_correction
-                            else ""
-                        )
-                    )
+                    "GTSAM IncrementalFixedLagSmoother active-window estimate; "
+                    "marginalized poses retain their last online value, while "
+                    "confirmed cross-window factors supply a rigid global map "
+                    "anchor; while multiple spatial modes exist, the terrain-"
+                    "particle MAP drives the provisional online target, while "
+                    "single-mode output uses the graph; the published map->odom "
+                    "transform follows that target continuously with bounded rates"
                 ),
                 "final_optimized_global_slam": (
-                    (
-                        "the fixed-lag online trajectory after consuming all "
-                        "factors that remain representable in its live window"
-                    )
-                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
-                    else (
-                        "the same global factor graph after consuming every "
-                        "accepted factor in a final optimization"
-                    )
+                    "the fixed-lag online trajectory after consuming all "
+                    "factors that remain representable in its live window"
                 ),
-                **(
-                    {
-                        "gtsam_full_history_isam2_diagnostic": (
-                            "separate full-history iSAM2 diagnostic; retained "
-                            "for old-node constraints and not used as the "
-                            "online map-to-odom output"
-                        )
-                    }
-                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
-                    else {}
+                "gtsam_full_history_isam2_diagnostic": (
+                    "separate full-history iSAM2 diagnostic; retained for "
+                    "old-node constraints and not used as the online "
+                    "map-to-odom output"
                 ),
             },
             "navigation_initialization": {
@@ -9107,7 +8792,7 @@ def main() -> int:
                 "edge_scaling": "standard deviation times sqrt(elapsed/reference)",
             },
             "pose_graph_backend_configuration": {
-                "selected": ARGS.pose_graph_backend,
+                "selected": POSE_GRAPH_BACKEND,
                 "implementation": diagnostics.pose_graph.optimizer_backend,
                 "fixed_lag_seconds": float(ARGS.pose_graph_fixed_lag_s),
                 "isam_relinearize_threshold": float(
@@ -9119,8 +8804,6 @@ def main() -> int:
                 "online_output_source": (
                     "incremental_fixed_lag_active_window_with_rigid_"
                     "global_anchor_for_cross_window_factors"
-                    if ARGS.pose_graph_backend == "gtsam-fixed-lag-isam2"
-                    else "numpy_batch_full_graph"
                 ),
             },
             "reproducibility": {
@@ -9501,20 +9184,14 @@ def main() -> int:
             "intensity_effective_independent_samples": (
                 ARGS.intensity_effective_independent_samples
             ),
-            "local_sonar_noise_floor_m": (
-                ARGS.local_sonar_noise_floor_m
-            ),
             "local_intensity_noise_std": (
                 ARGS.local_intensity_noise_std
             ),
             "local_intensity_surface_consistency_std_m": (
                 ARGS.local_intensity_surface_consistency_std_m
             ),
-            "local_observability_mode": ARGS.local_observability_mode,
-            "local_frontend": ARGS.local_frontend,
-            "feature_retain_direct_mbes_state_update": bool(
-                ARGS.feature_retain_direct_mbes_state_update
-            ),
+            "local_frontend": LOCAL_FRONTEND,
+            "direct_mbes_esikf_state_write": False,
             "feature_subframe_pings": ARGS.feature_subframe_pings,
             "feature_maximum_features": ARGS.feature_maximum_features,
             "feature_minimum_matches": ARGS.feature_minimum_matches,
@@ -9546,15 +9223,9 @@ def main() -> int:
             "feature_prediction_correction_scale_m": (
                 slam.config.feature_odometry.prediction_correction_scale_m
             ),
-            "local_sonar_state_update_policy": (
-                ARGS.local_sonar_state_update_policy
-            ),
             "local_map_history_s": ARGS.local_map_history_s,
-            "mbes_footprint_overlap_weighting_enabled": bool(
-                ARGS.enable_mbes_footprint_overlap_weighting
-            ),
             "local_intensity_state_update_enabled": bool(
-                not ARGS.disable_local_intensity_state_update
+                LOCAL_INTENSITY_STATE_UPDATE_ENABLED
             ),
             "local_intensity_map_coregisters_surface_elevation": True,
             "intensity_min_singular_ratio": (
@@ -10465,8 +10136,6 @@ def main() -> int:
                 getattr(acoustic_backend, "cast_count", 0)
             ),
             "sonar_backend_verification": backend_verification,
-            "slam_association_backend": slam_association_label,
-            "slam_max_points": ARGS.slam_max_points,
             "slam_voxel_size_m": ARGS.slam_voxel_size_m,
             "intensity_voxel_size_m": ARGS.intensity_voxel_size_m,
             "map_insert_stride": ARGS.map_insert_stride,
@@ -10491,38 +10160,8 @@ def main() -> int:
             "local_map_history_pings": diagnostics.local_map_history_pings,
             "local_map_evicted_pings": diagnostics.local_map_evicted_pings,
             "local_map_evicted_points": diagnostics.local_map_evicted_points,
-            "last_mbes_footprint_information_scale": (
-                diagnostics.last_mbes_footprint_information_scale
-            ),
-            "mean_mbes_footprint_information_scale": (
-                diagnostics.mean_mbes_footprint_information_scale
-            ),
-            "minimum_mbes_footprint_information_scale": (
-                diagnostics.minimum_mbes_footprint_information_scale
-            ),
             "association_map_half_extent_m": (
                 ARGS.association_map_half_extent_m
-            ),
-            "slam_association_gpu": bool(
-                getattr(slam_associator, "is_cuda", False)
-            ),
-            "slam_association_warmup_ms": float(
-                getattr(slam_associator, "warmup_ms", 0.0)
-            ),
-            "slam_association_mean_ms": float(
-                slam.filter.mean_association_ms
-            ),
-            "slam_association_calls": int(
-                slam.filter.association_calls
-            ),
-            "slam_gpu_call_mean_ms": float(
-                getattr(slam_associator, "mean_association_ms", 0.0)
-            ),
-            "slam_association_gpu_calls": int(
-                getattr(slam_associator, "gpu_calls", 0)
-            ),
-            "slam_association_cpu_fallbacks": int(
-                getattr(slam_associator, "cpu_fallbacks", 0)
             ),
             "sim_time_s": sim_time,
             "wall_time_s": time.monotonic() - started,
@@ -10564,8 +10203,6 @@ def main() -> int:
             "legacy_range_attached_intensity_samples": (
                 diagnostics.legacy_range_attached_intensity_samples
             ),
-            "accepted_geometry_updates": diagnostics.accepted_sonar_updates,
-            "rejected_geometry_updates": diagnostics.rejected_sonar_updates,
             "feature_frames": diagnostics.feature_odometry.frames,
             "feature_pair_attempts": (
                 diagnostics.feature_odometry.pair_attempts
@@ -10637,13 +10274,7 @@ def main() -> int:
             ),
             "rejected_intensity_updates": diagnostics.rejected_intensity_updates,
             "committed_geometry_groups": diagnostics.committed_geometry_groups,
-            "quarantined_geometry_groups": diagnostics.quarantined_geometry_groups,
             "committed_intensity_batches": diagnostics.committed_intensity_batches,
-            "quarantined_intensity_batches": diagnostics.quarantined_intensity_batches,
-            "sonar_rejection_reasons": diagnostics.sonar_rejection_reasons,
-            "sonar_observable_rank_counts": (
-                diagnostics.sonar_observable_rank_counts
-            ),
             "intensity_rejection_reasons": (
                 diagnostics.intensity_rejection_reasons
             ),
@@ -10791,7 +10422,7 @@ def main() -> int:
             ),
             "online_map_to_odom_change_audit": map_to_odom_audit,
             "map_to_odom_soft_correction": {
-                "enabled": bool(ARGS.enable_map_to_odom_soft_correction),
+                "enabled": MAP_TO_ODOM_SOFT_CORRECTION_ENABLED,
                 "role": "online_output_only_not_frontend_state_feedback",
                 "matcher_seed_uses_unsmoothed_graph_target": True,
                 "translation_time_constant_s": (
@@ -10839,8 +10470,6 @@ def main() -> int:
         sonar.close()
         if acoustic_backend is not None:
             acoustic_backend.close()
-        if slam_associator is not None:
-            slam_associator.close()
         if status_window is not None:
             try:
                 status_window.destroy()

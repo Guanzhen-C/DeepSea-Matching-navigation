@@ -357,9 +357,9 @@ open and the acoustic rays and returns are visible in the 3D viewport. The
 example limits acoustic pings to 10 Hz so its general-scene PhysX queries
 remain responsive. The large measured-terrain example is the reference CUDA
 path because its seabed is static and can be represented by one Warp mesh.
-That example also has a separate Warp point-to-surfel association kernel for
-the SLAM front end. It is not part of the sensor model and can be selected
-independently with `--slam-association-backend`; see the
+Its production Local estimator uses CUDA-batched feature consensus on the
+co-registered MBES/side-scan observations; the retired point-to-surfel state
+update is not a selectable frontend. See the
 [FastSonar-LIVO2 guide](underwater_fast_sonar_slam.md).
 
 For a self-contained live test that does not require the separate
@@ -379,35 +379,35 @@ For the actual SLAM estimator and a larger measured-terrain validation range,
 start the validated V2 large-area route with:
 
 ```bash
-standalone/run_v2_large_area_slam_isaac.sh
+standalone/run_v2_full_map_slam_isaac.sh
 ```
 
 It opens the Isaac Sim UI by default, uses the V2 standard profile, and runs a
-measured-data route with an approximately 2.42 x 1.81 km axis-aligned envelope
-and a 7.94 km lap. The route is checked at startup for valid bathymetry,
-measured backscatter, and at least 250 m clearance from their NoData boundaries.
-The launcher requests a 4x display time scale for responsiveness. Sensor data
+closed approximately 72.35 km route through the largest connected Monterey
+Canyon region with both measured bathymetry and backscatter. The launcher
+starts at the difficult 30 km section with exact evaluation initialization;
+truth is not fused after startup. Sensor data
 remain scheduled on exact application-clock events at 50 Hz IMU, 5 Hz DVL,
-10 Hz pressure depth, and 2.5 Hz sonar; measured wall-clock speed may be lower
+10 Hz pressure depth, and 5 Hz integrated sonar; measured wall-clock speed may be lower
 than the requested display scale. The AUV follows a kinematic route, so the
 Isaac physics timeline is not used as the navigation timestamp source.
 Close the window to stop. A finite non-UI smoke run is:
 
 ```bash
-standalone/run_v2_large_area_slam_isaac.sh --headless --duration 10
+standalone/run_v2_full_map_slam_isaac.sh --headless --duration 10
 ```
 
 Select the high-resolution V2 profile explicitly when needed:
 
 ```bash
-standalone/run_v2_large_area_slam_isaac.sh \
+standalone/run_v2_full_map_slam_isaac.sh \
     --sonar-profile v2-high-resolution --ping-hz 2.5
 ```
 
-The lower-level `standalone/run_large_scale_slam_isaac.sh` exposes all route,
-profile, backend, and sensor-sampling options. Both launchers fuse the
-integrated sonar with only IMU, DVL, and pressure depth and display local and
-loop-corrected trajectories. Details are in the
+The lower-level `standalone/run_large_scale_slam_isaac.sh` is an internal
+environment runner; use the full-map launcher so the production estimator
+topology cannot be omitted. It fuses the integrated sonar with only IMU, DVL,
+and pressure depth and displays Local and Global trajectories. Details are in the
 [FastSonar-LIVO2 guide](underwater_fast_sonar_slam.md).
 
 ## Preview without Isaac Sim

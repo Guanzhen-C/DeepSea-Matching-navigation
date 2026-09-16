@@ -1,4 +1,4 @@
-"""Runnable FAST-LIVO2-style underwater acoustic SLAM front end."""
+"""Runnable feature-based underwater acoustic-inertial SLAM front end."""
 
 from __future__ import annotations
 
@@ -43,17 +43,9 @@ class FastSonarSLAMConfig:
     feature_odometry: FeatureSonarOdometryConfig = field(
         default_factory=FeatureSonarOdometryConfig
     )
-    # ``direct`` retains the FAST-LIVO2-style point/intensity-to-map ESIKF.
-    # ``feature`` is the water-adapted geometry/appearance frontend: causal
-    # side-scan tracks are lifted into their co-registered MBES XYZ returns and
-    # provide the relative update.  The direct point-to-local-map ESIKF write
-    # is disabled in that mode by default because forward-only strips can
-    # reinforce their own map deformation.  MBES geometry is still consumed by
-    # the feature fit, local map, descriptors, graph, and Global backend.
-    local_frontend_mode: str = "direct"
-    # Re-enable the direct MBES state write only as a controlled hybrid
-    # ablation.  It is intentionally separate from retaining MBES data.
-    feature_retain_direct_mbes_state_update: bool = False
+    # Causal side-scan tracks are lifted into their co-registered MBES XYZ
+    # returns and provide the observable relative update. MBES geometry is
+    # also consumed by the local map, descriptors, graph, and Global backend.
     voxel_size: float = 1.8
     surfel_min_points: int = 5
     surfel_max_planarity: float = 0.14
@@ -73,25 +65,10 @@ class FastSonarSLAMConfig:
     # the front end an odometer: old local-frame deformation is retired while
     # revisits and absolute corrections remain the responsibility of Global.
     local_map_history_duration_s: float = 0.0
-    # Neighbouring physical pings overlap along track.  Retain every residual
-    # once, but continuously scale its information by the newly covered
-    # footprint fraction instead of treating overlapping support as new data.
-    mbes_footprint_overlap_weighting_enabled: bool = False
     # Keep the full incremental map, but pack only the current sensor-reach
     # neighbourhood for accelerated association. This is the non-destructive
     # counterpart of FAST-LIVO2's sliding local map.
     association_map_half_extent_m: float = 120.0
-    # FAST-LIVO2 updates its incremental geometry map from the converged
-    # LiDAR state.  A rejected acoustic registration has no such converged
-    # state, so admitting it to the reference map creates a self-consistent
-    # but drifting surface.  Keep those points in a separate quarantine map
-    # instead of using them for subsequent measurement association.
-    # Strict quarantine is useful for diagnosing corrupt registrations, but
-    # it cannot be the default on a forward-only strip survey: FAST-LIVO2
-    # must keep extending its incremental map into newly observed space.
-    # The production path therefore admits the propagated scan and lets the
-    # probabilistic map/update weighting represent its uncertainty.
-    quality_gate_map_updates: bool = False
     map_min_range: float = 0.5
     map_max_range: float = 80.0
     sidescan_max_age_s: float = 2.0
@@ -114,9 +91,8 @@ class FastSonarSLAMConfig:
     intensity_submap_anchor_interval_s: float = 0.0
     intensity_updates_enabled: bool = True
     # The integrated product obtains geometry and backscatter from the same
-    # raw echo.  A non-committing intensity alignment may still create a graph
-    # factor, but it must not contract the live ESIKF a second time.
-    intensity_local_state_update_enabled: bool = True
+    # raw echo. Intensity alignment is non-committing: it may create a graph
+    # factor, but never contracts the live filter a second time.
     integrated_timestamp_tolerance_s: float = 0.002
     # Retaining every IMU propagation as a separate NumPy object is useful
     # for short interactive traces but unnecessarily costly on multi-hour
@@ -162,15 +138,10 @@ class SLAMDiagnostics:
     accepted_graph_only_intensity_updates: int
     rejected_intensity_updates: int
     committed_geometry_groups: int
-    quarantined_geometry_groups: int
     local_map_history_pings: int
     local_map_evicted_pings: int
     local_map_evicted_points: int
-    last_mbes_footprint_information_scale: float
-    mean_mbes_footprint_information_scale: float
-    minimum_mbes_footprint_information_scale: float
     committed_intensity_batches: int
-    quarantined_intensity_batches: int
     sonar_rejection_reasons: dict[str, int]
     sonar_observable_rank_counts: dict[str, int]
     intensity_rejection_reasons: dict[str, int]
@@ -213,8 +184,6 @@ class FastSonarSLAM:
         surfel_associator=None,
     ) -> None:
         self.config = config or FastSonarSLAMConfig()
-        if self.config.local_frontend_mode not in {"direct", "feature"}:
-            raise ValueError("local_frontend_mode must be direct or feature")
         if int(self.config.intensity_min_separation_pings) < 1:
             raise ValueError(
                 "intensity_min_separation_pings must be at least one"
@@ -235,13 +204,6 @@ class FastSonarSLAM:
             raise ValueError(
                 "a fixed-lag local map requires one non-sliding MBES ping "
                 "per update"
-            )
-        if (
-            self.config.mbes_footprint_overlap_weighting_enabled
-            and int(self.config.mbes_group_pings) != 1
-        ):
-            raise ValueError(
-                "MBES footprint weighting requires one ping per update"
             )
         if int(self.config.intensity_group_pings) < 1:
             raise ValueError("intensity_group_pings must be at least one")
@@ -272,15 +234,6 @@ class FastSonarSLAM:
             max_plane_distance=self.config.surfel_max_plane_distance,
         )
         self.intensity_map = AcousticIntensityMap(
-            voxel_size=self.config.intensity_voxel_size
-        )
-        self.quarantine_map = SurfelVoxelMap(
-            voxel_size=self.config.voxel_size,
-            min_points=self.config.surfel_min_points,
-            max_planarity=self.config.surfel_max_planarity,
-            max_plane_distance=self.config.surfel_max_plane_distance,
-        )
-        self.quarantine_intensity_map = AcousticIntensityMap(
             voxel_size=self.config.intensity_voxel_size
         )
         self.pose_graph = AcousticPoseGraph(self.config.pose_graph)
@@ -329,21 +282,12 @@ class FastSonarSLAM:
         self._legacy_range_attached_intensity_samples = 0
         self._committed_geometry_groups = 0
         self._total_geometry_points_committed = 0
-        self._quarantined_geometry_groups = 0
         self._local_geometry_history: deque[
             tuple[float, np.ndarray, np.ndarray | None]
         ] = deque()
         self._local_map_evicted_pings = 0
         self._local_map_evicted_points = 0
-        self._last_mbes_footprint_origin_xy: np.ndarray | None = None
-        self._last_mbes_footprint_coverage_m = 0.0
-        self._last_mbes_footprint_information_scale = 1.0
-        self._mbes_footprint_information_scale_sum = 0.0
-        self._mbes_footprint_information_scale_count = 0
-        self._minimum_mbes_footprint_information_scale = 1.0
         self._committed_intensity_batches = 0
-        self._quarantined_intensity_batches = 0
-        self._geometry_pose_trusted = True
         self._sonar_rejection_reasons: Counter[str] = Counter()
         self._sonar_observable_rank_counts: Counter[str] = Counter()
         self._intensity_rejection_reasons: Counter[str] = Counter()
@@ -383,8 +327,6 @@ class FastSonarSLAM:
         self.filter.initialize(timestamp, **state_kwargs)
         self.map.clear()
         self.intensity_map.clear()
-        self.quarantine_map.clear()
-        self.quarantine_intensity_map.clear()
         self.pose_graph.reset()
         self.feature_odometry.reset()
         self.map_to_odom_corrector.reset(timestamp=float(timestamp))
@@ -416,19 +358,10 @@ class FastSonarSLAM:
         self._legacy_range_attached_intensity_samples = 0
         self._committed_geometry_groups = 0
         self._total_geometry_points_committed = 0
-        self._quarantined_geometry_groups = 0
         self._local_geometry_history.clear()
         self._local_map_evicted_pings = 0
         self._local_map_evicted_points = 0
-        self._last_mbes_footprint_origin_xy = None
-        self._last_mbes_footprint_coverage_m = 0.0
-        self._last_mbes_footprint_information_scale = 1.0
-        self._mbes_footprint_information_scale_sum = 0.0
-        self._mbes_footprint_information_scale_count = 0
-        self._minimum_mbes_footprint_information_scale = 1.0
         self._committed_intensity_batches = 0
-        self._quarantined_intensity_batches = 0
-        self._geometry_pose_trusted = True
         self._sonar_rejection_reasons.clear()
         self._sonar_observable_rank_counts.clear()
         self._intensity_rejection_reasons.clear()
@@ -529,45 +462,38 @@ class FastSonarSLAM:
                 "integrated ping must derive bathymetry and side-scan from "
                 "one raw-return grid"
             )
-        feature_mode = self.config.local_frontend_mode == "feature"
-        if feature_mode:
-            feature_result = self.feature_odometry.process(
-                ping,
-                rotation_world_body=self.state.rotation,
-                position_world_body=self.state.position,
-                state_covariance=self.state.covariance,
-            )
-            self._last_feature_odometry = feature_result
-            if feature_result.subframe_ready:
-                if (
-                    self.config.feature_odometry.state_update_policy
-                    == "along_track"
-                ):
-                    axis = np.asarray(
-                        feature_result.measured_along_track_axis_world,
-                        dtype=np.float64,
-                    ).reshape(2)
-                    covariance_xy = np.asarray(
-                        feature_result.measurement_covariance_world,
-                        dtype=np.float64,
-                    )[:2, :2]
-                    updated = (
-                        self.filter.update_horizontal_position_along_axis(
-                            feature_result.measured_along_track_projection_m,
-                            axis,
-                            float(axis @ covariance_xy @ axis),
-                        )
-                    )
-                else:
-                    updated = self.filter.update_planar_pose(
-                        feature_result.measured_position_xy_world,
-                        feature_result.measured_yaw_world,
-                        feature_result.measurement_covariance_world,
-                    )
-                if updated:
-                    self._feature_filter_updates += 1
-                else:
-                    self._feature_filter_update_failures += 1
+        feature_result = self.feature_odometry.process(
+            ping,
+            rotation_world_body=self.state.rotation,
+            position_world_body=self.state.position,
+            state_covariance=self.state.covariance,
+        )
+        self._last_feature_odometry = feature_result
+        if feature_result.subframe_ready:
+            if self.config.feature_odometry.state_update_policy == "along_track":
+                axis = np.asarray(
+                    feature_result.measured_along_track_axis_world,
+                    dtype=np.float64,
+                ).reshape(2)
+                covariance_xy = np.asarray(
+                    feature_result.measurement_covariance_world,
+                    dtype=np.float64,
+                )[:2, :2]
+                updated = self.filter.update_horizontal_position_along_axis(
+                    feature_result.measured_along_track_projection_m,
+                    axis,
+                    float(axis @ covariance_xy @ axis),
+                )
+            else:
+                updated = self.filter.update_planar_pose(
+                    feature_result.measured_position_xy_world,
+                    feature_result.measured_yaw_world,
+                    feature_result.measurement_covariance_world,
+                )
+            if updated:
+                self._feature_filter_updates += 1
+            else:
+                self._feature_filter_update_failures += 1
         stride = int(sample_stride)
         if stride < 1:
             raise ValueError("sample_stride must be at least one")
@@ -589,12 +515,11 @@ class FastSonarSLAM:
                 along_track_coverage_m=ping.along_track_coverage_m,
             )
         finally:
-            if feature_mode:
-                self.feature_odometry.finalize(
-                    rotation_world_body=self.state.rotation,
-                    position_world_body=self.state.position,
-                    state_covariance=self.state.covariance,
-                )
+            self.feature_odometry.finalize(
+                rotation_world_body=self.state.rotation,
+                position_world_body=self.state.position,
+                state_covariance=self.state.covariance,
+            )
 
     def process_bathymetric_sidescan(
         self,
@@ -731,11 +656,6 @@ class FastSonarSLAM:
         self._ping_count += 1
         current_entry = (self.state.copy(), points, values)
         self._evict_expired_local_geometry(self.state.timestamp)
-        footprint_information_scale = (
-            self._mbes_footprint_information_scale(
-                direct_intensity_coverage_m
-            )
-        )
         group_size = max(1, int(self.config.mbes_group_pings))
         stride = max(1, int(self.config.map_insert_stride))
         update: SonarUpdateResult | None = None
@@ -760,7 +680,6 @@ class FastSonarSLAM:
                     stride,
                     True,
                 )
-                self._geometry_pose_trusted = True
             else:
                 self._mbes_group.append(current_entry)
                 if len(self._mbes_group) >= group_size:
@@ -800,53 +719,7 @@ class FastSonarSLAM:
                 update_window_ready = True
 
         if registration_points is not None:
-            update_attempted = False
-            if (
-                update_window_ready
-                and self._ping_count > self.config.bootstrap_pings
-                and self.map.mature_voxel_count > 0
-                and (
-                    self.config.local_frontend_mode == "direct"
-                    or (
-                        self.config.local_frontend_mode == "feature"
-                        and self.config.feature_retain_direct_mbes_state_update
-                    )
-                )
-            ):
-                update_attempted = True
-                self.map.set_association_box(
-                    self.state.position,
-                    self.config.association_map_half_extent_m,
-                )
-                update = self.filter.update_sonar(
-                    registration_points,
-                    self.map,
-                    information_scale=(
-                        footprint_information_scale / float(group_size)
-                        if self.config.mbes_sliding_window_enabled
-                        else footprint_information_scale
-                    ),
-                )
-                rank_key = (
-                    f"r{update.rotation_observable_rank}_"
-                    f"t{update.translation_observable_rank}"
-                )
-                self._sonar_observable_rank_counts[rank_key] += 1
-                if update.accepted:
-                    self._accepted_updates += 1
-                else:
-                    self._rejected_updates += 1
-                    self._sonar_rejection_reasons[
-                        update.rejection_reason or "unspecified"
-                    ] += 1
-
-            self._geometry_pose_trusted = (
-                not update_attempted or bool(update and update.accepted)
-            )
-            commit_geometry = (
-                not self.config.quality_gate_map_updates
-                or self._geometry_pose_trusted
-            )
+            commit_geometry = True
             loop_points_body = transform_points(
                 self.filter.sensor_rotation_body,
                 self.filter.sensor_translation_body,
@@ -909,11 +782,6 @@ class FastSonarSLAM:
                 )
                 self._total_geometry_points_committed += inserted
                 self._committed_geometry_groups += 1
-            else:
-                self.quarantine_map.add_points(
-                    points_world[::stride], map_intensities
-                )
-                self._quarantined_geometry_groups += 1
         self._replace_latest_trajectory()
         return update
 
@@ -1055,10 +923,7 @@ class FastSonarSLAM:
         self._formed_intensity_strips += 1
         result: IntensityUpdateResult | None = None
         intensity_prior_state: InertialState | None = None
-        commit_intensity_state = bool(
-            self.config.intensity_local_state_update_enabled
-            and self.config.local_frontend_mode == "direct"
-        )
+        commit_intensity_state = False
         if (
             self.config.intensity_updates_enabled
             and self._ping_count
@@ -1269,87 +1134,17 @@ class FastSonarSLAM:
                     latest_anchor_timestamp
                 )
             anchor_id = int(self._intensity_submap_anchor_id)
-        intensity_pose_trusted = self._geometry_pose_trusted or bool(
-            result and result.accepted
-        )
-        commit_intensity = (
-            not self.config.quality_gate_map_updates
-            or intensity_pose_trusted
-        )
-        if commit_intensity:
-            self._pending_intensity.append(
-                (
-                    self._ping_count,
-                    points_world,
-                    grouped_values,
-                    heading,
-                    int(anchor_id),
-                )
-            )
-            self._pending_intensity_points += int(points_world.shape[0])
-        elif not commit_intensity:
-            self.quarantine_intensity_map.add_points(
+        self._pending_intensity.append(
+            (
+                self._ping_count,
                 points_world,
                 grouped_values,
-                heading_rad=heading,
-                observation_id=self._ping_count,
-                anchor_id=int(anchor_id),
+                heading,
+                int(anchor_id),
             )
-            self._quarantined_intensity_batches += 1
-        self._last_intensity_update = result
-
-    def _mbes_footprint_information_scale(
-        self, along_track_coverage_m: float
-    ) -> float:
-        """Return the independent fraction of one physical ping footprint.
-
-        At 5 Hz the V2 footprint advances only 0.3 m while its simultaneous
-        rows cover about 1.2 m along track.  Every current-ping residual is
-        retained exactly once; this continuous ``advance / coverage`` factor
-        merely prevents the shared spatial support from being counted as an
-        independent second measurement.  It uses the causal estimator pose,
-        never truth or the innovation magnitude.
-        """
-
-        coverage = float(along_track_coverage_m)
-        if not np.isfinite(coverage) or coverage < 0.0:
-            raise ValueError(
-                "MBES along-track coverage must be finite and non-negative"
-            )
-        translation_bs = self.filter.sensor_translation_body
-        origin_xy = (
-            self.state.position + self.state.rotation @ translation_bs
-        )[:2]
-        information_scale = 1.0
-        previous_origin = self._last_mbes_footprint_origin_xy
-        previous_coverage = self._last_mbes_footprint_coverage_m
-        if (
-            self.config.mbes_footprint_overlap_weighting_enabled
-            and previous_origin is not None
-            and coverage > 0.0
-            and previous_coverage > 0.0
-        ):
-            centre_advance = float(
-                np.linalg.norm(origin_xy - previous_origin)
-            )
-            mean_coverage = 0.5 * (coverage + previous_coverage)
-            information_scale = float(
-                np.clip(
-                    centre_advance / max(mean_coverage, 1.0e-12),
-                    np.finfo(np.float64).eps,
-                    1.0,
-                )
-            )
-        self._last_mbes_footprint_origin_xy = origin_xy.copy()
-        self._last_mbes_footprint_coverage_m = coverage
-        self._last_mbes_footprint_information_scale = information_scale
-        self._mbes_footprint_information_scale_sum += information_scale
-        self._mbes_footprint_information_scale_count += 1
-        self._minimum_mbes_footprint_information_scale = min(
-            self._minimum_mbes_footprint_information_scale,
-            information_scale,
         )
-        return information_scale
+        self._pending_intensity_points += int(points_world.shape[0])
+        self._last_intensity_update = result
 
     def _evict_expired_local_geometry(self, timestamp: float) -> None:
         """Retire scans older than the configured local-map fixed lag."""
@@ -1463,24 +1258,10 @@ class FastSonarSLAM:
             ),
             rejected_intensity_updates=self._rejected_intensity_updates,
             committed_geometry_groups=self._committed_geometry_groups,
-            quarantined_geometry_groups=self._quarantined_geometry_groups,
             local_map_history_pings=len(self._local_geometry_history),
             local_map_evicted_pings=self._local_map_evicted_pings,
             local_map_evicted_points=self._local_map_evicted_points,
-            last_mbes_footprint_information_scale=(
-                self._last_mbes_footprint_information_scale
-            ),
-            mean_mbes_footprint_information_scale=(
-                self._mbes_footprint_information_scale_sum
-                / max(1, self._mbes_footprint_information_scale_count)
-            ),
-            minimum_mbes_footprint_information_scale=(
-                self._minimum_mbes_footprint_information_scale
-                if self._mbes_footprint_information_scale_count
-                else 1.0
-            ),
             committed_intensity_batches=self._committed_intensity_batches,
-            quarantined_intensity_batches=self._quarantined_intensity_batches,
             sonar_rejection_reasons=dict(self._sonar_rejection_reasons),
             sonar_observable_rank_counts=dict(
                 self._sonar_observable_rank_counts
@@ -1613,8 +1394,6 @@ class FastSonarSLAM:
     def reset_map(self) -> None:
         self.map.clear()
         self.intensity_map.clear()
-        self.quarantine_map.clear()
-        self.quarantine_intensity_map.clear()
         self._ping_count = 0
         self._accepted_updates = 0
         self._rejected_updates = 0
@@ -1638,19 +1417,10 @@ class FastSonarSLAM:
         self._legacy_range_attached_intensity_samples = 0
         self._committed_geometry_groups = 0
         self._total_geometry_points_committed = 0
-        self._quarantined_geometry_groups = 0
         self._local_geometry_history.clear()
         self._local_map_evicted_pings = 0
         self._local_map_evicted_points = 0
-        self._last_mbes_footprint_origin_xy = None
-        self._last_mbes_footprint_coverage_m = 0.0
-        self._last_mbes_footprint_information_scale = 1.0
-        self._mbes_footprint_information_scale_sum = 0.0
-        self._mbes_footprint_information_scale_count = 0
-        self._minimum_mbes_footprint_information_scale = 1.0
         self._committed_intensity_batches = 0
-        self._quarantined_intensity_batches = 0
-        self._geometry_pose_trusted = True
         self._sonar_rejection_reasons.clear()
         self._sonar_observable_rank_counts.clear()
         self._intensity_rejection_reasons.clear()

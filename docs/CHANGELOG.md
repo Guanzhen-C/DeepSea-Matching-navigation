@@ -1,20 +1,18 @@
 # Changelog
 
-- Restored the formal feature-front-end launcher to the `b05477d` hybrid
-  terrain-navigation output policy while retaining an explicitly selected
-  GTSAM fixed-lag optimizer. During active whole-map recovery, or while the
-  ordinary terrain posterior has multiple modes, the online Global track uses
-  the particle MAP; after the posterior becomes single-modal it returns to the
-  GTSAM pose. Particle MAP publication remains output-only and does not bypass
-  the independent-evidence requirement for inserting a GTSAM factor. The
-  generic demo still defaults to graph-only, so this behavior is scoped to the
-  formal feature/GTSAM launcher and does not select the NumPy optimizer.
-- Changed the production terrain-navigation output policy to graph-only.
-  Particle cohorts and whole-map candidates are still propagated, scored, and
-  independently confirmed, but an unconfirmed MAP alias can no longer replace
-  the published GTSAM pose. Confirmed, graph-ready acquisitions retain the
-  existing robust factor/reseeding path. The former `multimodal-map` behavior
-  remains an explicit diagnostic ablation.
+- Consolidated the large-area SLAM demo into one production estimator. Local
+  is now always the co-registered MBES/side-scan feature frontend with no
+  direct point-to-self-map or same-echo intensity state write. Global is now
+  always the cohort particle terrain tracker, native 3-D BBS verification,
+  GTSAM incremental fixed-lag graph, and bounded `map -> odom` correction. The
+  validated multimodal output rule is fixed: whole-map recovery cohorts take
+  priority, multiple ordinary terrain modes temporarily publish the particle
+  MAP, and a single stable mode publishes GTSAM. Removed the NumPy batch graph,
+  Direct/Hybrid frontend switches, graph-only/always-map output policies, A/B
+  launchers, factor replay/comparison programs, and the extra wrapper. The sole
+  production entry is `standalone/run_v2_full_map_slam_isaac.sh`. Historical
+  entries below describe experiments that led to this selection; their
+  retired switches and launchers are no longer present.
 - Added an optional CUDA compute backend for the feature Local frontend. The
   256 prediction-centred RANSAC hypotheses are evaluated in one PyTorch CUDA
   batch in float64; the selected consensus, observability test, covariance,
@@ -135,7 +133,8 @@
   not a claimed transducer layout. The rolling waterfall is used only for display and
   descriptors. Standalone MBES and SSS models remain available for genuinely
   separate instruments.
-- Added `standalone/run_v2_large_area_slam_isaac.sh` for the UI demonstration.
+- Added the now-retired `standalone/run_v2_large_area_slam_isaac.sh` UI
+  demonstration launcher.
   Its complete-map route covers an approximately 2.42 x 1.81 km envelope and
   7.94 km per lap and is validated against bathymetry, measured-backscatter,
   and 250 m NoData-clearance requirements before simulation starts. Ping-rate

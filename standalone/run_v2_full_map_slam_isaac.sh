@@ -3,8 +3,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Sole production launcher: CUDA feature sonar odometry, joint cohort/particle
+# terrain navigation, native 3-D BBS verification, GTSAM incremental fixed-lag
+# smoothing, and bounded map->odom output correction. Algorithm-selection and
+# legacy ablation switches are intentionally absent.
+#
 # This is a closed, approximately 72.35 km 3-D traversal of the largest connected
-# Monterey Canyon region having both measured bathymetry and backscatter.  It
+# Monterey Canyon region having both measured bathymetry and backscatter. It
 # spans about 22.75 x 16.38 km, but is not exhaustive lawnmower sonar coverage.
 # At 1.5 m/s and 5 pings/s, consecutive integrated bathymetry/side-scan
 # acquisitions advance 0.30 m.  The documented 1.2 m standard-mode footprint
@@ -18,24 +23,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # a rendered frame is uploaded.  The raw waterfall still accumulates every
 # ping, while each presented image advances by at most 0.75 m at 1.5 m/s.
 # Each ping already contains eight simultaneous along-track rows per side.
-# The production front end therefore registers exactly one physical ping once
-# at the native 5 Hz rate.  A 30 s causal fixed-lag surfel map supplies about
-# 45 m of historical along-track aperture; the current ping enters that map
-# only after its update and is removed when it leaves the lag.  Adjacent
-# 1.2 m footprints overlap by 75%, so their full residuals are retained while
-# information is continuously weighted by the newly covered fraction.  The
-# single-ping MBES correction writes position only; yaw is intentionally left
-# to the inertial propagation and the multi-ping Global matcher.  The direct
-# intensity residual excludes the latest four pings from its reference map:
-# at 1.5 m/s this supplies a 1.2 m causal baseline, exactly one documented
-# standard-mode strip, so duplicated along-track rows cannot be reused as
-# independent evidence. Every current ping still updates against the fixed-lag
-# causal local map and every converged ping is written back. The 512 XYZI samples are
-# correlated inside the 5 m source mosaic, so their aggregate filter weight is
-# capped at 32 independent-equivalent samples.  A 120 s stable intensity-map
-# anchor mirrors FAST-LIVO2's persistent local map instead of fragmenting it
-# at every 30 s global keyframe.  These are continuous baseline/covariance/map
-# parameters; no extra acceptance threshold is introduced. One 30 s
+# The production front end registers four consecutive physical pings as one
+# feature-odometry subframe. IMU/DVL motion seeds side-scan tracking, matches
+# are lifted through co-registered MBES XYZ, CUDA evaluates geometric
+# hypotheses, and only the observable along-track correction enters Local.
+# Direct MBES and same-echo intensity state writes are not part of this path.
+# A 30 s causal surfel history remains available for mapping, descriptors and
+# Global matching. The 512 XYZI samples are correlated inside the 5 m source
+# mosaic, so their aggregate intensity factor weight is capped at 32
+# independent-equivalent samples. A 120 s stable intensity-map anchor avoids
+# fragmenting the appearance map at every graph keyframe. One 30 s
 # pose-graph interval contains 150 pings at 5 Hz. Retaining the
 # complete interval supplies about 45 m of along-track terrain-match aperture;
 # voxel centroids keep the numerical matcher budget fixed at 3072 points. The
@@ -56,9 +53,11 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --survey-speed-mps 1.5 \
     --survey-altitude-m 40 \
     --survey-maximum-pitch-deg 12 \
-    --initial-position-offset-x-m 5 \
-    --initial-position-offset-y-m -4 \
-    --initial-yaw-offset-deg 1.5 \
+    --survey-start-distance-m 30000 \
+    --initial-position-offset-x-m 0 \
+    --initial-position-offset-y-m 0 \
+    --initial-yaw-offset-deg 0 \
+    --initialize-from-truth \
     --sonar-profile v2-standard \
     --ping-hz 5 \
     --sonar-pings-in-water 2 \
@@ -69,9 +68,12 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --map-insert-stride 2 \
     --mbes-group-pings 1 \
     --local-map-history-s 30 \
-    --enable-mbes-footprint-overlap-weighting \
-    --local-observability-mode continuous \
-    --local-sonar-state-update-policy position \
+    --feature-subframe-pings 4 \
+    --feature-maximum-features 900 \
+    --feature-minimum-matches 24 \
+    --feature-ransac-residual-m 0.70 \
+    --feature-compute-backend cuda \
+    --subgrid-reflectivity-amplitude 0.18 \
     --local-intensity-surface-consistency-std-m 0.75 \
     --intensity-group-pings 1 \
     --intensity-min-group-span-m 1.0 \
@@ -80,7 +82,6 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --intensity-submap-anchor-interval-s 120 \
     --intensity-factor-min-interval-s 300 \
     --intensity-factor-optimize-interval 20 \
-    --disable-local-intensity-state-update \
     --trajectory-sample-interval-s 0.2 \
     --enable-terrain-map-matching \
     --enable-backscatter-map-matching \
@@ -107,7 +108,7 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --enable-global-terrain-relocalization \
     --terrain-global-window-pings 600 \
     --terrain-global-pyramid-stride 4 \
-    --terrain-global-yaw-window-deg 90 \
+    --terrain-global-yaw-window-deg 180 \
     --terrain-global-yaw-step-deg 5 \
     --terrain-global-minimum-correlation 0.30 \
     --terrain-global-maximum-bathymetry-rmse-m 6 \
@@ -115,6 +116,15 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --terrain-global-minimum-score-gap 0.08 \
     --terrain-global-confirmation-position-tolerance-m 25 \
     --terrain-global-confirmation-yaw-tolerance-deg 5 \
+    --terrain-global-maximum-cohorts 48 \
+    --terrain-global-particles-per-cohort 256 \
+    --terrain-global-particle-resample-ess-fraction 0.50 \
+    --terrain-global-particle-kernel-bandwidth 0.15 \
+    --terrain-global-minimum-independent-evidence 3 \
+    --terrain-global-cohort-confirmation-probability 0.97 \
+    --terrain-global-cohort-confirmation-odds 20 \
+    --bbs3d-global-translation-window-m 30 \
+    --bbs3d-global-yaw-window-deg 6 \
     --terrain-match-yaw-window-deg 8 \
     --terrain-prior-optimize-interval 1 \
     --association-map-half-extent-m 275 \
@@ -123,6 +133,9 @@ exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh" \
     --keyframe-max-interval-s 30 \
     --pose-graph-odometry-reference-interval-s 30 \
     --pose-graph-odometry-xy-std-m 1.0 \
+    --pose-graph-fixed-lag-s 180 \
+    --pose-graph-isam-relinearize-threshold 0.01 \
+    --pose-graph-isam-relinearize-skip 1 \
     --time-scale 20 \
     --ui-sonar-refresh-hz 2 \
     --progress-distance-m 250 \

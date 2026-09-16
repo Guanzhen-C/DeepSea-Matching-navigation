@@ -60,15 +60,12 @@ If Isaac Sim is unavailable on a presentation computer, run
 `python3 standalone/acoustic_slam_demo.py` from the repository root and open
 the generated PNG or GIF under `demo/acoustic_slam_preview/`.
 
-For the complete 300 x 220 m acoustic-inertial SLAM validation, run
-`standalone/run_large_scale_underwater_slam.sh --assert-quality`. To see the
-same large environment with live GPU bathymetry/co-registered-side-scan windows
-and SLAM tracks in Isaac Sim, run
-`standalone/run_large_scale_slam_isaac.sh`. Its default `auto`
-backend selects Warp CUDA for the static measured seabed and reports the
-ray and point-to-surfel providers independently in the status window. The
-default 384-point ESIKF group uses GPU association, while small configured
-groups automatically retain CPU association. See the
+For the production measured-map acoustic-inertial SLAM run with live
+bathymetry/co-registered-side-scan windows and SLAM tracks in Isaac Sim, use
+`standalone/run_v2_full_map_slam_isaac.sh`. Add `--headless` for non-visual
+execution. This is the sole large-area estimator launcher and fixes the CUDA
+feature Local frontend, cohort particle terrain tracker, native 3-D BBS,
+GTSAM fixed-lag graph, and bounded `map -> odom` output correction. See the
 [FastSonar-LIVO2 guide](underwater_fast_sonar_slam.md) for metrics, outputs,
 sensor interfaces, and limitations.
 

@@ -13,8 +13,8 @@ from oceansim.slam import (
     ESIKFConfig,
     FastSonarSLAM,
     FastSonarSLAMConfig,
+    GTSAMPlanarPoseGraph,
     IntensityUpdateResult,
-    PlanarPoseGraph,
     PoseGraphConfig,
     MeasuredBathymetryGrid,
     PoseGraphEdge,
@@ -954,8 +954,7 @@ def test_intensity_map_rejects_recent_or_wrong_view_support() -> None:
 
 
 def test_planar_pose_graph_closes_a_drifted_square() -> None:
-    config = PoseGraphConfig(optimizer_iterations=20)
-    graph = PlanarPoseGraph(config)
+    graph = GTSAMPlanarPoseGraph(PoseGraphConfig())
     raw = (
         [0.0, 0.0, 0.0],
         [10.0, 0.0, 0.0],
@@ -1126,44 +1125,6 @@ def test_large_area_sensor_and_slam_smoke() -> None:
     assert np.linalg.norm(sensors.gyro_bias) <= np.deg2rad(1.0) / 3600.0
 
 
-def test_quality_gate_keeps_rejected_scan_out_of_reference_map() -> None:
-    slam = FastSonarSLAM(
-        FastSonarSLAMConfig(
-            mbes_group_pings=1,
-            bootstrap_pings=0,
-            quality_gate_map_updates=True,
-        )
-    )
-    slam.initialize(0.0)
-    grid_x, grid_y = np.meshgrid(
-        np.linspace(-4.0, 4.0, 16), np.linspace(-4.0, 4.0, 16)
-    )
-    seed_points = np.column_stack(
-        (grid_x.ravel(), grid_y.ravel(), np.full(grid_x.size, -10.0))
-    )
-    slam.map.add_points(seed_points)
-    stable_points_before = slam.map.point_count
-    far_points = np.column_stack(
-        (
-            np.full(40, 30.0),
-            np.linspace(-6.0, 6.0, 40),
-            np.full(40, -10.0),
-        )
-    )
-
-    result = slam.process_mbes(far_points)
-
-    assert result is not None and not result.accepted
-    assert result.rejection_reason == "insufficient_correspondences"
-    assert slam.map.point_count == stable_points_before
-    assert slam.quarantine_map.point_count == far_points.shape[0]
-    diagnostics = slam.diagnostics()
-    assert diagnostics.quarantined_geometry_groups == 1
-    assert diagnostics.sonar_rejection_reasons == {
-        "insufficient_correspondences": 1
-    }
-
-
 def test_sidescan_reference_delay_and_motion_compensated_strip() -> None:
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
@@ -1201,7 +1162,7 @@ def test_sidescan_reference_delay_and_motion_compensated_strip() -> None:
     assert diagnostics.pending_intensity_points == 3 * points.shape[0]
 
 
-def test_causal_sliding_mbes_window_updates_each_ping_without_self_insertion(
+def test_feature_frontend_sliding_mbes_window_only_feeds_mapping_products(
     monkeypatch,
 ) -> None:
     point_count = 96
@@ -1253,24 +1214,17 @@ def test_causal_sliding_mbes_window_updates_each_ping_without_self_insertion(
         slam.process_mbes(points)
 
     diagnostics = slam.diagnostics()
-    # Three seed pings form the immutable reference. Pings four and five are
-    # withheld; ping six aligns the 4/5/6 window and only then commits ping 4.
-    assert update_sizes == [64, 64]
-    assert diagnostics.accepted_sonar_updates == 2
+    # The feature frontend never calls the retired direct MBES state update.
+    # Three seed pings enter the map; ping six completes the 4/5/6 mapping
+    # window and commits its oldest member.
+    assert update_sizes == []
+    assert diagnostics.accepted_sonar_updates == 0
     assert diagnostics.committed_geometry_groups == 5
     assert diagnostics.map_points == 5 * point_count
     assert len(slam._mbes_group) == 2
 
 
-@pytest.mark.parametrize(
-    ("retain_direct_update", "expected_update_calls"),
-    ((False, 0), (True, 2)),
-)
-def test_feature_frontend_direct_mbes_state_update_is_opt_in(
-    monkeypatch,
-    retain_direct_update: bool,
-    expected_update_calls: int,
-) -> None:
+def test_feature_frontend_never_writes_direct_mbes_state(monkeypatch) -> None:
     point_count = 96
     cross_track = np.linspace(-12.0, 12.0, point_count)
     points = np.column_stack(
@@ -1282,8 +1236,6 @@ def test_feature_frontend_direct_mbes_state_update_is_opt_in(
     )
     slam = FastSonarSLAM(
         FastSonarSLAMConfig(
-            local_frontend_mode="feature",
-            feature_retain_direct_mbes_state_update=retain_direct_update,
             bootstrap_pings=1,
             surfel_min_points=3,
             mbes_group_pings=1,
@@ -1320,17 +1272,15 @@ def test_feature_frontend_direct_mbes_state_update_is_opt_in(
         slam.process_mbes(points)
 
     diagnostics = slam.diagnostics()
-    assert update_calls == expected_update_calls
-    assert diagnostics.accepted_sonar_updates == expected_update_calls
-    # Disabling the local state write never discards the MBES observations:
-    # they still populate the local map and backend products.
+    assert update_calls == 0
+    assert diagnostics.accepted_sonar_updates == 0
+    # Removing the direct state write does not discard MBES observations: they
+    # still populate the local map and backend products.
     assert diagnostics.committed_geometry_groups == 3
     assert diagnostics.map_points == 3 * point_count
 
 
-def test_single_ping_fixed_lag_uses_each_observation_once_and_only_as_history(
-    monkeypatch,
-) -> None:
+def test_single_ping_fixed_lag_commits_each_observation_once_to_map() -> None:
     point_count = 48
     cross_track = np.linspace(-2.0, 2.0, point_count)
     points = np.column_stack(
@@ -1352,101 +1302,20 @@ def test_single_ping_fixed_lag_uses_each_observation_once_and_only_as_history(
         )
     )
     slam.initialize(0.0)
-    update_sizes: list[int] = []
-    reference_sizes: list[int] = []
-
-    def accepted_update(current_points, surfel_map, *, information_scale=1.0):
-        update_sizes.append(int(current_points.shape[0]))
-        reference_sizes.append(int(surfel_map.point_count))
-        return SonarUpdateResult(
-            accepted=True,
-            correspondences=current_points.shape[0],
-            inliers=current_points.shape[0],
-            iterations=1,
-            rmse_before=0.2,
-            rmse_after=0.1,
-            minimum_translation_eigenvalue=1.0,
-            information_condition=2.0,
-            adaptive_weight=1.0,
-            rotation_observable_rank=3,
-            translation_observable_rank=3,
-            rotation_correction_deg=0.0,
-            translation_correction=0.0,
-            information_scale=information_scale,
-        )
-
-    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
     for ping_index in range(1, 6):
         slam.filter.state.timestamp = float(ping_index)
         slam.filter.state.position[0] = 0.3 * float(ping_index - 1)
         slam.process_mbes(points)
 
     diagnostics = slam.diagnostics()
-    assert update_sizes == [point_count] * 4
-    # The current ping is committed only after its update. At a 2 s lag and
-    # 1 Hz synthetic cadence, timestamps on the lag boundary remain causal
-    # history, so at most two earlier pings are visible during an update.
-    assert reference_sizes == [point_count, 2 * point_count, 2 * point_count, 2 * point_count]
+    assert diagnostics.accepted_sonar_updates == 0
+    # At a 2 s lag and 1 Hz synthetic cadence, timestamps on the lag boundary
+    # remain mapping history, while older pings are evicted.
     assert diagnostics.local_map_history_pings == 3
     assert diagnostics.local_map_evicted_pings == 2
     assert diagnostics.local_map_evicted_points == 2 * point_count
     assert diagnostics.map_points == 3 * point_count
     assert diagnostics.total_geometry_points_committed == 5 * point_count
-
-
-def test_single_ping_footprint_overlap_scales_information_not_update_count(
-    monkeypatch,
-) -> None:
-    point_count = 48
-    points = np.column_stack(
-        (
-            np.zeros(point_count),
-            np.linspace(-4.0, 4.0, point_count),
-            np.full(point_count, -10.0),
-        )
-    )
-    slam = FastSonarSLAM(
-        FastSonarSLAMConfig(
-            bootstrap_pings=1,
-            surfel_min_points=3,
-            mbes_group_pings=1,
-            mbes_footprint_overlap_weighting_enabled=True,
-            intensity_updates_enabled=False,
-        )
-    )
-    slam.initialize(0.0)
-    information_scales: list[float] = []
-
-    def accepted_update(current_points, surfel_map, *, information_scale=1.0):
-        information_scales.append(float(information_scale))
-        return SonarUpdateResult(
-            accepted=True,
-            correspondences=current_points.shape[0],
-            inliers=current_points.shape[0],
-            iterations=1,
-            rmse_before=0.2,
-            rmse_after=0.1,
-            minimum_translation_eigenvalue=1.0,
-            information_condition=2.0,
-            adaptive_weight=1.0,
-            rotation_observable_rank=3,
-            translation_observable_rank=3,
-            rotation_correction_deg=0.0,
-            translation_correction=0.0,
-            information_scale=information_scale,
-        )
-
-    monkeypatch.setattr(slam.filter, "update_sonar", accepted_update)
-    for ping_index in range(1, 5):
-        slam.filter.state.timestamp = float(ping_index)
-        slam.filter.state.position[0] = 0.3 * float(ping_index - 1)
-        slam.process_mbes(points, direct_intensity_coverage_m=1.2)
-
-    assert information_scales == pytest.approx([0.25, 0.25, 0.25])
-    diagnostics = slam.diagnostics()
-    assert diagnostics.accepted_sonar_updates == 3
-    assert diagnostics.last_mbes_footprint_information_scale == pytest.approx(0.25)
-    assert diagnostics.minimum_mbes_footprint_information_scale == pytest.approx(0.25)
 
 
 def test_fixed_lag_mode_rejects_overlapping_current_ping_windows() -> None:
@@ -1524,7 +1393,6 @@ def test_same_ping_intensity_graph_only_mode_never_writes_local_state(
             intensity_min_separation_pings=1,
             intensity_group_pings=1,
             intensity_min_group_span_m=1.0,
-            intensity_local_state_update_enabled=False,
         )
     )
     slam.initialize(0.0)
@@ -1737,7 +1605,6 @@ def _make_stubbed_intensity_slam() -> FastSonarSLAM:
             intensity_min_separation_pings=1,
             intensity_group_pings=2,
             intensity_min_group_span_m=0.5,
-            quality_gate_map_updates=True,
         )
     )
     slam.initialize(0.0)
@@ -1794,9 +1661,10 @@ def test_graph_seeded_match_counts_only_after_factor_acceptance(monkeypatch) -> 
     assert slam._last_intensity_update is candidate_two
 
 
-def test_rejected_graph_seed_does_not_count_or_trust_intensity(monkeypatch) -> None:
+def test_rejected_graph_seed_does_not_count_but_retains_raw_intensity(
+    monkeypatch,
+) -> None:
     slam = _make_stubbed_intensity_slam()
-    slam._geometry_pose_trusted = False
     slam.pose_graph.loop_edges.append(
         PoseGraphEdge(0, 1, np.zeros(3), np.eye(3), kind="loop")
     )
@@ -1828,12 +1696,12 @@ def test_rejected_graph_seed_does_not_count_or_trust_intensity(monkeypatch) -> N
         "graph_factor_rejected": 1
     }
     assert diagnostics.committed_intensity_batches == 0
-    assert diagnostics.quarantined_intensity_batches == 1
+    assert diagnostics.pending_intensity_batches == 1
     assert slam._last_intensity_update is not None
     assert not slam._last_intensity_update.accepted
 
 
-def test_local_match_without_graph_factor_is_counted_and_absorbed_once(
+def test_noncommitting_intensity_match_without_graph_factor_never_absorbs_state(
     monkeypatch,
 ) -> None:
     slam = _make_stubbed_intensity_slam()
@@ -1860,11 +1728,12 @@ def test_local_match_without_graph_factor_is_counted_and_absorbed_once(
     _run_stubbed_intensity_strip(slam)
 
     diagnostics = slam.diagnostics()
-    assert absorbed == [3]
+    assert absorbed == []
     assert diagnostics.accepted_intensity_updates == 1
-    assert diagnostics.accepted_local_intensity_updates == 1
+    assert diagnostics.accepted_graph_only_intensity_updates == 1
+    assert diagnostics.accepted_local_intensity_updates == 0
     assert diagnostics.accepted_local_intensity_updates_with_graph_factor == 0
-    assert diagnostics.accepted_local_intensity_updates_without_graph_factor == 1
+    assert diagnostics.accepted_local_intensity_updates_without_graph_factor == 0
     assert diagnostics.accepted_graph_seeded_intensity_updates == 0
 
 

@@ -90,22 +90,19 @@ def _particle_observation(
 
 
 @pytest.mark.parametrize(
-    ("policy", "global_count", "ordinary_count", "expected"),
+    ("global_count", "ordinary_count", "expected"),
     [
-        ("graph", 3, 4, "pose_graph"),
-        ("multimodal-map", 2, 4, "global_terrain_particle_map"),
-        ("multimodal-map", 0, 2, "ordinary_terrain_particle_map"),
-        ("multimodal-map", 0, 1, "pose_graph"),
-        ("always-map", 0, 1, "ordinary_terrain_particle_map"),
-        ("always-map", 0, 0, "pose_graph"),
+        (2, 4, "global_terrain_particle_map"),
+        (0, 2, "ordinary_terrain_particle_map"),
+        (0, 1, "pose_graph"),
+        (0, 0, "pose_graph"),
     ],
 )
 def test_online_output_source_policy(
-    policy, global_count, ordinary_count, expected
+    global_count, ordinary_count, expected
 ) -> None:
     assert (
         select_terrain_navigation_output_source(
-            policy,
             global_active_cohorts=global_count,
             ordinary_active_cohorts=ordinary_count,
         )
@@ -117,17 +114,19 @@ def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
     launcher = (
         Path(__file__).resolve().parents[1]
         / "standalone"
-        / "run_v2_feature_hybrid_slam_isaac.sh"
+        / "run_v2_full_map_slam_isaac.sh"
     ).read_text(encoding="utf-8")
 
-    assert "--local-frontend feature" in launcher
-    assert "--pose-graph-backend gtsam-fixed-lag-isam2" in launcher
-    assert "--terrain-particle-online-output multimodal-map" in launcher
-    assert "--pose-graph-backend numpy-batch" not in launcher
+    assert "--feature-compute-backend cuda" in launcher
+    assert "--pose-graph-fixed-lag-s 180" in launcher
+    assert "--terrain-global-particles-per-cohort 256" in launcher
+    assert "--local-frontend" not in launcher
+    assert "--pose-graph-backend" not in launcher
+    assert "--terrain-particle-online-output" not in launcher
 
 
-def test_graph_output_keeps_unconfirmed_wrong_cohort_internal() -> None:
-    """A plausible but unconfirmed global alias must not become navigation."""
+def test_active_global_recovery_cohort_drives_provisional_output() -> None:
+    """An active whole-map recovery mode has priority over ordinary output."""
 
     tracker = GlobalCohortTracker(_permissive_config(random_seed=41))
     decision = tracker.update(
@@ -147,19 +146,10 @@ def test_graph_output_keeps_unconfirmed_wrong_cohort_internal() -> None:
     assert tracker.maximum_a_posteriori_pose(np.zeros(3)) is not None
     assert (
         select_terrain_navigation_output_source(
-            "multimodal-map",
             global_active_cohorts=tracker.active_cohort_count,
             ordinary_active_cohorts=0,
         )
         == "global_terrain_particle_map"
-    )
-    assert (
-        select_terrain_navigation_output_source(
-            "graph",
-            global_active_cohorts=tracker.active_cohort_count,
-            ordinary_active_cohorts=0,
-        )
-        == "pose_graph"
     )
 
 

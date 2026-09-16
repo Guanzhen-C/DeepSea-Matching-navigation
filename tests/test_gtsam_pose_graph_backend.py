@@ -10,7 +10,6 @@ import pytest
 from oceansim.slam import (
     AcousticPoseGraph,
     GTSAMPlanarPoseGraph,
-    PlanarPoseGraph,
     PoseGraphConfig,
     PoseGraphEdge,
 )
@@ -26,7 +25,6 @@ gtsam = pytest.importorskip("gtsam")
 
 def _gtsam_config(**overrides) -> PoseGraphConfig:
     values = {
-        "optimizer_backend": "gtsam_fixed_lag_isam2",
         "fixed_lag_seconds": 2.0,
         "isam_relinearize_threshold": 1.0e-5,
         "isam_relinearize_skip": 1,
@@ -52,19 +50,11 @@ def _add_chain(graph: GTSAMPlanarPoseGraph, count: int) -> None:
             graph.optimize()
 
 
-def test_acoustic_graph_backend_is_explicit_and_numpy_stays_default() -> None:
-    reference = AcousticPoseGraph(PoseGraphConfig())
-    candidate = AcousticPoseGraph(_gtsam_config())
+def test_acoustic_graph_always_uses_production_gtsam_backend() -> None:
+    graph = AcousticPoseGraph(PoseGraphConfig())
 
-    assert type(reference.graph) is PlanarPoseGraph
-    assert reference.graph.backend_name == "numpy_batch"
-    assert isinstance(candidate.graph, GTSAMPlanarPoseGraph)
-    assert candidate.graph.backend_name == "gtsam_isam2_incremental_fixed_lag"
-
-
-def test_unknown_backend_is_rejected_instead_of_silently_falling_back() -> None:
-    with pytest.raises(ValueError, match="optimizer_backend"):
-        AcousticPoseGraph(PoseGraphConfig(optimizer_backend="unknown"))
+    assert isinstance(graph.graph, GTSAMPlanarPoseGraph)
+    assert graph.graph.backend_name == "gtsam_isam2_incremental_fixed_lag"
 
 
 def test_gtsam_custom_factors_reproduce_reference_residual_coordinates() -> None:
@@ -124,106 +114,6 @@ def test_gtsam_custom_factors_reproduce_reference_residual_coordinates() -> None
         np.testing.assert_allclose(
             finite_difference, expected_jacobians[key_index], atol=2.0e-6
         )
-
-
-def test_gtsam_and_numpy_solve_same_unmarginalized_factor_stream() -> None:
-    common = {
-        "optimizer_iterations": 50,
-        "fixed_lag_seconds": 1000.0,
-        "isam_relinearize_threshold": 1.0e-5,
-        "isam_relinearize_skip": 1,
-    }
-    reference = PlanarPoseGraph(PoseGraphConfig(**common))
-    candidate = GTSAMPlanarPoseGraph(_gtsam_config(**common))
-    truth = np.array(
-        [[0.0, 0.0, 0.7], [4.0, 3.0, 0.75], [7.0, 7.0, 0.9], [4.0, 10.0, 1.4]]
-    )
-    seeds = truth + np.array(
-        [[0.0, 0.0, 0.0], [0.8, -0.4, 0.12], [1.4, -0.3, 0.2], [2.0, 0.5, 0.3]]
-    )
-    edge_information = np.array(
-        [[25.0, 4.0, 1.0], [4.0, 16.0, -0.5], [1.0, -0.5, 120.0]]
-    )
-    for index, seed in enumerate(seeds):
-        for graph in (reference, candidate):
-            graph.add_pose(seed, timestamp=float(index))
-        if index:
-            measurement = _relative_pose2(truth[index - 1], truth[index])
-            for graph in (reference, candidate):
-                graph.add_edge(
-                    index - 1,
-                    index,
-                    measurement,
-                    edge_information,
-                    kind="odometry",
-                )
-    prior_information = np.array(
-        [[9.0, 2.0, 0.2], [2.0, 12.0, -0.3], [0.2, -0.3, 60.0]]
-    )
-    for graph in (reference, candidate):
-        graph.add_prior(
-            3,
-            truth[3] + np.array([0.1, -0.1, 0.01]),
-            prior_information,
-            robust=False,
-        )
-        graph.optimize()
-
-    np.testing.assert_allclose(candidate.poses, reference.poses, atol=7.0e-5)
-    assert candidate.final_cost == pytest.approx(reference.final_cost, abs=2.0e-6)
-
-
-def test_robust_loop_and_terrain_objective_matches_numpy_reference() -> None:
-    common = {
-        "optimizer_iterations": 80,
-        "fixed_lag_seconds": 1000.0,
-        "isam_relinearize_threshold": 1.0e-6,
-        "robust_loop_delta": 2.5,
-        "robust_terrain_prior_delta": 2.5,
-    }
-    reference = PlanarPoseGraph(PoseGraphConfig(**common))
-    candidate = GTSAMPlanarPoseGraph(_gtsam_config(**common))
-    truth = np.array(
-        [[0.0, 0.0, 0.4], [3.0, 1.0, 0.5], [5.0, 4.0, 0.8], [0.0, 9.0, 2.0]]
-    )
-    seeds = truth + np.array(
-        [[0.0, 0.0, 0.0], [0.5, -0.2, 0.05], [1.0, -0.4, 0.1], [2.0, -0.2, 0.2]]
-    )
-    odometry_information = np.diag([25.0, 25.0, 100.0])
-    for index, seed in enumerate(seeds):
-        for graph in (reference, candidate):
-            graph.add_pose(seed, timestamp=float(index))
-        if index:
-            measurement = _relative_pose2(truth[index - 1], truth[index])
-            for graph in (reference, candidate):
-                graph.add_edge(
-                    index - 1,
-                    index,
-                    measurement,
-                    odometry_information,
-                    kind="odometry",
-                )
-    loop = _relative_pose2(truth[0], truth[-1]) + np.array([1.5, -1.0, 0.2])
-    for graph in (reference, candidate):
-        graph.add_edge(
-            0,
-            3,
-            loop,
-            np.diag([16.0, 16.0, 64.0]),
-            kind="loop",
-        )
-        graph.add_prior(
-            3,
-            truth[-1] + np.array([1.0, -1.0, 0.2]),
-            np.diag([9.0, 9.0, 36.0]),
-            robust=True,
-        )
-    for _ in range(8):
-        reference.optimize()
-        candidate.optimize()
-
-    np.testing.assert_allclose(candidate.poses, reference.poses, atol=1.0e-6)
-    assert candidate.final_cost == pytest.approx(reference.final_cost, abs=1.0e-8)
 
 
 def test_fixed_lag_marginalizes_and_preserves_last_online_estimates() -> None:
@@ -493,17 +383,15 @@ def test_rank_deficient_acoustic_information_is_not_given_fake_rank() -> None:
         assert np.linalg.matrix_rank(recovered, tol=1.0e-10) == expected_rank
 
 
-def test_acoustic_frontend_constructs_identical_factors_for_both_solvers() -> None:
+def test_acoustic_frontend_exports_serializable_gtsam_factor_stream() -> None:
     common = {
         "keyframe_distance_m": 0.1,
         "keyframe_max_interval_s": 1.0,
         "icp_min_inliers": 3,
         "icp_max_points": 20,
-        "optimizer_iterations": 50,
         "fixed_lag_seconds": 100.0,
         "isam_relinearize_threshold": 1.0e-5,
     }
-    reference = AcousticPoseGraph(PoseGraphConfig(**common))
     candidate = AcousticPoseGraph(_gtsam_config(**common))
     points = np.array(
         [[-1.0, -2.0, -10.0], [0.0, 0.0, -10.2], [1.0, 2.0, -9.8]]
@@ -516,38 +404,33 @@ def test_acoustic_frontend_constructs_identical_factors_for_both_solvers() -> No
     for index, pose in enumerate(poses):
         rotation = rotation_from_rpy(0.0, 0.0, pose[2])
         position = np.array([pose[0], pose[1], -40.0])
-        for backend in (reference, candidate):
-            assert backend.add_if_needed(
-                float(index),
-                rotation,
-                position,
-                points,
-                observation_id=index,
-                force=True,
-                odometry_pose2=pose,
-                detect_loops=False,
-            )
+        assert candidate.add_if_needed(
+            float(index),
+            rotation,
+            position,
+            points,
+            observation_id=index,
+            force=True,
+            odometry_pose2=pose,
+            detect_loops=False,
+        )
 
     matched = poses[-1] + np.array([-0.2, 0.1, -0.01])
     information = np.array(
         [[12.0, 2.0, 0.2], [2.0, 9.0, -0.1], [0.2, -0.1, 80.0]]
     )
-    for backend in (reference, candidate):
-        assert backend.add_terrain_prior(
-            timestamp=2.0,
-            observation_id=2,
-            prior_pose2=poses[-1],
-            raw_rotation_world_body=rotation_from_rpy(0.0, 0.0, poses[-1][2]),
-            raw_position_world=np.array([poses[-1][0], poses[-1][1], -40.0]),
-            matched_pose2=matched,
-            information_world=information,
-            optimize_interval=1,
-        )
+    assert candidate.add_terrain_prior(
+        timestamp=2.0,
+        observation_id=2,
+        prior_pose2=poses[-1],
+        raw_rotation_world_body=rotation_from_rpy(0.0, 0.0, poses[-1][2]),
+        raw_position_world=np.array([poses[-1][0], poses[-1][1], -40.0]),
+        matched_pose2=matched,
+        information_world=information,
+        optimize_interval=1,
+    )
 
-    reference_stream = reference.graph.factor_stream_payload()
     candidate_stream = candidate.graph.factor_stream_payload()
-    for key in ("pose_initializations", "pose_timestamps_s", "edges", "priors"):
-        assert candidate_stream[key] == reference_stream[key]
     json.dumps(candidate_stream)
     extended_stream = candidate.factor_stream_payload()
     assert len(extended_stream["raw_local_keyframe_pose2"]) == len(
@@ -564,6 +447,6 @@ def test_acoustic_frontend_constructs_identical_factors_for_both_solvers() -> No
         np.asarray([frame.raw_rotation for frame in candidate.keyframes]),
     )
     json.dumps(extended_stream)
-    np.testing.assert_allclose(
-        candidate.graph.poses, reference.graph.poses, atol=1.0e-4
+    assert candidate_stream["source_backend"] == (
+        "gtsam_isam2_incremental_fixed_lag"
     )

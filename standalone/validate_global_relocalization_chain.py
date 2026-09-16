@@ -325,7 +325,6 @@ def main() -> int:
     )
     graph = AcousticPoseGraph(
         PoseGraphConfig(
-            optimizer_backend="gtsam_fixed_lag_isam2",
             fixed_lag_seconds=2000.0,
             keyframe_distance_m=1.0,
             keyframe_max_interval_s=1.0,

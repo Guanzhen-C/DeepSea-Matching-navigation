@@ -1,8 +1,8 @@
-"""FAST-LIVO2-inspired underwater acoustic-inertial SLAM components.
+"""Feature-based underwater acoustic-inertial SLAM components.
 
-The package is dependency-light on purpose: the estimator and map only need
-NumPy, which allows the same implementation to run in Isaac Sim, ROS 2 nodes,
-and deterministic unit tests.
+The production estimator uses GTSAM for its incremental fixed-lag/global graph
+and keeps its sensor-facing API independent of Isaac Sim, so the same chain can
+run in Kit, ROS 2 nodes, bag replay, and deterministic unit tests.
 """
 
 from .esikf import (
@@ -71,7 +71,6 @@ from .pose_graph import (
     AcousticKeyframe,
     AcousticPoseGraph,
     GTSAMPlanarPoseGraph,
-    PlanarPoseGraph,
     PoseGraphConfig,
     PoseGraphDiagnostics,
     PoseGraphEdge,
@@ -157,7 +156,6 @@ __all__ = [
     "MapOdomSoftCorrector",
     "NavigationInitialization",
     "MeasuredBathymetryGrid",
-    "PlanarPoseGraph",
     "PoseGraphConfig",
     "PoseGraphDiagnostics",
     "PoseGraphEdge",
