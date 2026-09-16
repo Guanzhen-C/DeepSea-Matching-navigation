@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -109,6 +111,19 @@ def test_online_output_source_policy(
         )
         == expected
     )
+
+
+def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
+    launcher = (
+        Path(__file__).resolve().parents[1]
+        / "standalone"
+        / "run_v2_feature_hybrid_slam_isaac.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "--local-frontend feature" in launcher
+    assert "--pose-graph-backend gtsam-fixed-lag-isam2" in launcher
+    assert "--terrain-particle-online-output multimodal-map" in launcher
+    assert "--pose-graph-backend numpy-batch" not in launcher
 
 
 def test_graph_output_keeps_unconfirmed_wrong_cohort_internal() -> None:

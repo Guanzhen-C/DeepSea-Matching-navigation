@@ -14,8 +14,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #     ``--feature-retain-direct-mbes-state-update`` for that hybrid ablation);
 #   * GTSAM incremental fixed-lag graph optimization, cohort particle terrain
 #     tracking, 3-D BBS verification, and map-to-odom soft output correction;
-#     unconfirmed particle modes remain internal and only independently
-#     confirmed measurements can affect the published GTSAM solution;
+#   * the b05477d multimodal output policy: active whole-map recovery modes (or
+#     multiple ordinary terrain modes) temporarily publish the particle MAP,
+#     while a single stable mode publishes GTSAM.  Particle output remains
+#     output-only; only independently confirmed measurements enter GTSAM;
 #   * a transparent subgrid scattering model because the public USGS mosaic is
 #     5 m while the documented V2 along-track sampling is 0.15 m.
 # The regional bathymetry and low-frequency backscatter envelope remain the
@@ -53,6 +55,6 @@ exec "${SCRIPT_DIR}/run_v2_full_map_slam_isaac.sh" \
     --terrain-global-minimum-independent-evidence 3 \
     --terrain-global-cohort-confirmation-probability 0.97 \
     --terrain-global-cohort-confirmation-odds 20 \
-    --terrain-particle-online-output graph \
+    --terrain-particle-online-output multimodal-map \
     --enable-map-to-odom-soft-correction \
     "$@"

@@ -1,5 +1,14 @@
 # Changelog
 
+- Restored the formal feature-front-end launcher to the `b05477d` hybrid
+  terrain-navigation output policy while retaining an explicitly selected
+  GTSAM fixed-lag optimizer. During active whole-map recovery, or while the
+  ordinary terrain posterior has multiple modes, the online Global track uses
+  the particle MAP; after the posterior becomes single-modal it returns to the
+  GTSAM pose. Particle MAP publication remains output-only and does not bypass
+  the independent-evidence requirement for inserting a GTSAM factor. The
+  generic demo still defaults to graph-only, so this behavior is scoped to the
+  formal feature/GTSAM launcher and does not select the NumPy optimizer.
 - Changed the production terrain-navigation output policy to graph-only.
   Particle cohorts and whole-map candidates are still propagated, scored, and
   independently confirmed, but an unconfirmed MAP alias can no longer replace

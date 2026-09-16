@@ -388,13 +388,15 @@ into a pose-graph factor. The recovery chain is:
    but formerly confident false mode. Overlapping windows receive discounted
    weight, and three non-overlapping ping/time windows must support the same
    cohort before confirmation.
-5. The production `graph` output policy always publishes the GTSAM estimate.
-   Particle cohorts remain internal while terrain is ambiguous; only a cohort
-   confirmed by independent acquisition windows can re-seed an outage segment
-   and authorize a robust Cauchy x/y/yaw factor for GTSAM. This prevents a
-   plausible but unconfirmed whole-map alias from causing a temporary Global
-   pose jump. The former provisional `multimodal-map` behavior and the more
-   aggressive `always-map` behavior remain explicit diagnostic A/B modes.
+5. The formal feature/GTSAM launcher uses the `multimodal-map` policy retained
+   from `b05477d`. An active whole-map recovery cohort temporarily supplies the
+   published particle MAP; without global recovery, the ordinary particle MAP
+   is published only while more than one ordinary terrain mode remains. A
+   single stable mode returns output to GTSAM. This selection changes only the
+   online output transform: an independently confirmed current acquisition is
+   still required to re-seed an outage segment or authorize a robust Cauchy
+   x/y/yaw factor for GTSAM. The generic demo continues to default to `graph`,
+   and `always-map` remains the more aggressive diagnostic A/B mode.
 
 With `--enable-terrain-cohort-particle-backend`, the same particle policy also
 sits in front of ordinary bounded terrain factors. Persistent proposals retain
@@ -405,8 +407,9 @@ three non-overlapping observations must support the same propagated mode
 before GTSAM authorization.
 
 The graph never receives the recursive particle posterior as if it were a new
-sensor measurement, and the production online output does not publish an
-unconfirmed MAP mode.
+sensor measurement. The formal hybrid output can publish the current MAP mode
+during ambiguity/recovery, but this provisional output cannot authorize a
+graph factor.
 For every independent 300-ping window, the confirmed
 cohort selects only a local basin. A deterministic search and finite-
 difference Laplace approximation then derive the pose and information matrix

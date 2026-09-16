@@ -167,9 +167,11 @@ standalone/run_v2_feature_hybrid_slam_isaac.sh
 ```
 
 该启动器使用 GTSAM 增量固定滞后图、cohort 粒子地形跟踪、3-D BBS
-验证和 `map -> odom` 软输出校正；正式输出采用 graph-only 策略，未确认
-粒子只在内部保留，经过独立观测确认后才可通过因子影响 GTSAM。可追加
-`--headless`。在现有旧版
+验证和 `map -> odom` 软输出校正；正式输出采用 `b05477d` 的
+`multimodal-map` 混合策略：全局恢复候选活跃或普通地形后验保持多峰时
+临时发布粒子 MAP，恢复单峰后继续发布 GTSAM。粒子 MAP 仅改变在线输出，
+不能绕过独立观测确认而写入 GTSAM 因子。该启动器显式选择 GTSAM，不使用
+NumPy 位姿图。可追加 `--headless`。在现有旧版
 长程 Isaac 进程结束前，不并发启动第二实例，以避免内存/显存争用造成
 “Isaac Sim Python 无响应”。为与上述前端实验一致，启动器从路线 30 km
 处开始并使用仿真真值初始化；这只用于评估相对里程计，不是可部署初始
