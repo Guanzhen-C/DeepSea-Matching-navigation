@@ -41,18 +41,19 @@ def select_terrain_navigation_output_source(
     *,
     global_active_cohorts: int,
     ordinary_active_cohorts: int,
-    global_map_available: bool = True,
-    ordinary_map_available: bool = True,
+    global_map_available: bool,
+    ordinary_map_available: bool,
 ) -> str:
     """Select the validated online pose source without inspecting truth.
 
-    Whole-map recovery hypotheses have priority. Multiple ordinary terrain
-    modes temporarily publish their particle MAP; once the posterior is
-    unimodal, GTSAM again supplies the public pose. A selected particle
-    tracker may still return no pose when its explicit null hypothesis wins.
-    An unavailable whole-map hypothesis must not mask an available ordinary
-    multimodal terrain posterior; GTSAM is used only after both particle
-    sources have been exhausted.
+    Independently confirmed whole-map recovery hypotheses have priority;
+    callers express that confirmation through ``global_map_available``.
+    Unconfirmed whole-map modes remain shadow tracker states. Multiple
+    ordinary terrain modes may temporarily publish their particle MAP; once
+    that posterior is unimodal, GTSAM again supplies the public pose. An
+    unavailable whole-map hypothesis must not mask an available ordinary
+    multimodal terrain posterior; GTSAM is used only after both publishable
+    particle sources have been exhausted.
     """
     counts = {
         "global_active_cohorts": global_active_cohorts,
@@ -727,6 +728,9 @@ class GlobalCohortTracker:
     _last_leading_cohort_id: int | None = field(
         default=None, init=False, repr=False
     )
+    _last_decision: GlobalTrackingDecision | None = field(
+        default=None, init=False, repr=False
+    )
     _last_joint_log_likelihood_span: float = field(
         default=0.0, init=False, repr=False
     )
@@ -815,6 +819,48 @@ class GlobalCohortTracker:
         cohort_id, pose = predictions[0]
         if cohort_id != leading.cohort_id:
             raise RuntimeError("leading terrain cohort order is inconsistent")
+        result = np.asarray(pose, dtype=np.float64).reshape(3).copy()
+        result.setflags(write=False)
+        return result
+
+    def confirmed_maximum_a_posteriori_pose(
+        self, raw_pose2: np.ndarray
+    ) -> np.ndarray | None:
+        """Return the leading MAP pose only while it is independently confirmed.
+
+        Whole-map relocalization proposals are deliberately allowed to remain
+        multimodal and to outrank the explicit null hypothesis while they
+        accumulate evidence.  That makes them useful tracker states, but not
+        yet safe navigation outputs: a repetitive terrain alias can otherwise
+        move ``map->odom`` before the cohort has passed the same independent-
+        evidence, probability, odds, and covariance checks required for a
+        graph prior.
+
+        This accessor reuses the most recent immutable tracking decision and
+        propagates its confirmed leading cohort with the current raw odometry
+        increment.  It has no effect on ordinary terrain tracking, whose
+        provisional multimodal MAP remains available through
+        :meth:`maximum_a_posteriori_pose`.
+        """
+
+        decision = self._last_decision
+        if decision is None or decision.confirmed_cohort is None:
+            return None
+        if not self._cohorts:
+            return None
+        confirmed_cohort_id = decision.confirmed_cohort.cohort_id
+        if self._cohorts[0].cohort_id != confirmed_cohort_id:
+            raise RuntimeError(
+                "confirmed terrain cohort is not the leading posterior mode"
+            )
+        predictions = self.prediction_seeds(raw_pose2)
+        if not predictions:
+            return None
+        cohort_id, pose = predictions[0]
+        if cohort_id != confirmed_cohort_id:
+            raise RuntimeError(
+                "confirmed terrain cohort prediction is inconsistent"
+            )
         result = np.asarray(pose, dtype=np.float64).reshape(3).copy()
         result.setflags(write=False)
         return result
@@ -1861,7 +1907,9 @@ class GlobalCohortTracker:
         self.updates += 1
         self._previous_timestamp_s = timestamp
         self._previous_raw_pose2 = raw.copy()
-        return self._decision(independently_updated_cohort_ids)
+        decision = self._decision(independently_updated_cohort_ids)
+        self._last_decision = decision
+        return decision
 
     def reset(self) -> None:
         """Clear all cohorts after a verified factor has re-anchored the graph."""
@@ -1872,6 +1920,7 @@ class GlobalCohortTracker:
         self._previous_raw_pose2 = None
         self._current_raw_pose2 = None
         self._last_leading_cohort_id = None
+        self._last_decision = None
         self._last_joint_log_likelihood_span = 0.0
         self._last_joint_log_likelihood_std = 0.0
         self._rng = np.random.default_rng(self.config.random_seed)
@@ -1951,6 +2000,10 @@ class GlobalCohortTracker:
             "null_probability": float(self.null_probability),
             "best_probability": float(probabilities[0]) if probabilities else 0.0,
             "second_probability": float(probabilities[1]) if len(probabilities) > 1 else 0.0,
+            "confirmed_navigation_output_available": bool(
+                self._last_decision is not None
+                and self._last_decision.confirmed_cohort is not None
+            ),
         }
 
 

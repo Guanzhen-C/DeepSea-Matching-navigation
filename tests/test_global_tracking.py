@@ -105,6 +105,8 @@ def test_online_output_source_policy(
         select_terrain_navigation_output_source(
             global_active_cohorts=global_count,
             ordinary_active_cohorts=ordinary_count,
+            global_map_available=global_count > 0,
+            ordinary_map_available=ordinary_count > 1,
         )
         == expected
     )
@@ -135,11 +137,15 @@ def test_all_particle_null_hypotheses_fall_back_to_pose_graph() -> None:
 
 
 def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
+    root = Path(__file__).resolve().parents[1]
     launcher = (
-        Path(__file__).resolve().parents[1]
+        root
         / "standalone"
         / "run_v2_full_map_slam_isaac.sh"
     ).read_text(encoding="utf-8")
+    demo = (root / "standalone" / "large_scale_slam_isaac_demo.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "--feature-compute-backend cuda" in launcher
     assert "--pose-graph-fixed-lag-s 180" in launcher
@@ -147,10 +153,12 @@ def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
     assert "--local-frontend" not in launcher
     assert "--pose-graph-backend" not in launcher
     assert "--terrain-particle-online-output" not in launcher
+    assert "confirmed_maximum_a_posteriori_pose" in demo
+    assert "global_unconfirmed_shadow_updates" in demo
 
 
-def test_active_global_recovery_cohort_drives_provisional_output() -> None:
-    """An active whole-map recovery mode has priority over ordinary output."""
+def test_unconfirmed_global_recovery_cohort_remains_shadow_only() -> None:
+    """A plausible whole-map alias may be tracked but cannot drive output."""
 
     tracker = GlobalCohortTracker(_permissive_config(random_seed=41))
     decision = tracker.update(
@@ -168,12 +176,24 @@ def test_active_global_recovery_cohort_drives_provisional_output() -> None:
 
     assert not decision.confirmed
     assert tracker.maximum_a_posteriori_pose(np.zeros(3)) is not None
+    assert tracker.confirmed_maximum_a_posteriori_pose(np.zeros(3)) is None
+    assert (
+        select_terrain_navigation_output_source(
+            global_active_cohorts=tracker.active_cohort_count,
+            ordinary_active_cohorts=3,
+            global_map_available=False,
+            ordinary_map_available=True,
+        )
+        == "ordinary_terrain_particle_map"
+    )
     assert (
         select_terrain_navigation_output_source(
             global_active_cohorts=tracker.active_cohort_count,
             ordinary_active_cohorts=0,
+            global_map_available=False,
+            ordinary_map_available=False,
         )
-        == "global_terrain_particle_map"
+        == "pose_graph"
     )
 
 
@@ -191,6 +211,7 @@ def test_repeated_independent_evidence_confirms_one_persistent_cohort() -> None:
     )
 
     decisions = []
+    navigation_outputs = []
     for index, (raw, mapped) in enumerate(zip(raw_poses, map_poses)):
         start = index * 100
         decisions.append(
@@ -207,10 +228,16 @@ def test_repeated_independent_evidence_confirms_one_persistent_cohort() -> None:
                 ],
             )
         )
+        navigation_outputs.append(
+            tracker.confirmed_maximum_a_posteriori_pose(raw)
+        )
 
     assert not decisions[0].confirmed
     assert not decisions[1].confirmed
     assert decisions[2].confirmed
+    assert navigation_outputs[0] is None
+    assert navigation_outputs[1] is None
+    assert navigation_outputs[2] is not None
     cohort = decisions[2].confirmed_cohort
     assert cohort is not None
     assert cohort.total_evidence == 3
@@ -222,6 +249,41 @@ def test_repeated_independent_evidence_confirms_one_persistent_cohort() -> None:
         + decisions[2].null_probability,
         1.0,
     )
+    np.testing.assert_allclose(navigation_outputs[2], cohort.map_pose2)
+    assert not navigation_outputs[2].flags.writeable
+    assert tracker.diagnostics()[
+        "confirmed_navigation_output_available"
+    ]
+    first_miss_raw = np.array([240.0, 0.0, 0.0])
+    first_miss = tracker.update(
+        timestamp_s=310.0,
+        raw_pose2=first_miss_raw,
+        evidences=[],
+    )
+    assert first_miss.confirmed
+    assert (
+        tracker.confirmed_maximum_a_posteriori_pose(first_miss_raw)
+        is not None
+    )
+    second_miss_raw = np.array([320.0, 0.0, 0.0])
+    second_miss = tracker.update(
+        timestamp_s=410.0,
+        raw_pose2=second_miss_raw,
+        evidences=[],
+    )
+    assert not second_miss.confirmed
+    assert (
+        tracker.confirmed_maximum_a_posteriori_pose(second_miss_raw)
+        is None
+    )
+    assert not tracker.diagnostics()[
+        "confirmed_navigation_output_available"
+    ]
+    tracker.reset()
+    assert tracker.confirmed_maximum_a_posteriori_pose(raw_poses[-1]) is None
+    assert not tracker.diagnostics()[
+        "confirmed_navigation_output_available"
+    ]
 
 
 def test_two_repeatable_aliases_remain_ambiguous_instead_of_selecting_top_one() -> None:
