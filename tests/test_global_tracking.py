@@ -110,6 +110,30 @@ def test_online_output_source_policy(
     )
 
 
+def test_null_global_hypothesis_falls_through_to_ordinary_particle_map() -> None:
+    assert (
+        select_terrain_navigation_output_source(
+            global_active_cohorts=1,
+            ordinary_active_cohorts=9,
+            global_map_available=False,
+            ordinary_map_available=True,
+        )
+        == "ordinary_terrain_particle_map"
+    )
+
+
+def test_all_particle_null_hypotheses_fall_back_to_pose_graph() -> None:
+    assert (
+        select_terrain_navigation_output_source(
+            global_active_cohorts=1,
+            ordinary_active_cohorts=9,
+            global_map_available=False,
+            ordinary_map_available=False,
+        )
+        == "pose_graph"
+    )
+
+
 def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
     launcher = (
         Path(__file__).resolve().parents[1]

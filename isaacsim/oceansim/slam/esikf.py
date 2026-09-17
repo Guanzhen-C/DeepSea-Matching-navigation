@@ -883,9 +883,17 @@ class AcousticESIKF:
         This is the appropriate measurement model for the V2 eight-row
         side-scan KLT frontend: row flow observes displacement along the
         vehicle-forward aperture, but it does not independently observe
-        cross-track position or heading.  A correction projector guarantees
-        that those unobserved pose components cannot move through incidental
-        state cross-covariance.
+        cross-track position or heading.  The measurement is also a
+        prediction-centred relative constraint whose anchor already contains
+        the IMU/DVL propagation.  Letting it update velocity or IMU biases via
+        cross-covariance would therefore count the same motion information
+        twice and can turn a small along-track residual into long-run heading
+        drift.  This is implemented as a covariance-conservative consider
+        update: the scalar prior/measurement variances determine the position
+        blend, but the ESIKF covariance is not contracted because the unknown
+        anchor correlation is not represented in the state.  Attitude,
+        velocity, both IMU biases, cross-track position, depth, and every
+        covariance block therefore retain their previous values.
         """
 
         measurement = float(measured_projection_m)
@@ -905,27 +913,30 @@ class AcousticESIKF:
             [direction_xy[0], direction_xy[1], 0.0], dtype=np.float64
         )
         predicted = float(direction_xy @ self.state.position[:2])
-        jacobian = np.zeros((1, 15), dtype=np.float64)
-        jacobian[0, 3:5] = direction_xy
-
-        correction_projector = np.zeros((15, 15), dtype=np.float64)
-        world_projector = np.outer(direction_world, direction_world)
-        correction_projector[3:6, 3:6] = world_projector
-        correction_projector[6:9, 6:9] = world_projector
-        body_direction = self.state.rotation.T @ direction_world
-        body_direction /= max(float(np.linalg.norm(body_direction)), 1.0e-12)
-        correction_projector[12:15, 12:15] = np.outer(
-            body_direction, body_direction
+        state_axis = np.zeros(15, dtype=np.float64)
+        state_axis[3:6] = direction_world
+        prior_variance = max(
+            float(state_axis @ self.state.covariance @ state_axis),
+            self.config.covariance_floor,
         )
-        return self._kalman_update(
-            np.array([measurement - predicted], dtype=np.float64),
-            jacobian,
-            np.array(
-                [[max(measurement_variance, self.config.covariance_floor)]],
-                dtype=np.float64,
-            ),
-            correction_projector=correction_projector,
+        effective_measurement_variance = max(
+            measurement_variance, self.config.covariance_floor
         )
+        scalar_gain = prior_variance / (
+            prior_variance + effective_measurement_variance
+        )
+        candidate = self.state.copy()
+        candidate.position += (
+            direction_world * scalar_gain * (measurement - predicted)
+        )
+        # Deliberately keep the complete covariance bit-for-bit unchanged.
+        # Even a projected Joseph update changes position/inertial cross
+        # blocks; repeated eigenspectrum regularization then leaks that change
+        # into DVL/IMU gains over a long mission.  The feature module already
+        # carries the relative-factor uncertainty, while its correlation with
+        # the ESIKF anchor is unknown here.
+        self.state = candidate
+        return True
 
     def update_planar_pose(
         self,

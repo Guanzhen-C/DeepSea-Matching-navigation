@@ -444,3 +444,110 @@ def test_along_axis_update_cannot_change_cross_track_depth_or_attitude() -> None
     np.testing.assert_allclose(
         estimator.state.rotation, rotation_before, atol=5.0e-15, rtol=0.0
     )
+
+
+def test_along_axis_update_cannot_reestimate_inertial_motion_states() -> None:
+    generator = np.random.default_rng(911)
+    root = generator.normal(size=(15, 15)) * 0.035
+    covariance = root @ root.T + np.eye(15) * 4.0e-4
+    estimator = AcousticESIKF()
+    estimator.initialize(
+        0.0,
+        rotation=rotation_from_rpy(0.11, -0.07, 0.38),
+        position=np.array([14.0, -9.0, -47.0]),
+        velocity=np.array([1.6, -0.3, 0.08]),
+        gyro_bias=np.array([1.0e-4, -2.0e-4, 3.0e-4]),
+        accel_bias=np.array([0.012, -0.019, 0.008]),
+        covariance=covariance,
+    )
+    before = estimator.state.copy()
+    axis = np.array([0.8, 0.6])
+    measured_projection = float(axis @ before.position[:2] - 1.25)
+
+    assert estimator.update_horizontal_position_along_axis(
+        measured_projection, axis, 0.05**2
+    )
+
+    displacement = estimator.state.position - before.position
+    assert abs(float(axis @ displacement[:2])) > 0.1
+    assert abs(float(np.array([-axis[1], axis[0]]) @ displacement[:2])) < 1.0e-12
+    assert displacement[2] == 0.0
+    np.testing.assert_allclose(estimator.state.rotation, before.rotation, atol=0.0)
+    np.testing.assert_allclose(estimator.state.velocity, before.velocity, atol=0.0)
+    np.testing.assert_allclose(estimator.state.gyro_bias, before.gyro_bias, atol=0.0)
+    np.testing.assert_allclose(estimator.state.accel_bias, before.accel_bias, atol=0.0)
+
+    # The relative feature factor reuses the ESIKF anchor, so its unknown
+    # cross-correlation must not make any part of that filter more confident.
+    # Otherwise later DVL/IMU updates can carry the repeated information into
+    # velocity, bias, or heading.
+    np.testing.assert_allclose(
+        estimator.state.covariance,
+        before.covariance,
+        rtol=0.0,
+        atol=0.0,
+    )
+
+
+def test_along_axis_updates_cannot_create_future_heading_or_bias_drift() -> None:
+    generator = np.random.default_rng(912)
+    root = generator.normal(size=(15, 15)) * 0.025
+    covariance = root @ root.T + np.eye(15) * 5.0e-4
+    common = dict(
+        rotation=rotation_from_rpy(0.04, -0.03, 0.5),
+        position=np.array([80.0, -35.0, -52.0]),
+        velocity=np.array([1.45, 0.16, -0.04]),
+        gyro_bias=np.array([8.0e-5, -1.1e-4, 1.7e-4]),
+        accel_bias=np.array([0.009, -0.013, 0.006]),
+        covariance=covariance,
+    )
+    reference = AcousticESIKF()
+    corrected = AcousticESIKF()
+    reference.initialize(0.0, **common)
+    corrected.initialize(0.0, **common)
+
+    axis = np.array([math.cos(0.5), math.sin(0.5)])
+    projection = float(axis @ corrected.state.position[:2] + 0.7)
+    assert corrected.update_horizontal_position_along_axis(
+        projection, axis, 0.08**2
+    )
+
+    for sample in range(1, 301):
+        timestamp = 0.02 * sample
+        gyro = np.array([0.003, -0.002, 0.018])
+        specific_force = np.array([0.07, -0.025, 9.79])
+        assert reference.propagate(timestamp, gyro, specific_force)
+        assert corrected.propagate(timestamp, gyro, specific_force)
+        if sample % 5 == 0:
+            dvl = np.array([1.47, -0.57, -0.06])
+            assert reference.update_dvl(dvl)
+            assert corrected.update_dvl(dvl)
+        if sample % 10 == 0:
+            heading = float(rpy_from_rotation(corrected.state.rotation)[2])
+            axis = np.array([math.cos(heading), math.sin(heading)])
+            projection = float(
+                axis @ corrected.state.position[:2]
+                + 0.35 * math.sin(0.13 * sample)
+            )
+            assert corrected.update_horizontal_position_along_axis(
+                projection, axis, 0.08**2
+            )
+
+    np.testing.assert_allclose(
+        corrected.state.rotation, reference.state.rotation, rtol=0.0, atol=2.0e-13
+    )
+    np.testing.assert_allclose(
+        corrected.state.velocity, reference.state.velocity, rtol=0.0, atol=2.0e-12
+    )
+    np.testing.assert_allclose(
+        corrected.state.gyro_bias, reference.state.gyro_bias, rtol=0.0, atol=2.0e-13
+    )
+    np.testing.assert_allclose(
+        corrected.state.accel_bias, reference.state.accel_bias, rtol=0.0, atol=2.0e-12
+    )
+    np.testing.assert_allclose(
+        corrected.state.covariance,
+        reference.state.covariance,
+        rtol=0.0,
+        atol=0.0,
+    )

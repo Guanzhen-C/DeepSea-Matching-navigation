@@ -41,14 +41,18 @@ def select_terrain_navigation_output_source(
     *,
     global_active_cohorts: int,
     ordinary_active_cohorts: int,
+    global_map_available: bool = True,
+    ordinary_map_available: bool = True,
 ) -> str:
     """Select the validated online pose source without inspecting truth.
 
     Whole-map recovery hypotheses have priority. Multiple ordinary terrain
     modes temporarily publish their particle MAP; once the posterior is
     unimodal, GTSAM again supplies the public pose. A selected particle
-    tracker may still return no pose when its explicit null hypothesis wins,
-    in which case the caller falls back to GTSAM.
+    tracker may still return no pose when its explicit null hypothesis wins.
+    An unavailable whole-map hypothesis must not mask an available ordinary
+    multimodal terrain posterior; GTSAM is used only after both particle
+    sources have been exhausted.
     """
     counts = {
         "global_active_cohorts": global_active_cohorts,
@@ -57,10 +61,17 @@ def select_terrain_navigation_output_source(
     for name, value in counts.items():
         if isinstance(value, bool) or int(value) != value or int(value) < 0:
             raise ValueError(f"{name} must be a nonnegative integer")
+    availability = {
+        "global_map_available": global_map_available,
+        "ordinary_map_available": ordinary_map_available,
+    }
+    for name, value in availability.items():
+        if not isinstance(value, (bool, np.bool_)):
+            raise TypeError(f"{name} must be boolean")
 
-    if int(global_active_cohorts) > 0:
+    if int(global_active_cohorts) > 0 and bool(global_map_available):
         return "global_terrain_particle_map"
-    if int(ordinary_active_cohorts) > 1:
+    if int(ordinary_active_cohorts) > 1 and bool(ordinary_map_available):
         return "ordinary_terrain_particle_map"
     return "pose_graph"
 

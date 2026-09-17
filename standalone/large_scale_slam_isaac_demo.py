@@ -2880,8 +2880,12 @@ def main() -> int:
         "ordinary_particle_map_updates": 0,
         "global_particle_map_updates": 0,
         "pose_graph_fallback_updates": 0,
+        "global_null_fallback_updates": 0,
+        "ordinary_fallback_after_global_null_updates": 0,
         "last_source": "pose_graph",
         "last_particle_map_pose2": None,
+        "last_global_particle_map_available": False,
+        "last_ordinary_particle_map_available": False,
     }
     global_relocalization_stats = {
         "invocations": 0,
@@ -4756,47 +4760,59 @@ def main() -> int:
             if terrain_backend_particle_tracker is None
             else terrain_backend_particle_tracker.active_cohort_count
         )
-        preferred_source = select_terrain_navigation_output_source(
-            global_active_cohorts=global_active_cohorts,
-            ordinary_active_cohorts=ordinary_active_cohorts,
+        local_pose2 = np.array(
+            [
+                slam.state.position[0],
+                slam.state.position[1],
+                rpy_from_rotation(slam.state.rotation)[2],
+            ],
+            dtype=np.float64,
         )
-        particle_map_pose2 = None
-        particle_map_source = None
-        if (
-            preferred_source == "global_terrain_particle_map"
-            and global_cohort_tracker is not None
-        ):
-            local_pose2 = np.array(
-                [
-                    slam.state.position[0],
-                    slam.state.position[1],
-                    rpy_from_rotation(slam.state.rotation)[2],
-                ],
-                dtype=np.float64,
-            )
-            particle_map_pose2 = (
+        global_particle_map_pose2 = None
+        if global_active_cohorts > 0 and global_cohort_tracker is not None:
+            global_particle_map_pose2 = (
                 global_cohort_tracker.maximum_a_posteriori_pose(local_pose2)
             )
-            if particle_map_pose2 is not None:
-                particle_map_source = "global_terrain_particle_map"
+        ordinary_particle_map_pose2 = None
         if (
-            preferred_source == "ordinary_terrain_particle_map"
+            ordinary_active_cohorts > 1
             and terrain_backend_particle_tracker is not None
         ):
-            local_pose2 = np.array(
-                [
-                    slam.state.position[0],
-                    slam.state.position[1],
-                    rpy_from_rotation(slam.state.rotation)[2],
-                ],
-                dtype=np.float64,
-            )
-            particle_map_pose2 = (
+            ordinary_particle_map_pose2 = (
                 terrain_backend_particle_tracker
                 .maximum_a_posteriori_pose(local_pose2)
             )
-            if particle_map_pose2 is not None:
-                particle_map_source = "ordinary_terrain_particle_map"
+        global_map_available = global_particle_map_pose2 is not None
+        ordinary_map_available = ordinary_particle_map_pose2 is not None
+        terrain_navigation_output_stats[
+            "last_global_particle_map_available"
+        ] = bool(global_map_available)
+        terrain_navigation_output_stats[
+            "last_ordinary_particle_map_available"
+        ] = bool(ordinary_map_available)
+        if global_active_cohorts > 0 and not global_map_available:
+            terrain_navigation_output_stats[
+                "global_null_fallback_updates"
+            ] += 1
+
+        preferred_source = select_terrain_navigation_output_source(
+            global_active_cohorts=global_active_cohorts,
+            ordinary_active_cohorts=ordinary_active_cohorts,
+            global_map_available=global_map_available,
+            ordinary_map_available=ordinary_map_available,
+        )
+        particle_map_pose2 = None
+        particle_map_source = None
+        if preferred_source == "global_terrain_particle_map":
+            particle_map_pose2 = global_particle_map_pose2
+            particle_map_source = preferred_source
+        elif preferred_source == "ordinary_terrain_particle_map":
+            particle_map_pose2 = ordinary_particle_map_pose2
+            particle_map_source = preferred_source
+            if global_active_cohorts > 0 and not global_map_available:
+                terrain_navigation_output_stats[
+                    "ordinary_fallback_after_global_null_updates"
+                ] += 1
         if particle_map_pose2 is None:
             terrain_navigation_output_stats[
                 "pose_graph_fallback_updates"
@@ -8031,8 +8047,41 @@ def main() -> int:
                                 slam.state.position - truth.position
                             )
                         )
+                        dead_reckoning_error = float(
+                            np.linalg.norm(
+                                dead_reckoning.state.position - truth.position
+                            )
+                        )
                         global_error = float(
                             np.linalg.norm(global_position - truth.position)
+                        )
+                        truth_yaw = float(
+                            rpy_from_rotation(truth.rotation)[2]
+                        )
+                        local_yaw = float(
+                            rpy_from_rotation(slam.state.rotation)[2]
+                        )
+                        dead_reckoning_yaw = float(
+                            rpy_from_rotation(
+                                dead_reckoning.state.rotation
+                            )[2]
+                        )
+                        local_yaw_error = math.atan2(
+                            math.sin(local_yaw - truth_yaw),
+                            math.cos(local_yaw - truth_yaw),
+                        )
+                        dead_reckoning_yaw_error = math.atan2(
+                            math.sin(dead_reckoning_yaw - truth_yaw),
+                            math.cos(dead_reckoning_yaw - truth_yaw),
+                        )
+                        local_error_world = (
+                            slam.state.position - truth.position
+                        )
+                        truth_forward_xy = np.array(
+                            [math.cos(truth_yaw), math.sin(truth_yaw)]
+                        )
+                        truth_left_xy = np.array(
+                            [-math.sin(truth_yaw), math.cos(truth_yaw)]
                         )
                         elapsed_wall_s = time.monotonic() - started
                         checkpoint = {
@@ -8046,8 +8095,21 @@ def main() -> int:
                                 / max(route_report.path_length_m, 1.0e-12)
                             ),
                             "pings": ping_count,
+                            "dead_reckoning_error_m": dead_reckoning_error,
                             "local_error_m": local_error,
                             "online_global_error_m": global_error,
+                            "dead_reckoning_yaw_error_deg": float(
+                                np.rad2deg(dead_reckoning_yaw_error)
+                            ),
+                            "local_yaw_error_deg": float(
+                                np.rad2deg(local_yaw_error)
+                            ),
+                            "local_along_track_error_m": float(
+                                truth_forward_xy @ local_error_world[:2]
+                            ),
+                            "local_cross_track_error_m": float(
+                                truth_left_xy @ local_error_world[:2]
+                            ),
                             "keyframes": diagnostics.pose_graph.keyframes,
                             "loop_edges": diagnostics.pose_graph.loop_edges,
                             "pose_graph_optimizer_backend": (
@@ -8137,6 +8199,26 @@ def main() -> int:
                                     "particle_map_updates"
                                 ]
                             ),
+                            "terrain_navigation_global_map_available": bool(
+                                terrain_navigation_output_stats[
+                                    "last_global_particle_map_available"
+                                ]
+                            ),
+                            "terrain_navigation_ordinary_map_available": bool(
+                                terrain_navigation_output_stats[
+                                    "last_ordinary_particle_map_available"
+                                ]
+                            ),
+                            "terrain_navigation_global_null_fallback_updates": int(
+                                terrain_navigation_output_stats[
+                                    "global_null_fallback_updates"
+                                ]
+                            ),
+                            "terrain_navigation_ordinary_fallback_after_global_null_updates": int(
+                                terrain_navigation_output_stats[
+                                    "ordinary_fallback_after_global_null_updates"
+                                ]
+                            ),
                             "terrain_consecutive_failed_observations": (
                                 terrain_recovery.consecutive_failed_observations
                             ),
@@ -8168,7 +8250,12 @@ def main() -> int:
                             "[OceanSim progress] "
                             f"{travelled_distance_online_m / 1000.0:.1f} km / "
                             f"{route_report.path_length_m / 1000.0:.1f} km, "
-                            f"local/global {local_error:.3f}/{global_error:.3f} m, "
+                            "DR/local/global "
+                            f"{dead_reckoning_error:.3f}/{local_error:.3f}/"
+                            f"{global_error:.3f} m, "
+                            "yaw DR/local "
+                            f"{np.rad2deg(dead_reckoning_yaw_error):.2f}/"
+                            f"{np.rad2deg(local_yaw_error):.2f} deg, "
                             f"KF {diagnostics.pose_graph.keyframes}, "
                             f"loops {diagnostics.pose_graph.loop_edges}, "
                             f"terrain {terrain_prior_accepts}/"
@@ -8177,6 +8264,13 @@ def main() -> int:
                             f"{terrain_match_mode_stats['recovery']['invocations']}, "
                             "emergency "
                             f"{terrain_match_mode_stats['emergency']['invocations']}), "
+                            "source "
+                            f"{terrain_navigation_output_stats['last_source']}, "
+                            "modes G/O "
+                            f"{checkpoint['terrain_global_active_cohorts']}/"
+                            f"{checkpoint['terrain_backend_active_cohorts']}, "
+                            "failed "
+                            f"{terrain_recovery.consecutive_failed_observations}, "
                             f"{checkpoint['achieved_time_scale']:.1f}x achieved",
                             flush=True,
                         )
