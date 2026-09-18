@@ -1,18 +1,35 @@
 # Changelog
 
+## 改进版：确认后发布的全图重定位（2026-09-18）
+
+- 全图重定位候选继续由 cohort particle filter 跟踪，但在通过独立证据、
+  后验概率、优势比和协方差检查前仅作为影子状态，不能改变在线
+  `map -> odom` 输出；未确认期间回退到普通多模态粒子 MAP 或 GTSAM。
+- 在相同 73.070 km 路线、相同 243,569 个 5 Hz 样本和相同随机种子下，
+  与 `stable-long-range-slam-20260917` 严格 A/B 对比：Online Global RMSE
+  从 18.55 m 降至 6.36 m，P95 从 14.00 m 降至 11.71 m，最大误差从
+  459.95 m 降至 53.85 m；原 59--60.5 km 风险区间峰值从 459.95 m
+  降至 14.78 m，最终误差保持 4.35 m。DR、Local、固定滞后图优化和
+  全历史 iSAM2 诊断逐样本不变，说明差异来自在线发布仲裁，而非随机
+  波动或前端变化。
+- 本版保留科学边界：31.77 km 仍出现 53.85 m 的短时 Online Global
+  峰值，后续应独立分析；本次结果是确定性仿真验证，不是海试精度声明。
+
 - Consolidated the large-area SLAM demo into one production estimator. Local
   is now always the co-registered MBES/side-scan feature frontend with no
   direct point-to-self-map or same-echo intensity state write. Global is now
   always the cohort particle terrain tracker, native 3-D BBS verification,
   GTSAM incremental fixed-lag graph, and bounded `map -> odom` correction. The
-  validated multimodal output rule is fixed: whole-map recovery cohorts take
-  priority, multiple ordinary terrain modes temporarily publish the particle
-  MAP, and a single stable mode publishes GTSAM. Removed the NumPy batch graph,
-  Direct/Hybrid frontend switches, graph-only/always-map output policies, A/B
-  launchers, factor replay/comparison programs, and the extra wrapper. The sole
-  production entry is `standalone/run_v2_full_map_slam_isaac.sh`. Historical
-  entries below describe experiments that led to this selection; their
-  retired switches and launchers are no longer present.
+  validated multimodal output rule is fixed: only independently confirmed
+  whole-map recovery cohorts take priority, unconfirmed whole-map candidates
+  remain shadow states, multiple ordinary terrain modes temporarily publish
+  the particle MAP, and a single stable mode publishes GTSAM. Removed the
+  NumPy batch graph, Direct/Hybrid frontend switches, graph-only/always-map
+  output policies, A/B launchers, factor replay/comparison programs, and the
+  extra wrapper. The sole production entry is
+  `standalone/run_v2_full_map_slam_isaac.sh`. Historical entries below describe
+  experiments that led to this selection; their retired switches and launchers
+  are no longer present.
 - Added an optional CUDA compute backend for the feature Local frontend. The
   256 prediction-centred RANSAC hypotheses are evaluated in one PyTorch CUDA
   batch in float64; the selected consensus, observability test, covariance,
