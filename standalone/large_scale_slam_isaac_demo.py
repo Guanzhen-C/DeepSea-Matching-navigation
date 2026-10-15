@@ -2162,6 +2162,15 @@ def _follow_live_camera(truth) -> None:
 
 def main() -> int:
     world_model = MeasuredBathymetryGrid.from_path(ARGS.bathymetry)
+    terrain_source_label = str(
+        world_model.metadata.get("source_product")
+        or world_model.metadata.get("title")
+        or Path(ARGS.bathymetry).name
+    )
+    backscatter_source_label = str(
+        world_model.metadata.get("backscatter_source_product")
+        or terrain_source_label
+    )
     profile_mode = {
         "v2-standard": "standard",
         "v2-high-resolution": "high",
@@ -5372,7 +5381,7 @@ def main() -> int:
             world.step(render=True)
         world.play()
         print(
-            f"[OceanSim] complete measured Monterey Canyon "
+            f"[OceanSim] measured terrain {terrain_source_label}: "
             f"{world_model.width / 1000.0:.2f} x "
             f"{world_model.length / 1000.0:.2f} km + full-scale LAUV "
             f"{'headless runtime is active' if ARGS.headless else 'UI is live'}; "
@@ -8960,16 +8969,14 @@ def main() -> int:
                 ),
             },
             "scene_m": [world_model.width, world_model.length],
-            "terrain_source": world_model.metadata.get("source_product", "unknown"),
+            "terrain_source": terrain_source_label,
             "terrain_resolution_m": world_model.resolution_m,
             "terrain_matching_reference": (
                 {
                     "enabled": terrain_matcher is not None,
                     "map_role": "georeferenced prior bathymetry",
                     "surface_model": terrain_prior_model_kind,
-                    "source_product": world_model.metadata.get(
-                        "source_product", "unknown"
-                    ),
+                    "source_product": terrain_source_label,
                     "resolution_m": world_model.resolution_m,
                     "vertical_model_std_m": (
                         terrain_prior_vertical_model_std_m
@@ -8993,10 +9000,7 @@ def main() -> int:
                     "georeferenced side-scan texture refinement of accepted "
                     "bathymetric fixes"
                 ),
-                "source_product": world_model.metadata.get(
-                    "backscatter_source_product",
-                    world_model.metadata.get("source_product", "unknown"),
-                ),
+                "source_product": backscatter_source_label,
                 "resolution_m": world_model.resolution_m,
                 "radiometry": (
                     "unitless normalized survey mosaic; port/starboard and "
@@ -9155,14 +9159,17 @@ def main() -> int:
                 ARGS.subgrid_reflectivity_amplitude
             ),
             "reflectivity_provenance": (
-                "measured USGS 5 m mosaic only"
+                f"measured acoustic mosaic ({terrain_source_label}) only"
                 if ARGS.subgrid_reflectivity_amplitude == 0.0
                 else (
-                    "measured USGS 5 m envelope plus explicitly synthetic "
-                    "world-fixed unresolved scattering"
+                    f"measured acoustic mosaic ({terrain_source_label}) plus "
+                    "explicitly synthetic world-fixed unresolved scattering"
                 )
             ),
-            "bounds_utm_m": world_model.metadata.get("bounds_utm_m", {}),
+            "bounds_utm_m": world_model.metadata.get(
+                "bounds_utm_m",
+                world_model.metadata.get("bounds_projected_m", {}),
+            ),
             "vehicle": "LSTS/OceanScan LAUV",
             "sonar_profile": sonar_profile.to_metadata(),
             "sonar_profile_interpretation": {

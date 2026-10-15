@@ -1,0 +1,69 @@
+{
+  "catalog_version": 1,
+  "assembled_on": "2026-09-18",
+  "active_simulation_map_changed": false,
+  "datasets": [
+    {
+      "id": "lake_chelan_usgs_2023_3m",
+      "title": "Lake Chelan multibeam bathymetry and backscatter",
+      "provider": "USGS",
+      "doi": "10.5066/P1GE3YDR",
+      "landing_page": "https://www.usgs.gov/data/multibeam-bathymetry-data-and-gridded-surfaces-lake-chelan-washington-collected-during-usgs",
+      "path": "lake_chelan_usgs_2023_3m",
+      "survey_year": 2023,
+      "products": ["bathymetry", "multibeam_backscatter"],
+      "nominal_resolution_m": [3.0],
+      "horizontal_crs": "NAD83(2011) / UTM zone 10N",
+      "vertical_datum": "NAVD88",
+      "download_complete": true,
+      "archive_integrity": "publisher MD5 verified"
+    },
+    {
+      "id": "jenkinson_lake_usgs_2023",
+      "title": "Jenkinson Lake bathymetry and acoustic backscatter",
+      "provider": "USGS",
+      "doi": "10.5066/P13BSSDY",
+      "landing_page": "https://www.usgs.gov/data/bathymetry-and-acoustic-backscatter-data-jenkinson-lake-california-collected-during-three-usgs",
+      "path": "jenkinson_lake_usgs_2023",
+      "survey_year": 2023,
+      "products": ["bathymetry", "interferometric_sonar_backscatter"],
+      "nominal_resolution_m": [0.5, 1.0],
+      "vertical_datum": "NAVD88",
+      "download_complete": true,
+      "archive_integrity": "publisher MD5 verified"
+    },
+    {
+      "id": "wallops_assawoman_usgs_2024_1m",
+      "title": "Wallops and Assawoman Islands coastal multibeam bathymetry and backscatter",
+      "provider": "USGS",
+      "doi": "10.5066/P14SGUMT",
+      "landing_page": "https://coastal.er.usgs.gov/data-release/doi-P14SGUMT/",
+      "path": "wallops_assawoman_usgs_2024_1m",
+      "survey_year": 2024,
+      "products": ["bathymetry_xyz", "cube_uncertainty", "multibeam_backscatter"],
+      "nominal_resolution_m": [1.0],
+      "bathymetry_nodes": 34649380,
+      "horizontal_crs": ["WGS84 (G2139) / UTM zone 18N", "NAD83 / Virginia South State Plane"],
+      "vertical_datum": ["WGS84 (G2139) ellipsoid", "NAVD88 GEOID18"],
+      "archive_bytes": 1990115246,
+      "download_complete": true,
+      "archive_integrity": "ZIP test passed; locally computed SHA-256 recorded"
+    },
+    {
+      "id": "lake_michigan_sheboygan_noaa_2018",
+      "title": "Wisconsin Lake Michigan lakebed imagery — Sheboygan survey W00463",
+      "provider": "NOAA NCCOS/NCEI",
+      "accession": "0222391",
+      "landing_page": "https://www.ncei.noaa.gov/archive/archive-management-system/OAS/bin/prd/jquery/accession/details/222391",
+      "path": "lake_michigan_sheboygan_noaa_2018",
+      "survey_year": 2018,
+      "products": ["multibeam_bathymetry", "multibeam_backscatter", "dual_frequency_sidescan", "bathymetric_derivatives"],
+      "nominal_resolution_m": [0.5, 1.0, 2.0, 4.0],
+      "sonars": ["Kongsberg EM2040C", "Klein System 3000"],
+      "horizontal_crs": ["NAD83 / UTM zone 16N", "WGS84 / UTM zone 16N", "NAD83 / UTM zone 18N for HF sidescan"],
+      "archive_bytes": 458384931,
+      "download_complete": true,
+      "archive_integrity": "ZIP test passed; locally computed SHA-256 recorded"
+    }
+  ]
+}
