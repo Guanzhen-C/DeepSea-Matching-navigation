@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCAL_FRONTEND = "feature"
 LOCAL_INTENSITY_STATE_UPDATE_ENABLED = False
 POSE_GRAPH_BACKEND = "gtsam-fixed-lag-isam2"
-TERRAIN_PARTICLE_ONLINE_OUTPUT = "multimodal-map"
+TERRAIN_PARTICLE_ONLINE_OUTPUT = "confirmed-particle-or-graph"
 MAP_TO_ODOM_SOFT_CORRECTION_ENABLED = True
 
 
@@ -2891,12 +2891,15 @@ def main() -> int:
         "pose_graph_fallback_updates": 0,
         "global_null_fallback_updates": 0,
         "global_unconfirmed_shadow_updates": 0,
+        "ordinary_null_fallback_updates": 0,
+        "ordinary_unconfirmed_shadow_updates": 0,
         "ordinary_fallback_after_global_null_updates": 0,
         "ordinary_fallback_after_global_shadow_updates": 0,
         "last_source": "pose_graph",
         "last_particle_map_pose2": None,
         "last_global_provisional_map_available": False,
         "last_global_particle_map_available": False,
+        "last_ordinary_provisional_map_available": False,
         "last_ordinary_particle_map_available": False,
     }
     global_relocalization_stats = {
@@ -4792,19 +4795,27 @@ def main() -> int:
                 global_cohort_tracker
                 .confirmed_maximum_a_posteriori_pose(local_pose2)
             )
+        ordinary_provisional_map_pose2 = None
         ordinary_particle_map_pose2 = None
         if (
             ordinary_active_cohorts > 1
             and terrain_backend_particle_tracker is not None
         ):
-            ordinary_particle_map_pose2 = (
+            ordinary_provisional_map_pose2 = (
                 terrain_backend_particle_tracker
                 .maximum_a_posteriori_pose(local_pose2)
+            )
+            ordinary_particle_map_pose2 = (
+                terrain_backend_particle_tracker
+                .confirmed_maximum_a_posteriori_pose(local_pose2)
             )
         global_provisional_map_available = (
             global_provisional_map_pose2 is not None
         )
         global_map_available = global_particle_map_pose2 is not None
+        ordinary_provisional_map_available = (
+            ordinary_provisional_map_pose2 is not None
+        )
         ordinary_map_available = ordinary_particle_map_pose2 is not None
         terrain_navigation_output_stats[
             "last_global_provisional_map_available"
@@ -4812,6 +4823,9 @@ def main() -> int:
         terrain_navigation_output_stats[
             "last_global_particle_map_available"
         ] = bool(global_map_available)
+        terrain_navigation_output_stats[
+            "last_ordinary_provisional_map_available"
+        ] = bool(ordinary_provisional_map_available)
         terrain_navigation_output_stats[
             "last_ordinary_particle_map_available"
         ] = bool(ordinary_map_available)
@@ -4823,12 +4837,20 @@ def main() -> int:
             terrain_navigation_output_stats[
                 "global_unconfirmed_shadow_updates"
             ] += 1
+        if ordinary_active_cohorts > 1 and not ordinary_provisional_map_available:
+            terrain_navigation_output_stats[
+                "ordinary_null_fallback_updates"
+            ] += 1
+        elif ordinary_provisional_map_available and not ordinary_map_available:
+            terrain_navigation_output_stats[
+                "ordinary_unconfirmed_shadow_updates"
+            ] += 1
 
         preferred_source = select_terrain_navigation_output_source(
             global_active_cohorts=global_active_cohorts,
             ordinary_active_cohorts=ordinary_active_cohorts,
-            global_map_available=global_map_available,
-            ordinary_map_available=ordinary_map_available,
+            global_confirmed_map_available=global_map_available,
+            ordinary_confirmed_map_available=ordinary_map_available,
         )
         particle_map_pose2 = None
         particle_map_source = None
@@ -8247,6 +8269,11 @@ def main() -> int:
                                     "last_ordinary_particle_map_available"
                                 ]
                             ),
+                            "terrain_navigation_ordinary_provisional_map_available": bool(
+                                terrain_navigation_output_stats[
+                                    "last_ordinary_provisional_map_available"
+                                ]
+                            ),
                             "terrain_navigation_global_null_fallback_updates": int(
                                 terrain_navigation_output_stats[
                                     "global_null_fallback_updates"
@@ -8255,6 +8282,11 @@ def main() -> int:
                             "terrain_navigation_global_unconfirmed_shadow_updates": int(
                                 terrain_navigation_output_stats[
                                     "global_unconfirmed_shadow_updates"
+                                ]
+                            ),
+                            "terrain_navigation_ordinary_unconfirmed_shadow_updates": int(
+                                terrain_navigation_output_stats[
+                                    "ordinary_unconfirmed_shadow_updates"
                                 ]
                             ),
                             "terrain_navigation_ordinary_fallback_after_global_null_updates": int(
@@ -8860,9 +8892,9 @@ def main() -> int:
                     "GTSAM IncrementalFixedLagSmoother active-window estimate; "
                     "marginalized poses retain their last online value, while "
                     "confirmed cross-window factors supply a rigid global map "
-                    "anchor; a whole-map terrain cohort remains shadow-only "
-                    "until independently confirmed, while an available ordinary "
-                    "multimodal terrain MAP may drive the provisional target; "
+                    "anchor; whole-map and ordinary terrain particle cohorts "
+                    "remain shadow-only until independently confirmed; only a "
+                    "confirmed particle cohort may temporarily drive the target, "
                     "otherwise output uses the graph; the published map->odom "
                     "transform follows that target continuously with bounded rates"
                 ),
@@ -9619,9 +9651,11 @@ def main() -> int:
                     "current_independent_raw_sonar_likelihood_local_laplace"
                 ),
                 "online_output_source": (
-                    "confirmed_whole_map_or_ordinary_multimodal_MAP_or_pose_graph"
+                    "confirmed_whole_map_or_confirmed_ordinary_particle_MAP_"
+                    "or_pose_graph"
                 ),
                 "whole_map_proposals_are_shadow_only_until_confirmed": True,
+                "ordinary_proposals_are_shadow_only_until_confirmed": True,
                 "online_output_is_factor_authorization": False,
                 "online_output_statistics": dict(
                     terrain_navigation_output_stats

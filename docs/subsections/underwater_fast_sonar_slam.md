@@ -329,14 +329,15 @@ into a pose-graph factor. The recovery chain is:
    but formerly confident false mode. Overlapping windows receive discounted
    weight, and three non-overlapping ping/time windows must support the same
    cohort before confirmation.
-5. The production estimator uses the validated multimodal output rule retained
-   from `b05477d`. An active whole-map recovery cohort temporarily supplies the
-   published particle MAP; without global recovery, the ordinary particle MAP
-   is published only while more than one ordinary terrain mode remains. A
-   single stable mode returns output to GTSAM. This selection changes only the
-   online output transform: an independently confirmed current acquisition is
-   still required to re-seed an outage segment or authorize a robust Cauchy
-   x/y/yaw factor for GTSAM. This is the only published-output policy.
+5. The production estimator publishes a particle pose only after the leading
+   whole-map or ordinary terrain cohort passes the independent-evidence,
+   posterior-probability, odds, covariance, and current-observation checks.
+   Every unconfirmed mode remains a shadow tracker state, even when it is the
+   particle MAP and currently outranks the explicit null hypothesis. GTSAM
+   supplies the online output during that ambiguity. This prevents repetitive
+   or weak terrain from moving `map -> odom` before the estimator has enough
+   independent evidence, while preserving every cohort for continued tracking
+   and later confirmation. This is the only published-output policy.
 
 The same particle policy also sits in front of ordinary bounded terrain
 factors. Persistent proposals retain

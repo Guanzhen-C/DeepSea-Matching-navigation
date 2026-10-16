@@ -41,19 +41,18 @@ def select_terrain_navigation_output_source(
     *,
     global_active_cohorts: int,
     ordinary_active_cohorts: int,
-    global_map_available: bool,
-    ordinary_map_available: bool,
+    global_confirmed_map_available: bool,
+    ordinary_confirmed_map_available: bool,
 ) -> str:
     """Select the validated online pose source without inspecting truth.
 
-    Independently confirmed whole-map recovery hypotheses have priority;
-    callers express that confirmation through ``global_map_available``.
-    Unconfirmed whole-map modes remain shadow tracker states. Multiple
-    ordinary terrain modes may temporarily publish their particle MAP; once
-    that posterior is unimodal, GTSAM again supplies the public pose. An
-    unavailable whole-map hypothesis must not mask an available ordinary
-    multimodal terrain posterior; GTSAM is used only after both publishable
-    particle sources have been exhausted.
+    Independently confirmed whole-map recovery hypotheses have priority.
+    A confirmed ordinary terrain cohort may provide a temporary output while
+    several ordinary cohorts remain active, but an unconfirmed particle MAP
+    is always a shadow state. This prevents a weakly separated mode in flat or
+    repetitive terrain from moving ``map->odom`` merely because it currently
+    outranks the explicit null hypothesis. GTSAM supplies the public pose when
+    neither tracker has a confirmed publishable cohort.
     """
     counts = {
         "global_active_cohorts": global_active_cohorts,
@@ -63,16 +62,22 @@ def select_terrain_navigation_output_source(
         if isinstance(value, bool) or int(value) != value or int(value) < 0:
             raise ValueError(f"{name} must be a nonnegative integer")
     availability = {
-        "global_map_available": global_map_available,
-        "ordinary_map_available": ordinary_map_available,
+        "global_confirmed_map_available": global_confirmed_map_available,
+        "ordinary_confirmed_map_available": (
+            ordinary_confirmed_map_available
+        ),
     }
     for name, value in availability.items():
         if not isinstance(value, (bool, np.bool_)):
             raise TypeError(f"{name} must be boolean")
 
-    if int(global_active_cohorts) > 0 and bool(global_map_available):
+    if int(global_active_cohorts) > 0 and bool(
+        global_confirmed_map_available
+    ):
         return "global_terrain_particle_map"
-    if int(ordinary_active_cohorts) > 1 and bool(ordinary_map_available):
+    if int(ordinary_active_cohorts) > 1 and bool(
+        ordinary_confirmed_map_available
+    ):
         return "ordinary_terrain_particle_map"
     return "pose_graph"
 
@@ -838,9 +843,11 @@ class GlobalCohortTracker:
 
         This accessor reuses the most recent immutable tracking decision and
         propagates its confirmed leading cohort with the current raw odometry
-        increment.  It has no effect on ordinary terrain tracking, whose
-        provisional multimodal MAP remains available through
-        :meth:`maximum_a_posteriori_pose`.
+        increment. Both whole-map recovery and ordinary terrain trackers must
+        use this accessor before allowing a particle state to affect the
+        published navigation pose. The provisional MAP remains available via
+        :meth:`maximum_a_posteriori_pose` for diagnostics and continued
+        hypothesis tracking only.
         """
 
         decision = self._last_decision

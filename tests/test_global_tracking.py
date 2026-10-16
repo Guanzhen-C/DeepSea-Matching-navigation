@@ -90,35 +90,47 @@ def _particle_observation(
 
 
 @pytest.mark.parametrize(
-    ("global_count", "ordinary_count", "expected"),
+    (
+        "global_count",
+        "ordinary_count",
+        "global_confirmed",
+        "ordinary_confirmed",
+        "expected",
+    ),
     [
-        (2, 4, "global_terrain_particle_map"),
-        (0, 2, "ordinary_terrain_particle_map"),
-        (0, 1, "pose_graph"),
-        (0, 0, "pose_graph"),
+        (2, 4, True, True, "global_terrain_particle_map"),
+        (2, 4, False, True, "ordinary_terrain_particle_map"),
+        (0, 2, False, True, "ordinary_terrain_particle_map"),
+        (0, 2, False, False, "pose_graph"),
+        (0, 1, False, True, "pose_graph"),
+        (0, 0, False, False, "pose_graph"),
     ],
 )
 def test_online_output_source_policy(
-    global_count, ordinary_count, expected
+    global_count,
+    ordinary_count,
+    global_confirmed,
+    ordinary_confirmed,
+    expected,
 ) -> None:
     assert (
         select_terrain_navigation_output_source(
             global_active_cohorts=global_count,
             ordinary_active_cohorts=ordinary_count,
-            global_map_available=global_count > 0,
-            ordinary_map_available=ordinary_count > 1,
+            global_confirmed_map_available=global_confirmed,
+            ordinary_confirmed_map_available=ordinary_confirmed,
         )
         == expected
     )
 
 
-def test_null_global_hypothesis_falls_through_to_ordinary_particle_map() -> None:
+def test_null_global_hypothesis_falls_through_to_confirmed_ordinary_map() -> None:
     assert (
         select_terrain_navigation_output_source(
             global_active_cohorts=1,
             ordinary_active_cohorts=9,
-            global_map_available=False,
-            ordinary_map_available=True,
+            global_confirmed_map_available=False,
+            ordinary_confirmed_map_available=True,
         )
         == "ordinary_terrain_particle_map"
     )
@@ -129,8 +141,8 @@ def test_all_particle_null_hypotheses_fall_back_to_pose_graph() -> None:
         select_terrain_navigation_output_source(
             global_active_cohorts=1,
             ordinary_active_cohorts=9,
-            global_map_available=False,
-            ordinary_map_available=False,
+            global_confirmed_map_available=False,
+            ordinary_confirmed_map_available=False,
         )
         == "pose_graph"
     )
@@ -155,6 +167,7 @@ def test_formal_feature_launcher_uses_gtsam_multimodal_backend() -> None:
     assert "--terrain-particle-online-output" not in launcher
     assert "confirmed_maximum_a_posteriori_pose" in demo
     assert "global_unconfirmed_shadow_updates" in demo
+    assert "ordinary_unconfirmed_shadow_updates" in demo
 
 
 def test_unconfirmed_global_recovery_cohort_remains_shadow_only() -> None:
@@ -181,8 +194,8 @@ def test_unconfirmed_global_recovery_cohort_remains_shadow_only() -> None:
         select_terrain_navigation_output_source(
             global_active_cohorts=tracker.active_cohort_count,
             ordinary_active_cohorts=3,
-            global_map_available=False,
-            ordinary_map_available=True,
+            global_confirmed_map_available=False,
+            ordinary_confirmed_map_available=True,
         )
         == "ordinary_terrain_particle_map"
     )
@@ -190,8 +203,22 @@ def test_unconfirmed_global_recovery_cohort_remains_shadow_only() -> None:
         select_terrain_navigation_output_source(
             global_active_cohorts=tracker.active_cohort_count,
             ordinary_active_cohorts=0,
-            global_map_available=False,
-            ordinary_map_available=False,
+            global_confirmed_map_available=False,
+            ordinary_confirmed_map_available=False,
+        )
+        == "pose_graph"
+    )
+
+
+def test_unconfirmed_ordinary_multimodal_map_remains_shadow_only() -> None:
+    """Regression for the Sheboygan weak-terrain output excursion."""
+
+    assert (
+        select_terrain_navigation_output_source(
+            global_active_cohorts=0,
+            ordinary_active_cohorts=17,
+            global_confirmed_map_available=False,
+            ordinary_confirmed_map_available=False,
         )
         == "pose_graph"
     )
