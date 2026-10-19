@@ -1,0 +1,102 @@
+{
+  "scope": "600 m native Isaac/Warp CUDA frontend + cohort particle + GTSAM test; not a 47 km validation",
+  "same_configuration_fields": [
+    "ping_rate_hz",
+    "survey_speed_mps",
+    "survey_altitude_m",
+    "terrain_resolution_m",
+    "terrain_match_window_pings",
+    "terrain_match_translation_window_m",
+    "terrain_match_yaw_window_deg",
+    "feature_subframe_pings",
+    "sidescan_imaging_rays_per_side_per_row",
+    "sidescan_slam_sample_stride",
+    "pose_graph_backend_configuration",
+    "navigation_initialization"
+  ],
+  "identical_timestamps_and_dead_reckoning": true,
+  "source_geometry_and_coverage_equal": true,
+  "results": {
+    "baseline": {
+      "distance_m": 599.9968893961066,
+      "samples": 2001,
+      "global": {
+        "samples": 2001,
+        "rmse_3d_m": 2.202566667601973,
+        "mean_3d_m": 1.9899899765266014,
+        "median_3d_m": 2.238652508042699,
+        "p95_3d_m": 3.2163942711339315,
+        "p99_3d_m": 3.27663957714017,
+        "max_3d_m": 3.2895530061931444,
+        "final_3d_m": 2.461746357251194,
+        "horizontal_rmse_m": 2.2025462696196225,
+        "vertical_rmse_m": 0.009479209668815478,
+        "final_horizontal_m": 2.461733738900217,
+        "final_vertical_m": 0.007882017500662641
+      },
+      "local": {
+        "samples": 2001,
+        "rmse_3d_m": 1.645746578283798,
+        "mean_3d_m": 1.5436545880030326,
+        "median_3d_m": 1.781118398246607,
+        "p95_3d_m": 2.125519107860212,
+        "p99_3d_m": 2.2245064902334883,
+        "max_3d_m": 2.2633657985490316,
+        "final_3d_m": 1.8612070170612793,
+        "horizontal_rmse_m": 1.6457192787704968,
+        "vertical_rmse_m": 0.009479209668815478,
+        "final_horizontal_m": 1.8611903272256347,
+        "final_vertical_m": 0.007882017500662641
+      },
+      "accepted_absolute_priors": 5,
+      "side_scan_accepted": 0,
+      "side_scan_attempts": 12,
+      "radiometric_contract": null
+    },
+    "db_power": {
+      "distance_m": 599.9968893961066,
+      "samples": 2001,
+      "global": {
+        "samples": 2001,
+        "rmse_3d_m": 1.3655379932367981,
+        "mean_3d_m": 1.2941132705266498,
+        "median_3d_m": 1.4067289169098165,
+        "p95_3d_m": 1.7378764431511093,
+        "p99_3d_m": 1.9074229277866386,
+        "max_3d_m": 1.9789372129657528,
+        "final_3d_m": 1.7378764431511093,
+        "horizontal_rmse_m": 1.3655050917361078,
+        "vertical_rmse_m": 0.009479209668815478,
+        "final_horizontal_m": 1.7378585688886397,
+        "final_vertical_m": 0.007882017500662641
+      },
+      "local": {
+        "samples": 2001,
+        "rmse_3d_m": 1.4910382495071992,
+        "mean_3d_m": 1.4107955714525375,
+        "median_3d_m": 1.6114146968931495,
+        "p95_3d_m": 1.8352210658487265,
+        "p99_3d_m": 1.8739602905558777,
+        "max_3d_m": 1.8875641728561623,
+        "final_3d_m": 1.6065834249595885,
+        "horizontal_rmse_m": 1.4910081173748007,
+        "vertical_rmse_m": 0.009479209668815478,
+        "final_horizontal_m": 1.6065640899618667,
+        "final_vertical_m": 0.007882017500662641
+      },
+      "accepted_absolute_priors": 11,
+      "side_scan_accepted": 6,
+      "side_scan_attempts": 12,
+      "radiometric_contract": {
+        "encoding": "relative_linear_power_from_documented_db",
+        "source_metadata": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_3m_backscatter_NAD83_metadata.txt",
+        "absolute_calibration": false,
+        "unknown_inter_section_gain": true,
+        "reference": "one constant median dB offset per source section",
+        "display_contrast_is_not_measurement": true,
+        "parent_map": "/home/cgz/OceanSim/data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/prepared"
+      }
+    }
+  },
+  "global_rmse_reduction_percent": 38.00242175082415
+}
