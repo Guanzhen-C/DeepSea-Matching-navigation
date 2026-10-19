@@ -31,6 +31,16 @@ case "${ALIAS}" in
 esac
 
 MAP_DIR="${ROOT_DIR}/data/underwater_terrain_datasets/${DATASET_ID}/prepared"
+if [[ "${ALIAS}" == "chelan" ]]; then
+    # The source declares dB intensity. Keep the archived display-normalized
+    # map for A/B replay, but use the separately decoded power map for new runs.
+    MAP_DIR="${ROOT_DIR}/data/underwater_terrain_datasets/${DATASET_ID}/prepared_db_power"
+    if [[ ! -f "${MAP_DIR}/metadata.json" ]]; then
+        echo "Prepare the Lake Chelan dB-derived acoustic map first:" >&2
+        echo "  python ${SCRIPT_DIR}/prepare_chelan_radiometric_map.py" >&2
+        exit 1
+    fi
+fi
 ROUTE="${MAP_DIR}/full_map_traversal_route.json"
 if [[ ! -f "${MAP_DIR}/metadata.json" || ! -f "${ROUTE}" ]]; then
     echo "Prepared map is missing for '${ALIAS}'. Run:" >&2

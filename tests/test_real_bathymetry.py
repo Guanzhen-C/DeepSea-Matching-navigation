@@ -146,6 +146,35 @@ def test_from_path_keeps_legacy_npz_compatibility(tmp_path) -> None:
     assert indices.shape == (2 * 3 * 6,)
 
 
+@pytest.mark.parametrize("compact", [False, True])
+def test_chunked_native_mesh_preserves_exact_triangle_order_and_half_cell_holes(compact) -> None:
+    rng = np.random.default_rng(67)
+    # Cross multiple 128-row chunk boundaries, with many one-triangle cells.
+    elevation = rng.normal(-100, 2, (271, 23)).astype(np.float32)
+    valid = rng.random(elevation.shape) > .35
+    world = MeasuredBathymetryGrid(elevation, resolution_m=6, valid_mask=valid)
+    grid_x, grid_y, grid_z = world.mesh_grid()
+    all_points = np.c_[grid_x.ravel(), grid_y.ravel(), grid_z.ravel()].astype(np.float32)
+    triangles = []
+    columns = valid.shape[1]
+    for r in range(valid.shape[0] - 1):
+        for c in range(columns - 1):
+            ul = r * columns + c
+            if valid[r, c] and valid[r, c + 1] and valid[r + 1, c + 1]:
+                triangles.append([ul, ul + 1, ul + columns + 1])
+            if valid[r, c] and valid[r + 1, c + 1] and valid[r + 1, c]:
+                triangles.append([ul, ul + columns + 1, ul + columns])
+    expected = np.asarray(triangles, dtype=np.int32)
+    if compact:
+        used, expected_indices = np.unique(expected, return_inverse=True)
+        expected_points = all_points[used]
+    else:
+        expected_points, expected_indices = all_points, expected
+    points, indices = world.triangle_mesh(stride=1, compact=compact)
+    np.testing.assert_array_equal(points, expected_points)
+    np.testing.assert_array_equal(indices, expected_indices.ravel())
+
+
 @pytest.mark.parametrize(
     "invalid_parameter",
     (

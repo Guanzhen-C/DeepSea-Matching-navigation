@@ -30,6 +30,7 @@ import math
 
 import numpy as np
 
+from .acoustic_radiometry import log_backscatter, uses_relative_power
 from .esikf import AcousticESIKF, InertialState
 from .math3d import project_to_so3, so3_exp, so3_log
 from .real_bathymetry import MeasuredBathymetryGrid
@@ -1675,6 +1676,7 @@ class BackscatterMapMatcher:
             raise ValueError("terrain has no measured backscatter")
         self.terrain = terrain
         self.config = config or BackscatterMatcherConfig()
+        self._relative_power = uses_relative_power(terrain.metadata)
 
     @staticmethod
     def _axis_samples(limit: float, step: float) -> np.ndarray:
@@ -1847,23 +1849,13 @@ class BackscatterMapMatcher:
         # trends that the design matrix can remove.  A documented floor limits
         # the influence of weak returns dominated by additive receiver noise.
         observation_texture = self._remove_trend(
-            np.log(
-                np.clip(
-                    observed[valid],
-                    self.config.radiometric_log_floor,
-                    None,
-                )
-            ),
+            log_backscatter(observed[valid], self.config.radiometric_log_floor,
+                            relative_power=self._relative_power),
             selected_design,
         )
         map_texture = self._remove_trend(
-            np.log(
-                np.clip(
-                    predicted[valid],
-                    self.config.radiometric_log_floor,
-                    None,
-                )
-            ),
+            log_backscatter(predicted[valid], self.config.radiometric_log_floor,
+                            relative_power=self._relative_power),
             selected_design,
         )
         observation_std = float(np.sqrt(np.mean(observation_texture**2)))
@@ -2060,6 +2052,7 @@ class BackscatterMapMatcher:
         )
         candidates: list[tuple[float, np.ndarray, tuple]] = []
         evaluated = 0
+        supported_diagnostics = None
         for yaw in yaw_values:
             for dx in translation_values:
                 for dy in translation_values:
@@ -2078,15 +2071,30 @@ class BackscatterMapMatcher:
                         context_group_ids,
                     )
                     evaluated += 1
+                    if (
+                        diagnostics[1] >= self.config.minimum_points
+                        and diagnostics[2] >= self.config.minimum_valid_fraction
+                        and (
+                            supported_diagnostics is None
+                            or min(diagnostics[3:5]) > min(supported_diagnostics[3:5])
+                        )
+                    ):
+                        supported_diagnostics = diagnostics
                     if np.isfinite(diagnostics[0]):
                         candidates.append(
                             (float(diagnostics[0]), correction, diagnostics)
                         )
         if not candidates:
+            support = supported_diagnostics
             return self._rejected(
-                "insufficient_map_overlap",
+                "insufficient_backscatter_texture" if support is not None
+                else "insufficient_map_overlap",
                 base_pose2,
                 correlation_before=before,
+                correspondences=0 if support is None else support[1],
+                valid_fraction=0.0 if support is None else support[2],
+                observation_texture_std=0.0 if support is None else support[3],
+                map_texture_std=0.0 if support is None else support[4],
                 evaluated_candidates=evaluated,
             )
         candidates.sort(key=lambda item: item[0], reverse=True)

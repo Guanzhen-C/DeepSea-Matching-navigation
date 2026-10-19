@@ -22,6 +22,7 @@ import math
 
 import numpy as np
 
+from .acoustic_radiometry import log_backscatter, uses_relative_power
 from .esikf import InertialState
 from .math3d import rotation_from_rpy, rpy_from_rotation, wrap_angle
 from .real_bathymetry import MeasuredBathymetryGrid
@@ -295,9 +296,16 @@ class GlobalTerrainRelocalizer:
         source_valid = np.asarray(valid[:rows, :columns], dtype=bool).copy()
         source_valid &= np.isfinite(selected)
         if logarithmic:
-            selected = np.log(
-                np.clip(selected, self.config.backscatter_log_floor, None)
-            ).astype(np.float32, copy=False)
+            if uses_relative_power(self.terrain.metadata):
+                # Reference maps have no receiver noise. Retain the full
+                # documented dB contrast across sections with different gains;
+                # a single whole-map absolute floor would erase dark regions.
+                selected = np.log(np.maximum(selected, np.finfo(np.float32).tiny))
+            else:
+                selected = np.log(
+                    np.clip(selected, self.config.backscatter_log_floor, None)
+                )
+            selected = selected.astype(np.float32, copy=False)
         # A true area pyramid suppresses source-grid aliasing.  A coarse cell
         # is valid only when its complete source block is measured, preventing
         # NoData boundaries from being averaged into plausible terrain.
@@ -336,6 +344,7 @@ class GlobalTerrainRelocalizer:
         points_body: np.ndarray,
         values: np.ndarray,
         floor: float,
+        relative_power: bool = False,
     ) -> np.ndarray:
         cross_track = np.abs(points_body[:, 1])
         scale = max(float(np.percentile(cross_track, 95.0)), 1.0)
@@ -350,7 +359,7 @@ class GlobalTerrainRelocalizer:
                 side * normalized_range,
             )
         )
-        logged = np.log(np.clip(values, floor, None))
+        logged = log_backscatter(values, floor, relative_power=relative_power)
         try:
             coefficients = np.linalg.lstsq(design, logged, rcond=None)[0]
         except np.linalg.LinAlgError:
@@ -559,6 +568,7 @@ class GlobalTerrainRelocalizer:
                     backscatter_points,
                     finite_values,
                     self.config.backscatter_log_floor,
+                    relative_power=uses_relative_power(self.terrain.metadata),
                 )
         if self.config.require_backscatter and (
             backscatter_points.shape[0] < self.config.minimum_backscatter_bins

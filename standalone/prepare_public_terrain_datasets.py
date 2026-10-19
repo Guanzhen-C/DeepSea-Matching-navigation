@@ -373,10 +373,44 @@ def _normalize_registered_layer(
     return unit, float(low), float(high)
 
 
+def _relative_power_registered_layer(
+    values: np.ndarray, valid: np.ndarray
+) -> tuple[np.ndarray, dict]:
+    """Decode a documented dB intensity layer without display contrast stretching.
+
+    Each survey section may have an unknown constant gain. Subtracting its
+    median is a constant gain change in power, preserving every within-section
+    dB difference. The resulting values are relative power, not calibrated
+    seafloor scattering strength. No percentile clipping is performed.
+    """
+
+    measured = np.asarray(values[valid], dtype=np.float64)
+    if not measured.size or not np.isfinite(measured).all():
+        raise ValueError("dB backscatter must contain finite measured samples")
+    reference_db = float(np.median(measured))
+    exponent = (measured - reference_db) / 10.0
+    # Reject unsupported data instead of silently clipping physical contrast.
+    limit = np.log10(np.finfo(np.float32).max)
+    if np.any(np.abs(exponent) >= limit):
+        raise ValueError("dB dynamic range cannot be represented as float32 power")
+    power = np.full(values.shape, np.nan, dtype=np.float32)
+    power[valid] = np.power(10.0, exponent).astype(np.float32)
+    return power, {
+        "native_units": "dB intensity (as documented by the source)",
+        "registered_reference_db": reference_db,
+        "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+        "radiometric_reference": "per-section median; unknown constant survey gain",
+        "percentile_clipping": False,
+        "registered_percentile_1_99": np.percentile(measured, (1, 99)).tolist(),
+    }
+
+
 def _mosaic_backscatter(
     sources: list[tuple[str, RasterInfo]],
     target: GridSpec,
     bathymetry_valid: np.ndarray,
+    *,
+    documented_db: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[dict]]:
     total = np.zeros((target.rows, target.columns), dtype=np.float32)
     count = np.zeros((target.rows, target.columns), dtype=np.uint8)
@@ -392,7 +426,11 @@ def _mosaic_backscatter(
         sampled_valid &= bathymetry_valid[rows, columns]
         if not np.any(sampled_valid):
             continue
-        unit, low, high = _normalize_registered_layer(sampled, sampled_valid)
+        if documented_db:
+            unit, radiometry = _relative_power_registered_layer(sampled, sampled_valid)
+        else:
+            unit, low, high = _normalize_registered_layer(sampled, sampled_valid)
+            radiometry = {"registered_percentile_1_99": [low, high]}
         region_total = total[rows, columns]
         region_count = count[rows, columns]
         region_sources = source_mask[rows, columns]
@@ -406,7 +444,7 @@ def _mosaic_backscatter(
                 "source_shape_pixels": list(info.shape),
                 "source_resolution_m": [info.dx, abs(info.dy)],
                 "registered_samples": int(np.count_nonzero(sampled_valid)),
-                "registered_percentile_1_99": [low, high],
+                **radiometry,
             }
         )
         del values, valid, sampled, sampled_valid, unit

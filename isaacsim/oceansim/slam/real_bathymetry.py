@@ -434,46 +434,53 @@ class MeasuredBathymetryGrid:
         columns = column_indices.size
         if rows * columns > np.iinfo(np.int32).max:
             raise ValueError("mesh has too many vertices for int32 indices")
-        upper_left = (
-            np.arange(rows - 1, dtype=np.int32)[:, None] * columns
-            + np.arange(columns - 1, dtype=np.int32)[None, :]
-        )
-        upper_right = upper_left + 1
-        lower_left = upper_left + columns
-        lower_right = lower_left + 1
-        triangles = np.stack(
-            (
-                upper_left,
-                upper_right,
-                lower_right,
-                upper_left,
-                lower_right,
-                lower_left,
-            ),
-            axis=-1,
-        ).reshape(-1, 3)
-
         if int(stride) == 1:
-            valid = self.valid_mask
-            first_valid = (
-                valid[:-1, :-1]
-                & valid[:-1, 1:]
-                & valid[1:, 1:]
-            )
-            second_valid = (
-                valid[:-1, :-1]
-                & valid[1:, 1:]
-                & valid[1:, :-1]
-            )
-            triangle_valid = np.stack(
-                (first_valid, second_valid), axis=-1
-            ).reshape(-1)
+            # Chelan's bounding raster is only ~5% measured. Allocating six
+            # indices for every bounding-rectangle cell before dropping
+            # NoData used >1.6 GB just for the triangle array. Emit measured
+            # triangles in bounded row chunks, retaining exactly the original
+            # row-major order, half-cell validity and winding.
+            chunks = []
+            for start in range(0, rows - 1, 128):
+                stop = min(start + 128, rows - 1)
+                upper = self.valid_mask[start:stop]
+                lower = self.valid_mask[start + 1:stop + 1]
+                first_valid = upper[:, :-1] & upper[:, 1:] & lower[:, 1:]
+                second_valid = upper[:, :-1] & lower[:, 1:] & lower[:, :-1]
+                valid_indices = np.flatnonzero(
+                    np.stack((first_valid, second_valid), axis=-1).reshape(-1)
+                )
+                if not valid_indices.size:
+                    continue
+                cells = valid_indices // 2
+                upper_left = (
+                    (start + cells // (columns - 1)) * columns
+                    + cells % (columns - 1)
+                ).astype(np.int32)
+                first = (valid_indices % 2) == 0
+                part = np.empty((valid_indices.size, 3), dtype=np.int32)
+                part[:, 0] = upper_left
+                part[:, 1] = upper_left + np.where(first, 1, columns + 1)
+                part[:, 2] = upper_left + np.where(first, columns + 1, columns)
+                chunks.append(part)
+            triangles = (np.concatenate(chunks) if chunks else
+                         np.empty((0, 3), dtype=np.int32))
+            del chunks
         else:
+            upper_left = (
+                np.arange(rows - 1, dtype=np.int32)[:, None] * columns
+                + np.arange(columns - 1, dtype=np.int32)[None, :]
+            )
+            triangles = np.stack(
+                (upper_left, upper_left + 1, upper_left + columns + 1,
+                 upper_left, upper_left + columns + 1, upper_left + columns),
+                axis=-1,
+            ).reshape(-1, 3)
             cell_valid = self._coarse_cells_fully_measured(
                 row_indices, column_indices
             )
             triangle_valid = np.repeat(cell_valid.reshape(-1), 2)
-        triangles = triangles[triangle_valid]
+            triangles = triangles[triangle_valid]
 
         if triangles.size == 0:
             return (

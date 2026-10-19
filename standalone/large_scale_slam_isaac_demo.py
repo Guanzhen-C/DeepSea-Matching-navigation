@@ -5949,11 +5949,10 @@ def main() -> int:
                                         full_backscatter_patch_body,
                                         full_backscatter_patch_values,
                                         ARGS.backscatter_match_maximum_points,
-                                        # The prior backscatter raster has a
-                                        # 5 m ground sample distance. Keeping
-                                        # denser cells would only duplicate
-                                        # correlated evidence.
-                                        minimum_voxel_size_m=5.0,
+                                        # Match the actual source-map ground
+                                        # spacing, rather than assuming the
+                                        # Monterey 5 m raster for every map.
+                                        minimum_voxel_size_m=world_model.resolution_m,
                                     )
                                     last_backscatter_patch_reduced_points = (
                                         int(backscatter_patch_body.shape[0])
@@ -9035,10 +9034,12 @@ def main() -> int:
                 "source_product": backscatter_source_label,
                 "resolution_m": world_model.resolution_m,
                 "radiometry": (
-                    "unitless normalized survey mosaic; port/starboard and "
+                    str(world_model.metadata.get("backscatter_mosaic_units", "unitless normalized survey mosaic"))
+                    + "; port/starboard and "
                     "smooth cross-track trends removed before zero-mean "
                     "normalized correlation; not calibrated target strength"
                 ),
+                "source_radiometric_contract": world_model.metadata.get("radiometry"),
                 "fusion": (
                     "weighted covariance intersection in local SE(2) "
                     "coordinates; bathymetry/backscatter independence is "

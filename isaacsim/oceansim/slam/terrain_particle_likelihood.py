@@ -19,6 +19,7 @@ import math
 
 import numpy as np
 
+from .acoustic_radiometry import log_backscatter, uses_relative_power
 from .esikf import InertialState
 from .math3d import rpy_from_rotation
 from .real_bathymetry import MeasuredBathymetryGrid
@@ -261,16 +262,14 @@ class AcousticTerrainParticleLikelihood:
             backscatter_points @ self.reference_state.rotation.T
         )
         self._backscatter_values = intensity
+        self._relative_power = uses_relative_power(self.backscatter_terrain.metadata)
         self._backscatter_design = self._radiometric_design(
             backscatter_points
         )
         if intensity.size:
-            observed_log = np.log(
-                np.clip(
-                    intensity,
-                    self.config.radiometric_log_floor,
-                    None,
-                )
+            observed_log = log_backscatter(
+                intensity, self.config.radiometric_log_floor,
+                relative_power=self._relative_power,
             )
             self._backscatter_observed_texture = _remove_linear_trend(
                 observed_log, self._backscatter_design
@@ -477,6 +476,7 @@ class AcousticTerrainParticleLikelihood:
         correlations = np.full(particles.shape[0], np.nan, dtype=np.float64)
         coverage = np.zeros(particles.shape[0], dtype=np.float64)
         map_texture_std = np.zeros(particles.shape[0], dtype=np.float64)
+        observation_texture_std = np.zeros(particles.shape[0], dtype=np.float64)
         for start in range(0, particles.shape[0], self.config.particle_chunk_size):
             stop = min(start + self.config.particle_chunk_size, particles.shape[0])
             x, y, _, _, _ = self._world_coordinates(
@@ -497,16 +497,23 @@ class AcousticTerrainParticleLikelihood:
                     continue
                 design = self._backscatter_design[valid]
                 map_texture = _remove_linear_trend(
-                    np.log(
-                        np.clip(
-                            predicted[local_index, valid],
-                            self.config.radiometric_log_floor,
-                            None,
-                        )
-                    ),
+                    log_backscatter(predicted[local_index, valid],
+                                    self.config.radiometric_log_floor,
+                                    relative_power=self._relative_power),
                     design,
                 )
-                observed_texture = self._backscatter_observed_texture[valid]
+                if np.all(valid):
+                    observed_texture = self._backscatter_observed_texture
+                else:
+                    # Both channels must remove nuisance gains on the same
+                    # support. Restricting an already-projected texture is
+                    # not the projection of the restricted observations.
+                    observed_texture = _remove_linear_trend(
+                        log_backscatter(self._backscatter_values[valid],
+                                        self.config.radiometric_log_floor,
+                                        relative_power=self._relative_power),
+                        design,
+                    )
                 denominator = float(
                     np.linalg.norm(observed_texture)
                     * np.linalg.norm(map_texture)
@@ -522,6 +529,9 @@ class AcousticTerrainParticleLikelihood:
                 )
                 map_texture_std[output_index] = float(
                     np.sqrt(np.mean(map_texture**2))
+                )
+                observation_texture_std[output_index] = float(
+                    np.sqrt(np.mean(observed_texture**2))
                 )
 
         finite = np.isfinite(correlations)
@@ -546,9 +556,7 @@ class AcousticTerrainParticleLikelihood:
             np.clip(coverage[finite], 1.0e-6, 1.0)
             / max(best_coverage, 1.0e-6)
         )
-        observed_std = float(
-            np.sqrt(np.mean(self._backscatter_observed_texture**2))
-        )
+        observed_std = float(observation_texture_std[best_index])
         texture_reference = self.config.backscatter_texture_reference_std
         texture_observability = (
             observed_std / (observed_std + texture_reference)
