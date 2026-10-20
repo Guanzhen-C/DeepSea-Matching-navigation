@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 from collections import Counter, deque
+import csv
 from dataclasses import asdict, replace
 import json
 import math
@@ -76,6 +78,22 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument("--seed", type=int, default=31)
+    parser.add_argument(
+        "--terrain-merge-converged-cohorts",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help=(
+            "experimental persistent-basin consolidation; off preserves "
+            "the validated Monterey particle policy"
+        ),
+    )
+    parser.add_argument(
+        "--terrain-replay-directory", type=Path,
+        help=(
+            "optional new directory for incremental current-window raw sonar "
+            "archives and particle decisions; survives interrupted runs"
+        ),
+    )
     parser.add_argument(
         "--initial-position-offset-x-m",
         type=float,
@@ -2738,6 +2756,7 @@ def main() -> int:
     )
     global_cohort_tracker = TerrainNavigationFilter(
         TerrainNavigationFilterConfig(
+                merge_converged_cohorts=ARGS.terrain_merge_converged_cohorts,
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -2765,6 +2784,7 @@ def main() -> int:
     )
     terrain_backend_particle_tracker = TerrainNavigationFilter(
         TerrainNavigationFilterConfig(
+                merge_converged_cohorts=ARGS.terrain_merge_converged_cohorts,
                 maximum_cohorts=ARGS.terrain_global_maximum_cohorts,
                 particles_per_cohort=(
                     ARGS.terrain_global_particles_per_cohort
@@ -2882,6 +2902,9 @@ def main() -> int:
         "raw_likelihood_factor_rejections": 0,
     }
     terrain_backend_particle_records: list[dict] = []
+    if ARGS.terrain_replay_directory is not None:
+        # Exclusive directory creation prevents silently mixing experiments.
+        ARGS.terrain_replay_directory.mkdir(parents=True, exist_ok=False)
     terrain_backend_particle_last_patch_end_observation_id = -1
     terrain_navigation_output_stats = {
         "policy": TERRAIN_PARTICLE_ONLINE_OUTPUT,
@@ -4752,6 +4775,48 @@ def main() -> int:
                 "uses_truth": False,
             }
         )
+        if ARGS.terrain_replay_directory is not None:
+            replay_record = {
+                "timestamp_s": float(timestamp),
+                "observation_id": int(observation_id),
+                "mode": mode,
+                "local_pose2": local_pose2.tolist(),
+                "patch_start_timestamp_s": float(patch_start_timestamp),
+                "patch_end_timestamp_s": float(patch_end_timestamp),
+                "patch_start_observation_id": int(patch_start_observation_id),
+                "patch_end_observation_id": int(patch_end_observation_id),
+                "likelihood_config": asdict(terrain_particle_likelihood_config),
+                "tracker_config": asdict(terrain_backend_particle_tracker.config),
+                "compact_evidences": [
+                    asdict(evidence) for evidence in original_evidence_tuple
+                ],
+                "decision": terrain_backend_particle_records[-1],
+                "tracker_diagnostics": terrain_backend_particle_tracker.diagnostics(),
+                "truth_evaluation_only": (
+                    None if evaluation_truth_state is None else {
+                        "position": evaluation_truth_state.position.tolist(),
+                        "rotation": evaluation_truth_state.rotation.tolist(),
+                    }
+                ),
+            }
+            replay_record, _ = sanitize_for_strict_json(replay_record)
+            archive = ARGS.terrain_replay_directory / f"window_{observation_id:08d}.npz"
+            temporary_archive = archive.with_suffix(".npz.tmp")
+            with temporary_archive.open("wb") as stream:
+                np.savez_compressed(
+                    stream,
+                    record_json=np.array(json.dumps(replay_record, ensure_ascii=False, allow_nan=False)),
+                    reference_position=patch_reference_state.position,
+                    reference_rotation=patch_reference_state.rotation,
+                    bathymetry_points_body=patch_body,
+                    backscatter_points_body=backscatter_patch_body,
+                    backscatter_values=backscatter_patch_values,
+                )
+            temporary_archive.replace(archive)
+            with (ARGS.terrain_replay_directory / "decisions.jsonl").open(
+                "a", encoding="utf-8"
+            ) as stream:
+                stream.write(json.dumps(replay_record, ensure_ascii=False, allow_nan=False) + "\n")
         return decision
 
     def published_online_global_pose():
@@ -5311,6 +5376,19 @@ def main() -> int:
     local_rotation_track: list[np.ndarray] = [initial.rotation.copy()]
     online_global_track: list[np.ndarray] = [initial.position.copy()]
     online_global_rotation_track: list[np.ndarray] = [initial.rotation.copy()]
+    live_trace_stream = None
+    live_trace_writer = None
+    if ARGS.terrain_replay_directory is not None:
+        live_trace_stream = (
+            ARGS.terrain_replay_directory / "online_poses_5hz.csv"
+        ).open("x", encoding="utf-8", newline="", buffering=64 * 1024)
+        atexit.register(live_trace_stream.close)
+        live_trace_writer = csv.writer(live_trace_stream)
+        live_trace_writer.writerow([
+            "timestamp_s", "travelled_distance_m",
+            *[f"{track}_{axis}_m" for track in ("truth", "dr", "local", "global")
+              for axis in ("x", "y", "z")],
+        ])
 
     # UI tracks are deliberately separate from the full-rate evaluation
     # histories above.  Correcting and converting only this bounded cache
@@ -8091,6 +8169,11 @@ def main() -> int:
                                 display_sample_spacing_m *= 2.0
                                 display_sample_version += 1
 
+                    if live_trace_writer is not None:
+                        live_trace_writer.writerow([
+                            sim_time, travelled_distance_online_m,
+                            *np.concatenate(ping_samples).tolist(),
+                        ])
                     if (
                         travelled_distance_online_m + 1.0e-9
                         >= next_progress_distance_m
@@ -8325,6 +8408,13 @@ def main() -> int:
                             )
                             stream.write("\n")
                         temporary_progress_path.replace(progress_path)
+                        if live_trace_stream is not None:
+                            live_trace_stream.flush()
+                            os.fsync(live_trace_stream.fileno())
+                            with (ARGS.terrain_replay_directory / "progress.jsonl").open(
+                                "a", encoding="utf-8"
+                            ) as stream:
+                                stream.write(json.dumps(checkpoint, allow_nan=False) + "\n")
                         print(
                             "[OceanSim progress] "
                             f"{travelled_distance_online_m / 1000.0:.1f} km / "
@@ -9648,6 +9738,13 @@ def main() -> int:
                 "state": "map-frame vehicle SE(2)",
                 "motion_source": "local_acoustic_inertial_odometry_se2_increment",
                 "persistent_proposal_provenance_enforced": True,
+                "converged_cohort_merging_enabled": (
+                    ARGS.terrain_merge_converged_cohorts
+                ),
+                "terrain_replay_directory": (
+                    None if ARGS.terrain_replay_directory is None
+                    else str(ARGS.terrain_replay_directory)
+                ),
                 "graph_measurement_source": (
                     "current_independent_raw_sonar_likelihood_local_laplace"
                 ),

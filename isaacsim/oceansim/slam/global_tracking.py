@@ -500,8 +500,14 @@ class GlobalCohortTrackerConfig:
     same_observation_nms_yaw_deg: float = 2.0
     maximum_missed_observations: int = 8
     minimum_retained_probability: float = 1.0e-6
+    # Opt-in for cross-terrain experiments. The validated Monterey policy is
+    # unchanged. Persistent cohorts, unlike same-window proposals, previously
+    # had no consolidation step even after converging to the same basin.
+    merge_converged_cohorts: bool = False
 
     def __post_init__(self) -> None:
+        if not isinstance(self.merge_converged_cohorts, (bool, np.bool_)):
+            raise TypeError("merge_converged_cohorts must be boolean")
         integer_names = (
             "maximum_cohorts",
             "particles_per_cohort",
@@ -723,6 +729,7 @@ class GlobalCohortTracker:
     candidate_birth_mass_allocations: int = field(default=0, init=False)
     posterior_mode_switches: int = field(default=0, init=False)
     hypothesis_transition_updates: int = field(default=0, init=False)
+    converged_cohorts_merged: int = field(default=0, init=False)
 
     _cohorts: list[_Cohort] = field(default_factory=list, init=False, repr=False)
     _null_log_probability: float = field(default=0.0, init=False, repr=False)
@@ -937,7 +944,9 @@ class GlobalCohortTracker:
             cohort.log_probability = math.log(max(float(probability), 1.0e-300))
         self.hypothesis_transition_updates += 1
 
-    def _regularized_systematic_resample(self, cohort: _Cohort) -> None:
+    def _regularized_systematic_resample(
+        self, cohort: _Cohort, *, target_count: int | None = None
+    ) -> None:
         """Systematic resampling followed by covariance-preserving jitter.
 
         A Liu-West-style shrink/jitter step prevents a small Global-UTAN
@@ -945,7 +954,7 @@ class GlobalCohortTracker:
         observation while approximately preserving its first two moments.
         """
 
-        count = cohort.particles.shape[0]
+        count = cohort.particles.shape[0] if target_count is None else target_count
         weights = np.exp(cohort.log_weights - _logsumexp(cohort.log_weights))
         positions = (
             float(self._rng.uniform(0.0, 1.0 / count))
@@ -1553,6 +1562,118 @@ class GlobalCohortTracker:
         self._next_cohort_id += 1
         self.cohorts_created += 1
 
+    def _merge_converged_cohorts(self) -> None:
+        """Consolidate duplicated basins, not independent measurements.
+
+        Require both the posterior centres AND fresh current-window modes to
+        agree inside the existing metric NMS resolution. All members must use
+        exactly the same disjoint sonar window and have rank >= 2. Thus stale
+        predictions and different acquisitions cannot be
+        joined merely because their reporting covariances are very broad.
+
+        Probability masses ADD; particle distributions form a MIXTURE (never
+        a product of correlated posteriors). Between-mode spread is retained
+        through mixture resampling. Evidence counts take the minimum, not the
+        sum. The current graph measurement is one representative window-only
+        Laplace factor, conservatively weakened by mode disagreement. It is
+        never replaced by the recursive particle covariance.
+        """
+        if not self.config.merge_converged_cohorts:
+            return
+        from .terrain_matching import information_with_covariance_floor
+
+        remaining = sorted(
+            self._cohorts, key=lambda item: item.log_probability, reverse=True
+        )
+        retained = []
+
+        def close(first: np.ndarray, second: np.ndarray) -> bool:
+            delta = self._residual(first, second)
+            return bool(
+                np.linalg.norm(delta[:2])
+                <= self.config.same_observation_nms_position_m
+                and abs(math.degrees(float(delta[2])))
+                <= self.config.same_observation_nms_yaw_deg
+            )
+
+        def compatible(first: _Cohort, second: _Cohort) -> bool:
+            return bool(
+                first.last_measurement_is_graph_ready
+                and second.last_measurement_is_graph_ready
+                and first.last_processed_patch_end_observation_id
+                == second.last_processed_patch_end_observation_id
+                and abs(first.last_processed_patch_end_timestamp_s
+                        - second.last_processed_patch_end_timestamp_s) < 1.0e-9
+                and close(first.map_pose2, second.map_pose2)
+                and close(first.last_measurement_pose2,
+                          second.last_measurement_pose2)
+            )
+
+        while remaining:
+            representative = remaining.pop(0)
+            group = [representative]
+            others = []
+            for candidate in remaining:
+                # Complete-link clustering prevents a chain of nearby peaks
+                # from silently bridging two distinct terrain aliases.
+                if all(compatible(member, candidate) for member in group):
+                    group.append(candidate)
+                else:
+                    others.append(candidate)
+            remaining = others
+            if len(group) > 1:
+                mass = _logsumexp(np.array([
+                    member.log_probability for member in group
+                ]))
+                component_weights = np.exp(np.array([
+                    member.log_probability - mass for member in group
+                ]))
+                particles = np.concatenate([
+                    member.particles for member in group
+                ])
+                weights = np.concatenate([
+                    member.log_weights + member.log_probability - mass
+                    for member in group
+                ])
+                disagreement = np.stack([
+                    self._residual(representative.last_measurement_pose2,
+                                   member.last_measurement_pose2)
+                    for member in group
+                ])
+                systematic_floor = (
+                    disagreement * component_weights[:, None]
+                ).T @ disagreement
+                representative.last_measurement_information = (
+                    information_with_covariance_floor(
+                        representative.last_measurement_information,
+                        systematic_floor,
+                    )
+                )
+                # The finite covariance is for reporting/association only;
+                # preserve its null-direction surrogate and add disagreement.
+                representative.last_measurement_covariance = (
+                    representative.last_measurement_covariance
+                    + systematic_floor
+                )
+                representative.total_evidence = min(
+                    member.total_evidence for member in group
+                )
+                representative.independent_evidence = min(
+                    member.independent_evidence for member in group
+                )
+                representative.particles = particles
+                representative.log_weights = weights - _logsumexp(weights)
+                representative.log_probability = mass
+                self._regularized_systematic_resample(
+                    representative, target_count=self.config.particles_per_cohort
+                )
+                representative.last_effective_sample_size = float(
+                    self.config.particles_per_cohort
+                )
+                self.converged_cohorts_merged += len(group) - 1
+            retained.append(representative)
+        self._cohorts = retained
+
     def _normalize_and_prune(self) -> None:
         values = [self._null_log_probability]
         values.extend(cohort.log_probability for cohort in self._cohorts)
@@ -1900,6 +2021,7 @@ class GlobalCohortTracker:
                 if independent:
                     independently_updated_cohort_ids.add(cohort.cohort_id)
 
+        self._merge_converged_cohorts()
         self._normalize_and_prune()
         leading_cohort_id = (
             None if not self._cohorts else self._cohorts[0].cohort_id
@@ -1962,6 +2084,10 @@ class GlobalCohortTracker:
             "duplicate_evidences_suppressed": int(
                 self.duplicate_evidences_suppressed
             ),
+            "converged_cohort_merging_enabled": bool(
+                self.config.merge_converged_cohorts
+            ),
+            "converged_cohorts_merged": int(self.converged_cohorts_merged),
             "particles_per_cohort": int(self.config.particles_per_cohort),
             "active_particles": int(
                 len(self._cohorts) * self.config.particles_per_cohort
