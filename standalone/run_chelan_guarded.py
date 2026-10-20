@@ -12,6 +12,7 @@ from datetime import datetime
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import subprocess
 
@@ -48,9 +49,19 @@ def main():
                                text=True, capture_output=True)
     if processes.returncode == 0:
         parser.error('another OceanSim task is already running; it was NOT stopped:\n' + processes.stdout)
+    gpu_check = subprocess.run([
+        'nvidia-smi', '--id=0', '--query-gpu=memory.free',
+        '--format=csv,noheader,nounits',
+    ], text=True, capture_output=True, check=True)
+    gpu_free_mib = int(gpu_check.stdout.strip())
+    if gpu_free_mib < 2048:
+        parser.error(f'GPU 0 has only {gpu_free_mib} MiB free; require 2048 MiB before launch')
     label = datetime.now().strftime('%Y%m%d-%H%M%S-%f')
     unit = f'oceansim-chelan-{args.profile}-{label}'
     command = [
+        # The service holds this lock throughout the actual simulation. This
+        # also closes the admission race between simultaneous launchers.
+        '/usr/bin/flock', '--nonblock', f'/run/user/{os.getuid()}/oceansim-chelan-slam.lock',
         '/usr/bin/env', 'OPENBLAS_NUM_THREADS=1', 'OMP_NUM_THREADS=1', 'MKL_NUM_THREADS=1',
         '/bin/bash', str(ROOT / 'standalone/run_v2_public_terrain.sh'), 'chelan',
         '--headless', '--duration', '0', '--survey-laps', '1.0',
@@ -71,6 +82,7 @@ def main():
                 '--property', f'StandardError=append:{output}/simulation.log', *command]
     manifest = dict(unit=unit + '.service', argv=command, systemd_properties=properties,
                     memory_available_at_launch_gib=available/GIB,
+                    gpu_free_at_launch_mib=gpu_free_mib,
                     source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                     tracked_diff=subprocess.check_output(['git', 'diff', '--stat'], cwd=ROOT, text=True),
                     profile=args.profile, scope='full_route' if args.full_route else 'fresh_start_segment',

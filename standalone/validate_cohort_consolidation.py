@@ -7,6 +7,7 @@ navigation replay or a new RMSE result. No archived truth enters the tracker.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -122,13 +123,85 @@ def audit_archive(path):
                 scope='posterior-centre audit only; lacks complete particle covariance and current-window modes; not accepted fixes or a causal replay')
 
 
+def native_pair(directory):
+    reports = {name: json.loads((directory / filename / 'metrics.json').read_text())
+               for name, filename in (
+                   ('baseline', 'native_baseline_6500_8300m'),
+                   ('consolidation', 'native_consolidation_6500_8300m'))}
+    fields = (
+        'ping_rate_hz', 'survey_speed_mps', 'survey_altitude_m',
+        'survey_start_distance_m', 'requested_survey_segment_distance_m',
+        'terrain_resolution_m', 'terrain_match_window_pings',
+        'terrain_match_translation_window_m', 'terrain_match_yaw_window_deg',
+        'feature_subframe_pings', 'sidescan_imaging_rays_per_side_per_row',
+        'sidescan_slam_sample_stride', 'pose_graph_backend_configuration',
+        'navigation_initialization', 'terrain_prior_surface',
+        'reproducibility',
+    )
+    for field in fields:
+        assert field in reports['baseline'], field
+        assert reports['baseline'][field] == reports['consolidation'][field], field
+    arrays = {}
+    result = dict(scope='1.8 km fresh-start native pair at Chelan route 6.5--8.3 km; not a 47 km result',
+                  identical_configuration_fields=list(fields), results={})
+    for name, filename in (('baseline', 'native_baseline_6500_8300m'),
+                           ('consolidation', 'native_consolidation_6500_8300m')):
+        report = reports[name]
+        assert report['run_status'] == 'completed'
+        assert abs(report['survey_travelled_distance_m'] - 1800) < .5
+        arrays[name] = np.loadtxt(directory / filename / 'metrics_position_errors.csv',
+                                  skiprows=1, delimiter=',')
+        result['results'][name] = dict(
+            distance_m=report['survey_travelled_distance_m'],
+            online_global=report['position_error_statistics']['online_global_slam'],
+            local=report['position_error_statistics']['local_acoustic_esikf'],
+            accepted_absolute_priors=report['accepted_terrain_prior_factors'],
+            confirmed_windows=report['terrain_cohort_particle_backend']['statistics']['confirmed_updates'],
+            maximum_failed_observations=report['terrain_maximum_consecutive_failed_prior_observations'],
+            diagnostics=report['terrain_cohort_particle_backend']['diagnostics'])
+    # Time + DR + Local must be unchanged when editing only the backend.
+    np.testing.assert_allclose(arrays['baseline'][:, :3], arrays['consolidation'][:, :3],
+                               atol=1.e-9, rtol=0.)
+    result['identical_timestamps_dr_and_local_at_all_5hz_samples'] = True
+    a = result['results']['baseline']['online_global']['rmse_3d_m']
+    b = result['results']['consolidation']['online_global']['rmse_3d_m']
+    result['online_global_rmse_reduction_percent'] = 100. * (1. - b/a)
+    return result
+
+
+def verify_frozen_monterey():
+    frozen = Path('/home/cgz/OceanSim_worktrees/monterey-72km-stable-20260918')
+    expected = '8b5df53cb57f9de2506d78d90b16e33bf5e96510'
+    actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=frozen, text=True).strip()
+    assert actual == expected
+    status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'],
+                                     cwd=frozen, text=True).strip()
+    assert not status, 'frozen tracked files were modified'
+    route_name = 'data/monterey_canyon_full_5m/full_map_traversal_route.json'
+    route_bytes = (ROOT / route_name).read_bytes()
+    assert route_bytes == (frozen / route_name).read_bytes()
+    checksums = subprocess.check_output(['sha256sum', '-c', 'sha256sums.txt'],
+                                      cwd=ROOT/'data/monterey_canyon_full_5m', text=True)
+    return dict(commit=actual, worktree=str(frozen), tracked_source_clean=True,
+                original_route_unchanged=True,
+                route_sha256=hashlib.sha256(route_bytes).hexdigest(),
+                measured_map_checksums=checksums.strip().splitlines(),
+                frozen_policy='multimodal-map', experimental_default_merge_enabled=False,
+                scope='code/data isolation and disabled-policy numeric regression; no new 72 km run claimed')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--archives', type=Path, nargs='*', default=[])
+    parser.add_argument('--native-pair', type=Path)
+    parser.add_argument('--verify-frozen-monterey', action='store_true')
     args = parser.parse_args()
-    result = dict(disabled_policy_regression=frozen_default_regression(),
-                  archive_diagnostics=[audit_archive(path) for path in args.archives])
+    result = (native_pair(args.native_pair) if args.native_pair else
+              dict(disabled_policy_regression=frozen_default_regression(),
+                   archive_diagnostics=[audit_archive(path) for path in args.archives]))
+    if args.verify_frozen_monterey:
+        result['frozen_monterey_regression'] = verify_frozen_monterey()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps(result, ensure_ascii=False, indent=2))

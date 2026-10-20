@@ -4812,11 +4812,15 @@ def main() -> int:
                     backscatter_points_body=backscatter_patch_body,
                     backscatter_values=backscatter_patch_values,
                 )
+                stream.flush()
+                os.fsync(stream.fileno())
             temporary_archive.replace(archive)
             with (ARGS.terrain_replay_directory / "decisions.jsonl").open(
                 "a", encoding="utf-8"
             ) as stream:
                 stream.write(json.dumps(replay_record, ensure_ascii=False, allow_nan=False) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
         return decision
 
     def published_online_global_pose():
@@ -5381,7 +5385,7 @@ def main() -> int:
     if ARGS.terrain_replay_directory is not None:
         live_trace_stream = (
             ARGS.terrain_replay_directory / "online_poses_5hz.csv"
-        ).open("x", encoding="utf-8", newline="", buffering=64 * 1024)
+        ).open("x", encoding="utf-8", newline="", buffering=1)
         atexit.register(live_trace_stream.close)
         live_trace_writer = csv.writer(live_trace_stream)
         live_trace_writer.writerow([
@@ -10732,6 +10736,10 @@ def main() -> int:
                 nonfinite_replacements
             ),
         }
+        if live_trace_stream is not None:
+            live_trace_stream.flush()
+            os.fsync(live_trace_stream.fileno())
+            live_trace_stream.close()
         with ARGS.metrics.open("w", encoding="utf-8") as stream:
             json.dump(metrics, stream, indent=2, allow_nan=False)
             stream.write("\n")

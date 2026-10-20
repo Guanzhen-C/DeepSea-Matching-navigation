@@ -23,6 +23,8 @@ def test_launcher_is_bounded_and_never_kills_other_jobs():
     assert 'MemoryMax=7G' in source
     assert 'MemorySwapMax=0' in source
     assert 'available < 12 * GIB' in source
+    assert 'gpu_free_mib < 2048' in source
+    assert "'/usr/bin/flock', '--nonblock'" in source
     assert 'if processes.returncode == 0:' in source
     assert 'kill(' not in source and 'pkill' not in source
     assert "'source_sha256'" in source
@@ -36,3 +38,11 @@ def test_monterey_runs_frozen_code_not_experimental_code():
     assert '"${STABLE_DIR}/standalone/run_v2_full_map_slam_isaac.sh"' in wrapper
     assert '--terrain-merge-converged-cohorts' not in wrapper
     assert '--terrain-merge-converged-cohorts' not in standard
+
+
+def test_online_pose_journal_flushes_before_isaac_shutdown():
+    source = (ROOT/'standalone/large_scale_slam_isaac_demo.py').read_text()
+    assert 'newline="", buffering=1' in source
+    closing = source.index('            live_trace_stream.close()')
+    assert closing < source.index('        with ARGS.metrics.open("w"')
+    assert closing < source.index('        simulation_app.close()', closing)
