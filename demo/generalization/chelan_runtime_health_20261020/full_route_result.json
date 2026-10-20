@@ -1,0 +1,54 @@
+{
+  "observed_completed_at": "2026-10-20T21:41:11+08:00",
+  "run_directory": "demo/generalization/chelan_cohort_fix_20261020/full_route_consolidation_seed31",
+  "unit": "oceansim-chelan-consolidation-20261020-151625-879035.service",
+  "estimator_commit": "e6f0844149f0b0d84dfdf48ad88bff204e56c7d4",
+  "runtime_fix_commit": "db26f9c",
+  "run_status": "completed",
+  "termination_reason": "requested_survey_laps_reached",
+  "unit_final_state": "inactive",
+  "exit_status": 0,
+  "requested_route_completed": true,
+  "route_distance_m": 47116.48901858927,
+  "simulation_duration_s": 31411.0,
+  "wall_duration_s_including_reclaim_stall": 23057.545124451,
+  "samples": 157056,
+  "sample_hz": 5,
+  "online_global": {
+    "definition": "Synchronized unaligned three-dimensional Euclidean error of the actually published online pose, NOT post-hoc optimized trajectory error.",
+    "rmse_m": 7.309652725075417,
+    "median_m": 4.292744128301116,
+    "p95_m": 15.15880680344032,
+    "p99_m": 24.520086163342427,
+    "maximum_m": 46.803784285047506,
+    "maximum_at_distance_km": 46.975188909,
+    "final_m": 34.92428396887328
+  },
+  "dead_reckoning": {"rmse_m": 944.1429194142128, "final_m": 2656.6417235465883},
+  "local": {"rmse_m": 942.3254946029449, "final_m": 2646.317206334623},
+  "absolute_priors_inserted": 777,
+  "duplicate_cohorts_merged": 113,
+  "maximum_consecutive_failed_prior_windows": 14,
+  "final_consecutive_failed_prior_windows": 4,
+  "data_integrity": {
+    "complete_live_pose_samples": 157056,
+    "final_error_csv_samples": 157056,
+    "missing_matched_timestamps": 0,
+    "non_5hz_gaps": 0,
+    "maximum_error_difference_live_vs_final_csv_m": {
+      "dr": 4.54747350886e-13,
+      "local": 4.54747350886e-13,
+      "online_global": 3.5527136788e-15
+    }
+  },
+  "runtime_intervention": "See runtime_intervention.json. Only the unreachable 6 GiB soft memory target was raised to the existing 7 GiB hard limit. No estimator change, restart, pose reset, or lost simulated sample. Raw original manifest is preserved.",
+  "interpretation": [
+    "The duplicate-cohort fix sustains absolute terrain factors over the full route instead of the old long-duration confirmation loss.",
+    "Mean/median performance does not eliminate tail failures: a 46.8 m late-route peak and 34.9 m endpoint error remain unresolved.",
+    "Local/DR still accumulate kilometre-scale drift. This run does not establish a high-accuracy independent frontend.",
+    "Do not substitute the lower post-hoc optimized RMSE for the online output reported above.",
+    "This is one seeded simulation on a same-survey low-pass prior and synthetic acoustic observations, not an independent survey or field trial, and route completion is not exhaustive lake-bottom coverage."
+  ],
+  "next_controlled_algorithm_test": "Raw-sonar candidate recovery and explicit alternative hypotheses, with current multi-window confirmation retained. The selected-window proposal diagnostics justify testing, not immediate deployment or a full-route accuracy claim.",
+  "monterey_72km_frozen_version_modified": false
+}
