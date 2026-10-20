@@ -27,7 +27,7 @@ def memory_available_bytes(text: str) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--profile', choices=('baseline', 'consolidation'), required=True)
+    parser.add_argument('--profile', choices=('baseline', 'consolidation', 'raw-recovery'), required=True)
     parser.add_argument('--start-distance-m', type=float, default=0.)
     scope = parser.add_mutually_exclusive_group(required=True)
     scope.add_argument('--distance-m', type=float)
@@ -69,8 +69,10 @@ def main():
         '--survey-segment-distance-m', str(args.distance_m or 0.),
         '--seed', '31', '--progress-distance-m', '100',
         '--terrain-replay-directory', str(output / 'terrain_replay'),
-        '--terrain-merge-converged-cohorts' if args.profile == 'consolidation'
+        '--terrain-merge-converged-cohorts' if args.profile != 'baseline'
         else '--no-terrain-merge-converged-cohorts',
+        '--terrain-raw-mode-recovery' if args.profile == 'raw-recovery'
+        else '--no-terrain-raw-mode-recovery',
         '--metrics', str(output / 'metrics.json'),
     ]
     # Anonymous/locked working memory exceeded the former 6 GiB soft limit

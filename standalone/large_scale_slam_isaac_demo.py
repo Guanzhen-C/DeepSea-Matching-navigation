@@ -88,6 +88,11 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--terrain-raw-mode-recovery",
+        action=argparse.BooleanOptionalAction, default=False,
+        help="experimental wider raw-sonar proposals after failed PF windows; confirmation unchanged",
+    )
+    parser.add_argument(
         "--terrain-replay-directory", type=Path,
         help=(
             "optional new directory for incremental current-window raw sonar "
@@ -2906,6 +2911,11 @@ def main() -> int:
         # Exclusive directory creation prevents silently mixing experiments.
         ARGS.terrain_replay_directory.mkdir(parents=True, exist_ok=False)
     terrain_backend_particle_last_patch_end_observation_id = -1
+    from oceansim.slam.raw_mode_recovery import RawModeRecovery
+    terrain_raw_mode_recovery = RawModeRecovery(
+        enabled=ARGS.terrain_raw_mode_recovery,
+        after_failed_windows=ARGS.terrain_recovery_after_rejections,
+    )
     terrain_navigation_output_stats = {
         "policy": TERRAIN_PARTICLE_ONLINE_OUTPUT,
         "particle_map_updates": 0,
@@ -4607,6 +4617,12 @@ def main() -> int:
             terrain_backend_particle_stats[
                 "compact_proposal_refinements"
             ] += 1
+        recovery_evidences = terrain_raw_mode_recovery.generate(
+            raw_likelihood,
+            terrain_backend_particle_tracker.prediction_seeds(local_pose2),
+            particle_observation, source_index=len(refined_evidences),
+        )
+        refined_evidences.extend(recovery_evidences)
         evidence_tuple = tuple(refined_evidences)
         decision = terrain_backend_particle_tracker.update(
             timestamp_s=timestamp,
@@ -4614,6 +4630,7 @@ def main() -> int:
             evidences=evidence_tuple,
             particle_observation=particle_observation,
         )
+        terrain_raw_mode_recovery.observe(decision)
         terrain_backend_particle_last_patch_end_observation_id = int(
             patch_end_observation_id
         )
@@ -4637,6 +4654,8 @@ def main() -> int:
                 "status": decision.status,
                 "candidate_count": len(evidence_tuple),
                 "raw_likelihood_refinements": refinement_records,
+                "raw_recovery_proposals": [asdict(item) for item in recovery_evidences],
+                "raw_mode_recovery": terrain_raw_mode_recovery.diagnostics(),
                 "null_probability": float(decision.null_probability),
                 "best_probability": float(decision.best_probability),
                 "odds_over_second": float(decision.odds_over_second),
@@ -4787,6 +4806,7 @@ def main() -> int:
                 "patch_end_observation_id": int(patch_end_observation_id),
                 "likelihood_config": asdict(terrain_particle_likelihood_config),
                 "tracker_config": asdict(terrain_backend_particle_tracker.config),
+                "raw_mode_recovery": terrain_raw_mode_recovery.diagnostics(),
                 "compact_evidences": [
                     asdict(evidence) for evidence in original_evidence_tuple
                 ],
@@ -9745,6 +9765,7 @@ def main() -> int:
                 "converged_cohort_merging_enabled": (
                     ARGS.terrain_merge_converged_cohorts
                 ),
+                "raw_mode_recovery": terrain_raw_mode_recovery.diagnostics(),
                 "terrain_replay_directory": (
                     None if ARGS.terrain_replay_directory is None
                     else str(ARGS.terrain_replay_directory)

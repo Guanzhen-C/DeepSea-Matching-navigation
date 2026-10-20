@@ -26,6 +26,7 @@ from oceansim.slam import (
     TerrainParticleLikelihoodConfig, reporting_covariance_from_information,
     sanitize_for_strict_json,
 )
+from oceansim.slam.raw_mode_recovery import RawModeRecovery
 
 
 def current_evidence(approximation, record, config, source_index, cohort_id=None):
@@ -49,13 +50,14 @@ def current_evidence(approximation, record, config, source_index, cohort_id=None
     )
 
 
-def replay(directory, terrain, prior, maximum_windows=None):
+def replay(directory, terrain, prior, maximum_windows=None, *, compare_raw_recovery=False):
     files = sorted(directory.glob('window_*.npz'))
     if maximum_windows is not None:
         files = files[:maximum_windows]
     if not files:
         raise ValueError('no recorded sonar windows')
     trackers = {}
+    recoveries = {}
     rows = []
     reproduction_errors = []
     started = time.monotonic()
@@ -63,10 +65,13 @@ def replay(directory, terrain, prior, maximum_windows=None):
         with np.load(path, allow_pickle=False) as data:
             record = json.loads(str(data['record_json']))
             if not trackers:
-                for enabled in (False, True):
+                profiles = (('baseline', True, False), ('raw_recovery', True, True)) if compare_raw_recovery else (
+                    ('baseline', False, False), ('consolidation', True, False))
+                for name, enabled, recovery_enabled in profiles:
                     config = GlobalCohortTrackerConfig(**dict(
                         record['tracker_config'], merge_converged_cohorts=enabled))
-                    trackers['consolidation' if enabled else 'baseline'] = GlobalCohortTracker(config)
+                    trackers[name] = GlobalCohortTracker(config)
+                    recoveries[name] = RawModeRecovery(enabled=recovery_enabled)
             config = TerrainParticleLikelihoodConfig(**record['likelihood_config'])
             raw = AcousticTerrainParticleLikelihood(
                 prior, InertialState(position=data['reference_position'], rotation=data['reference_rotation']),
@@ -98,11 +103,15 @@ def replay(directory, terrain, prior, maximum_windows=None):
                     information_matrix=info, position_std_m=float(np.sqrt(np.linalg.eigvalsh(covariance[:2,:2])[-1])),
                     yaw_std_deg=float(np.rad2deg(np.sqrt(covariance[2,2]))),
                     source_index=len(evidences), target_cohort_id=None))
+            evidences.extend(recoveries[name].generate(raw, tracker.prediction_seeds(local),
+                observation, source_index=len(evidences)))
             decision = tracker.update(timestamp_s=record['timestamp_s'], raw_pose2=local,
                                       evidences=evidences, particle_observation=observation)
+            recoveries[name].observe(decision)
             truth = record.get('truth_evaluation_only')
             best = decision.cohorts[0] if decision.cohorts else None
-            if name == 'baseline' and not record['tracker_config']['merge_converged_cohorts']:
+            if (tracker.config.merge_converged_cohorts == record['tracker_config']['merge_converged_cohorts']
+                    and recoveries[name].enabled == record.get('raw_mode_recovery', {}).get('enabled', False)):
                 recorded = record['decision']
                 if decision.status != recorded['status']:
                     raise AssertionError('baseline PF replay does not reproduce the recording status')
@@ -118,7 +127,8 @@ def replay(directory, terrain, prior, maximum_windows=None):
                 probability=decision.best_probability, null_probability=decision.null_probability,
                 odds=decision.odds_over_second, cohorts=len(decision.cohorts), error_xy_m=error,
                 graph_ready=bool(decision.confirmed_cohort and decision.confirmed_cohort.last_measurement_is_graph_ready),
-                merged=tracker.converged_cohorts_merged)
+                merged=tracker.converged_cohorts_merged,
+                raw_recovery=recoveries[name].diagnostics())
             rows.append(row)
             print(json.dumps(row), flush=True)
     summary = {}
@@ -145,6 +155,7 @@ def main():
     p.add_argument('--directory', type=Path, required=True)
     p.add_argument('--bathymetry', type=Path, default=ROOT/'data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/prepared_db_power')
     p.add_argument('--maximum-windows', type=int)
+    p.add_argument('--compare-raw-recovery', action='store_true')
     p.add_argument('--output', type=Path, required=True)
     args = p.parse_args()
     terrain = MeasuredBathymetryGrid.from_path(args.bathymetry)
@@ -154,7 +165,8 @@ def main():
         valid_mask=terrain.valid_mask, metadata=terrain.metadata,
         source_path=terrain.source_path,
     )
-    result = replay(args.directory, terrain, prior, args.maximum_windows)
+    result = replay(args.directory, terrain, prior, args.maximum_windows,
+                    compare_raw_recovery=args.compare_raw_recovery)
     safe, _ = sanitize_for_strict_json(result)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(safe, ensure_ascii=False, indent=2, allow_nan=False)+'\n')
