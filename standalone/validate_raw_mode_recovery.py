@@ -33,8 +33,8 @@ def validate_replay(path):
     np.testing.assert_array_equal([r['timestamp_s'] for r in baseline],
                                   [r['timestamp_s'] for r in candidate])
     intervals = {}
-    for name, start_km, end_km in (('all', 0., 100.), ('last_10km', 37., 100.),
-                                  ('last_3km', 44., 100.)):
+    for name, start_km, end_km in (('all', 0., 100.), ('from_37km', 37., 100.),
+                                  ('from_44km', 44., 100.)):
         intervals[name] = {profile: statistics([r for r in rows
             if start_km <= r['timestamp_s'] * 1.5 / 1000 < end_km])
             for profile, rows in (('baseline', baseline), ('raw_recovery', candidate))}

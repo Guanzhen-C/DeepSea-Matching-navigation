@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-20",
+  "request": "保存当前版本，继续改进并进行全程测试",
+  "saved_baseline_tag": "chelan-47km-baseline-20261020",
+  "saved_baseline_commit": "256cfcc",
+  "experiment_branch": "improve/chelan-raw-mode-recovery-20261020",
+  "algorithm_commit": "25b86b590e862937e2e7337bf88fa25f01b4522b",
+  "change": {
+    "default_enabled": false,
+    "experimental_profile": "raw-recovery",
+    "trigger": "After three previous ordinary-PF windows without a newly independent, confirmed, graph-ready fix.",
+    "search": "Existing deterministic raw.refine_pose followed by a fresh current-window rank-aware Laplace approximation, from each persistent-cohort prediction.",
+    "cohort_identity": "Recovered candidates are unassigned new proposals. Existing cohorts are not teleported, and confirmation history is not transferred.",
+    "probability": "Existing same-observation NMS, joint raw likelihood, fixed birth mass and explicit null model remain unchanged. Proposal fit is not applied as a second likelihood update.",
+    "graph_handoff": "Existing probability/odds, disjoint-acquisition count and current-observation rank requirements remain unchanged.",
+    "unchanged": ["frontend", "IMU/DVL/depth precision", "sonar geometry", "5 Hz physical ping rate", "150-ping observation aperture", "GTSAM", "online pose-source policy", "Monterey 72 km frozen version"],
+    "truth_used_by_estimator": false
+  },
+  "validation": {
+    "cpu_suite": "432 passed, 1 CUDA skipped",
+    "native_cuda_feature_suite": "12 passed, including CUDA/CPU registration equivalence",
+    "replay": "replay_validation.json",
+    "combined_validation": "validation_summary.json",
+    "isolation": "isolation_regression.json",
+    "native_pair": {
+      "baseline_directory": "native_baseline_44000_44600m_v2",
+      "candidate_directory": "native_recovery_44000_44600m",
+      "start_distance_m": 44000,
+      "length_m": 600,
+      "initialization": "fresh start at truth, seed 31, NOT a resumed estimator checkpoint",
+      "result": "Both completed 600 m with 2001 samples and online Global RMSE 1.039469 m. All synchronized truth/DR/Local and Global poses are identical.",
+      "limitation": "Healthy segment never triggered raw recovery (searches 0). This validates inactive-path integration only; active recovery was exercised by 301 searches in the full PF replay and still requires a new closed-loop full-route test."
+    },
+    "initial_native_smoke_failure": {
+      "directory": "native_baseline_44000_44600m",
+      "cause": "Incorrect oceansim import namespace inside native Isaac package; no navigation samples were produced.",
+      "corrected_in_commit": "25b86b5",
+      "regression_test": "test_native_recovery_import_uses_isaacsim_package_namespace",
+      "not_counted_as_completed_test": true
+    }
+  },
+  "limits_and_open_problems": [
+    "PF-only replay improves average and P95 XY error and graph-ready window availability, but not its worst peak. It is not a new online Global full-route result.",
+    "A recovered nearby proposal may still be suppressed by provenance-preserving 10 m / 2 degree same-observation NMS. This experiment intentionally does not change or weaken that established policy.",
+    "The raw proposal search is bounded to the existing local proposal budget. It is not a whole-map relocalizer and cannot guarantee recovery from arbitrarily bad odometry.",
+    "At recorded route 46.935--46.980 km, the true 30 s planar chord is 39.151 m while BOTH DR and Local report 75.165 m. Local body-frame SE(2) translation increment error is 49.218 m during an approximately 92 degree turn. This points to a shared inertial/DVL/motion-input issue, not proof of a feature-registration-specific failure or merely a constant global-frame offset. The deeper cause is not yet established.",
+    "New native 600 m tests start fresh; they cannot reproduce the accumulated 44 km drift. Only a new complete closed-loop route can establish long-range online behavior.",
+    "Original 72 km navigation is preserved by frozen worktree, original map/route checksum checks and disabled-path stochastic regression; no new complete 72 km run is claimed."
+  ],
+  "resources": {
+    "native_memory_high_and_max_gib": 7,
+    "native_swap_max": 0,
+    "native_cpu_quota_percent": 200,
+    "minimum_host_available_before_launch_gib": 12,
+    "minimum_gpu_free_before_launch_mib": 2048,
+    "one_native_run_at_a_time": true,
+    "headless": true,
+    "other_user_jobs_untouched": true
+  },
+  "recording": {
+    "online_poses": "all synchronized 5 Hz samples, line-buffered CSV and periodic fsync",
+    "raw_windows": "each 30 s raw sonar NPZ and decision JSONL, atomic archive plus fsync",
+    "progress": "100 m checkpoints; health checks use file freshness and complete rows",
+    "final": "metrics.json, metrics_position_errors.csv, metrics_pose_graph_factors.json",
+    "do_not_overwrite_prior_run": true
+  }
+}

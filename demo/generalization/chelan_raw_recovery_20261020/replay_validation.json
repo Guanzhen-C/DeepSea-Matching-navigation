@@ -1,0 +1,83 @@
+{
+  "protocol": "Summarize causal PF replay and matched native tests, never conflate them.\n\nTruth enters metrics only, after the two policies have run. Fresh-start segment\ntests are NOT reproductions of the estimator drift accumulated over 44 km.\nThe new full-route closed-loop experiment is still required.\n",
+  "replay": {
+    "file": "demo/generalization/chelan_raw_recovery_20261020/full_replay_initial.json",
+    "scope": "PF-only same-input causal replay, not online Global error",
+    "recording_reproduction": {
+      "windows": 1047,
+      "maximum_probability_difference": 7.922174027896745e-11,
+      "maximum_pose_component_difference": 1.1823431123048067e-10
+    },
+    "intervals": {
+      "all": {
+        "baseline": {
+          "windows": 1047,
+          "confirmed": 782,
+          "graph_ready": 777,
+          "rmse_xy_m": 5.896365737473882,
+          "p95_xy_m": 10.336492899247395,
+          "max_xy_m": 44.581385697111315,
+          "confirmed_above_15m": 2
+        },
+        "raw_recovery": {
+          "windows": 1047,
+          "confirmed": 807,
+          "graph_ready": 802,
+          "rmse_xy_m": 5.614082644746144,
+          "p95_xy_m": 8.702398937901553,
+          "max_xy_m": 45.87241995654323,
+          "confirmed_above_15m": 1
+        }
+      },
+      "from_37km": {
+        "baseline": {
+          "windows": 225,
+          "confirmed": 134,
+          "graph_ready": 133,
+          "rmse_xy_m": 8.507805202211427,
+          "p95_xy_m": 14.15671079158121,
+          "max_xy_m": 44.581385697111315,
+          "confirmed_above_15m": 2
+        },
+        "raw_recovery": {
+          "windows": 225,
+          "confirmed": 163,
+          "graph_ready": 161,
+          "rmse_xy_m": 7.8296429756681585,
+          "p95_xy_m": 10.158474575574695,
+          "max_xy_m": 45.87241995654323,
+          "confirmed_above_15m": 1
+        }
+      },
+      "from_44km": {
+        "baseline": {
+          "windows": 70,
+          "confirmed": 31,
+          "graph_ready": 31,
+          "rmse_xy_m": 12.576792847459469,
+          "p95_xy_m": 26.132045461132613,
+          "max_xy_m": 44.581385697111315,
+          "confirmed_above_15m": 1
+        },
+        "raw_recovery": {
+          "windows": 70,
+          "confirmed": 45,
+          "graph_ready": 44,
+          "rmse_xy_m": 11.83001941914786,
+          "p95_xy_m": 26.733395698945863,
+          "max_xy_m": 45.87241995654323,
+          "confirmed_above_15m": 0
+        }
+      }
+    },
+    "raw_recovery": {
+      "enabled": true,
+      "after_failed_windows": 3,
+      "failed_windows": 4,
+      "searches": 301,
+      "proposals": 301,
+      "existing_nms_and_confirmation_unchanged": true
+    },
+    "truth_used_for_estimation": false
+  }
+}
