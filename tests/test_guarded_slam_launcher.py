@@ -48,3 +48,9 @@ def test_online_pose_journal_flushes_before_isaac_shutdown():
     closing = source.index('            live_trace_stream.close()')
     assert closing < source.index('        with ARGS.metrics.open("w"')
     assert closing < source.index('        simulation_app.close()', closing)
+
+
+def test_native_recovery_import_uses_isaacsim_package_namespace():
+    source = (ROOT/'standalone/large_scale_slam_isaac_demo.py').read_text()
+    assert 'from isaacsim.oceansim.slam.raw_mode_recovery import RawModeRecovery' in source
+    assert 'from oceansim.slam.raw_mode_recovery import' not in source

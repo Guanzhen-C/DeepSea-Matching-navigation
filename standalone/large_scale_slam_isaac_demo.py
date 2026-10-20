@@ -2911,7 +2911,7 @@ def main() -> int:
         # Exclusive directory creation prevents silently mixing experiments.
         ARGS.terrain_replay_directory.mkdir(parents=True, exist_ok=False)
     terrain_backend_particle_last_patch_end_observation_id = -1
-    from oceansim.slam.raw_mode_recovery import RawModeRecovery
+    from isaacsim.oceansim.slam.raw_mode_recovery import RawModeRecovery
     terrain_raw_mode_recovery = RawModeRecovery(
         enabled=ARGS.terrain_raw_mode_recovery,
         after_failed_windows=ARGS.terrain_recovery_after_rejections,
