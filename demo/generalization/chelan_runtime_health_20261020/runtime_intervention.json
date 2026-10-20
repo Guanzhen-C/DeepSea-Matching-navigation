@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-20",
+  "run_unit": "oceansim-chelan-consolidation-20261020-151625-879035.service",
+  "estimator_source_commit": "e6f0844149f0b0d84dfdf48ad88bff204e56c7d4",
+  "problem": "Unit was active but last checkpoint/pose write stopped at about 19:30:50, 44.5 km. Earlier status quoted stale checkpoint data as if progressing; this was corrected explicitly.",
+  "evidence_before": {
+    "python_pid": 54079,
+    "wrapper_pid": 54078,
+    "wait_channel": "mem_cgroup_handle_over_high",
+    "memory_high_bytes": 6442450944,
+    "memory_max_bytes": 7516192768,
+    "anonymous_bytes": 6468833280,
+    "memory_high_events": 16399499,
+    "memory_max_events": 0,
+    "oom_events": 0,
+    "oom_kill_events": 0,
+    "cgroup_memory_full_pressure_avg10_percent": 20.65
+  },
+  "intervention_at": "2026-10-20T21:22:51+08:00",
+  "action": "Changed ONLY the live MemoryHigh from 6 GiB to 7 GiB, equal to the existing hard ceiling. The un-reclaimable anonymous working set had exceeded the old soft target while swap was disabled.",
+  "hard_memory_limit_unchanged_bytes": 7516192768,
+  "swap_limit_unchanged_bytes": 0,
+  "no_estimator_or_sensor_settings_changed": true,
+  "no_process_restart_or_checkpoint_reset": true,
+  "no_other_application_stopped": true,
+  "recovery_evidence": {
+    "pose_journal_resumed_at": "2026-10-20T21:23:31+08:00",
+    "checkpoint_at": "2026-10-20T21:24:43+08:00",
+    "distance_m": 44700.29285661365,
+    "absolute_priors_before_after": [747, 751],
+    "consecutive_failures_after": 0,
+    "instantaneous_online_global_error_m": 11.017999097916164,
+    "memory_full_pressure_avg10_after_percent": 0.0
+  },
+  "sampling_audit_after_recovery": {
+    "samples": 150447,
+    "last_sim_time_s": 30089.2,
+    "minimum_dt_s": 0.199999999997,
+    "maximum_dt_s": 0.200000000001,
+    "non_5hz_gaps": 0
+  },
+  "permanent_changes": [
+    "Guarded launcher now uses MemoryHigh=7G and the SAME MemoryMax=7G/MemorySwapMax=0.",
+    "Read-only status utility checks final metrics, complete 5 Hz CSV rows and file freshness; active/success alone cannot establish progress or completion."
+  ],
+  "boundaries": "Hard resource limits do not protect against unrelated applications exhausting the host. A stale-progress warning may mean a deliberate pause or a long operation, so it never automatically kills or restarts a task."
+}

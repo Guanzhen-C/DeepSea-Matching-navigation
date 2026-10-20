@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-20",
+  "baseline_algorithm": "e6f0844149f0b0d84dfdf48ad88bff204e56c7d4",
+  "runtime_improvements_implemented": [
+    "Corrected the pathological 6 GiB soft reclaim target without increasing the 7 GiB hard limit or allowing swap.",
+    "Added a read-only status command which checks complete 5 Hz pose rows, file freshness, final metrics and memory pressure, instead of trusting active/success alone."
+  ],
+  "no_online_navigation_algorithm_was_modified": true,
+  "no_72km_frozen_code_or_map_was_modified": true,
+  "aperture_diagnostic": {
+    "source": "aperture_diagnostic.json",
+    "scope": "5 selected difficult windows at route distances 39.555, 44.28, 44.46, 44.955 and 45.18 km. Actual recorded sonar/odometry references, 30/60/120 s apertures, identical final PF seed and independent-information caps; no truth deskew or graph loop.",
+    "seed_boundary": "Seed is the recorded post-update PF MAP, not the original pre-update cohort prediction. Consequently even the diagnostic 30 s rank can differ from the recorded original rank.",
+    "result": "Longer windows sometimes increase numerical rank, but do not consistently decrease position error. Some 120 s windows have worse intensity agreement. Do not apply a universal 120 s replacement based on these examples."
+  },
+  "wider_candidate_diagnostic": {
+    "source": "proposal_diagnostic.json",
+    "scope": "Same 5 end times and 30 s data, using the existing deterministic raw-likelihood proposal refiner before local Gaussian approximation. Diagnostic modes have NOT been admitted to PF/GTSAM.",
+    "examples": [
+      {"distance_km": 44.46, "narrow_error_m": 10.880286266978834, "proposal_error_m": 0.6280838822566345, "rank_narrow_proposal": [2, 3]},
+      {"distance_km": 44.955, "narrow_error_m": 9.286189362613205, "proposal_error_m": 5.372547775589904, "rank_narrow_proposal": [2, 3]},
+      {"distance_km": 45.18, "narrow_error_m": 8.54908882060254, "proposal_error_m": 1.0529511051505753, "rank_narrow_proposal": [2, 3]}
+    ],
+    "interpretation": "Some apparent low-rank failures arise near an inadequately refined local mode, not solely from intrinsically flat terrain. A wider recovery proposal is worth controlled testing; a stronger local fit does not by itself prove global uniqueness or authorize a correction."
+  },
+  "output_source_diagnostic": {
+    "source": "output_source_diagnostic.json",
+    "scope": "1019 independent-window timestamps through simulated time 30570 s, NOT full-rate full-route RMSE. Predetermined counterfactual uses confirmed ordinary PF for one cohort, otherwise keeps recorded output. No truth-dependent source selection, no soft-output transients or future proposal feedback simulated.",
+    "eligible_windows": 578,
+    "recorded_window_time_RMSE_xy_m": 7.0055691764707095,
+    "counterfactual_window_time_RMSE_xy_m": 6.764149425194742,
+    "maximum_error_unchanged_m": 28.75097209272701,
+    "interpretation": "Changing output arbitration alone gives only a small diagnostic improvement and leaves the worst peaks. It is not the preferred first algorithm change and has not been deployed."
+  },
+  "next_algorithm_experiment": {
+    "priority": "Better raw-sonar recovery candidate generation when ordinary tracking has lost a usable mode.",
+    "safety_requirements": [
+      "Keep the current validated algorithm and original 72 km frozen version separately reproducible.",
+      "Treat a recovered distant mode as a new hypothesis rather than silently moving a persistent cohort identity.",
+      "Preserve null/alias alternatives and require the existing independent-window confirmation before publication or graph authorization.",
+      "Audit proposal deduplication so it cannot discard a genuinely better nearby raw mode merely due to persistent-ID preference.",
+      "Test same inputs/seeds first, then native front/back integration and full-route regression; include false-alias controls.",
+      "Do not infer closed-loop long-range improvement from the selected-window diagnostics above."
+    ]
+  }
+}

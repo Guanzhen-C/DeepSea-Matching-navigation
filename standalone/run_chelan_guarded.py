@@ -73,7 +73,12 @@ def main():
         else '--no-terrain-merge-converged-cohorts',
         '--metrics', str(output / 'metrics.json'),
     ]
-    properties = ['MemoryHigh=6G', 'MemoryMax=7G', 'MemorySwapMax=0',
+    # Anonymous/locked working memory exceeded the former 6 GiB soft limit
+    # late in a real run. With swap disabled the kernel could not reclaim it,
+    # so memory.high caused indefinite reclaim while memory.max was untouched.
+    # Keep the SAME 7 GiB hard safety boundary without an unreachable lower
+    # reclaim target. This changes resource scheduling, never sensor events.
+    properties = ['MemoryHigh=7G', 'MemoryMax=7G', 'MemorySwapMax=0',
                   'CPUQuota=200%', 'CPUWeight=20', 'IOWeight=20', 'Nice=10', 'OOMPolicy=stop']
     service = ['systemd-run', '--user', '--unit', unit, '--working-directory', str(ROOT)]
     for prop in properties:

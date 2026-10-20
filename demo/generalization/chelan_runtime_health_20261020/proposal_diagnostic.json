@@ -1,0 +1,238 @@
+{
+  "protocol": "Compare sonar-window apertures on recorded data without changing a run.\n\nThis is a local-likelihood diagnostic, NOT a navigation A/B. Compose only\nrecorded local-odometry reference frames (no truth deskew). All apertures use\nthe same final posterior seed, final estimated roll/pitch/depth, 768-point\nbudgets and effective-independent-sample caps. Historical windows were already\ndeskewed/voxelized by the recording estimator, so this cannot replace a raw-ping\nlong-window replay. Truth is read only after estimation to calculate errors.\n",
+  "diagnostic_only": true,
+  "seed_provenance": "recorded post-update PF MAP; not the original pre-update prediction, so diagnostic 30 s ranks can differ from recorded ranks",
+  "refinement": "proposal",
+  "proposed_graph_fix_authorized": false,
+  "no_particle_tracking_or_graph_was_run": true,
+  "original_run_unmodified": true,
+  "truth_used_by_estimator": false,
+  "directory": "demo/generalization/chelan_cohort_fix_20261020/full_route_consolidation_seed31/terrain_replay",
+  "records": [
+    {
+      "end_timestamp_s": 26370.0,
+      "window_count": 1,
+      "nominal_aperture_s": 30,
+      "approximate_route_distance_km": 39.555,
+      "seed_pose2": [
+        -13353.284852866287,
+        11417.843202333126,
+        -1.1658346982829833
+      ],
+      "refined_pose2": [
+        -13353.284852866287,
+        11418.843202333126,
+        -1.1592897135880047
+      ],
+      "refinement": "proposal",
+      "local_search_seed_pose2": [
+        -13353.284852866287,
+        11418.843202333126,
+        -1.1592897135880047
+      ],
+      "observable_rank": 3,
+      "information_eigenvalues": [
+        0.004774938126077528,
+        0.07097588328187875,
+        0.4510724062786682
+      ],
+      "horizontal_error_m": 2.2773649656934105,
+      "yaw_error_deg": 3.9405644254241756,
+      "current_window_recorded_rank": 3,
+      "diagnostics": {
+        "particle_count": 19,
+        "bathymetry_points": 275,
+        "backscatter_points": 395,
+        "bathymetry_observability": 0.8574742156469434,
+        "backscatter_observability": 0.6969936441798229,
+        "best_bathymetry_normalized_loss": 0.05075843941246841,
+        "best_backscatter_correlation": 0.532554016548251,
+        "best_bathymetry_valid_fraction": 1.0,
+        "best_backscatter_valid_fraction": 1.0,
+        "log_likelihood_ratio_min": 3.7574136577199106,
+        "log_likelihood_ratio_max": 3.8078236461510118,
+        "log_likelihood_ratio_std": 0.01806924731950672
+      }
+    },
+    {
+      "end_timestamp_s": 29520.0,
+      "window_count": 1,
+      "nominal_aperture_s": 30,
+      "approximate_route_distance_km": 44.28,
+      "seed_pose2": [
+        -10847.712402460675,
+        7902.78177300645,
+        -1.6254307954847715
+      ],
+      "refined_pose2": [
+        -10846.962402460675,
+        7900.03177300645,
+        -1.6079775029648282
+      ],
+      "refinement": "proposal",
+      "local_search_seed_pose2": [
+        -10846.962402460675,
+        7900.03177300645,
+        -1.6079775029648282
+      ],
+      "observable_rank": 3,
+      "information_eigenvalues": [
+        0.02564799082727949,
+        0.08194963306558854,
+        0.9559655162302247
+      ],
+      "horizontal_error_m": 0.6333461187797957,
+      "yaw_error_deg": -1.0882743681580875,
+      "current_window_recorded_rank": 3,
+      "diagnostics": {
+        "particle_count": 19,
+        "bathymetry_points": 367,
+        "backscatter_points": 378,
+        "bathymetry_observability": 0.4143927694800921,
+        "backscatter_observability": 0.6670511894443616,
+        "best_bathymetry_normalized_loss": 0.04610646760515465,
+        "best_backscatter_correlation": 0.6998276537591559,
+        "best_bathymetry_valid_fraction": 1.0,
+        "best_backscatter_valid_fraction": 1.0,
+        "log_likelihood_ratio_min": 3.840676161577738,
+        "log_likelihood_ratio_max": 3.8855401761427624,
+        "log_likelihood_ratio_std": 0.013646085034169683
+      }
+    },
+    {
+      "end_timestamp_s": 29640.0,
+      "window_count": 1,
+      "nominal_aperture_s": 30,
+      "approximate_route_distance_km": 44.46,
+      "seed_pose2": [
+        -10840.97127312154,
+        7707.395308696127,
+        -1.4153682198183415
+      ],
+      "refined_pose2": [
+        -10838.47127312154,
+        7721.395308696127,
+        -1.424094866078313
+      ],
+      "refinement": "proposal",
+      "local_search_seed_pose2": [
+        -10838.47127312154,
+        7721.395308696127,
+        -1.424094866078313
+      ],
+      "observable_rank": 3,
+      "information_eigenvalues": [
+        0.027147637364531983,
+        0.08579883283303161,
+        1.3106063678830169
+      ],
+      "horizontal_error_m": 0.6280838822566345,
+      "yaw_error_deg": -0.1088878537950011,
+      "current_window_recorded_rank": 2,
+      "diagnostics": {
+        "particle_count": 19,
+        "bathymetry_points": 345,
+        "backscatter_points": 498,
+        "bathymetry_observability": 0.4717706314099263,
+        "backscatter_observability": 0.6564009944432344,
+        "best_bathymetry_normalized_loss": 0.04273639899753034,
+        "best_backscatter_correlation": 0.5571796187530473,
+        "best_bathymetry_valid_fraction": 1.0,
+        "best_backscatter_valid_fraction": 1.0,
+        "log_likelihood_ratio_min": 3.8147242146712297,
+        "log_likelihood_ratio_max": 3.8581500096331487,
+        "log_likelihood_ratio_std": 0.013340818996322945
+      }
+    },
+    {
+      "end_timestamp_s": 29970.0,
+      "window_count": 1,
+      "nominal_aperture_s": 30,
+      "approximate_route_distance_km": 44.955,
+      "seed_pose2": [
+        -10539.572954866788,
+        7327.644304549589,
+        -0.569319610139642
+      ],
+      "refined_pose2": [
+        -10554.822954866788,
+        7333.144304549589,
+        -0.5802279179646064
+      ],
+      "refinement": "proposal",
+      "local_search_seed_pose2": [
+        -10554.072954866788,
+        7332.894304549589,
+        -0.5758645948346208
+      ],
+      "observable_rank": 3,
+      "information_eigenvalues": [
+        0.0198904334063775,
+        0.08269896675189191,
+        0.6404047838312036
+      ],
+      "horizontal_error_m": 5.372547775589904,
+      "yaw_error_deg": 0.5520349788226492,
+      "current_window_recorded_rank": 1,
+      "diagnostics": {
+        "particle_count": 19,
+        "bathymetry_points": 494,
+        "backscatter_points": 352,
+        "bathymetry_observability": 0.7620271082276577,
+        "backscatter_observability": 0.7695428258761293,
+        "best_bathymetry_normalized_loss": 0.1257253999742145,
+        "best_backscatter_correlation": 0.6406870592347593,
+        "best_bathymetry_valid_fraction": 1.0,
+        "best_backscatter_valid_fraction": 1.0,
+        "log_likelihood_ratio_min": 3.793098535902992,
+        "log_likelihood_ratio_max": 3.8590328643374003,
+        "log_likelihood_ratio_std": 0.017815308584581573
+      }
+    },
+    {
+      "end_timestamp_s": 30120.0,
+      "window_count": 1,
+      "nominal_aperture_s": 30,
+      "approximate_route_distance_km": 45.18,
+      "seed_pose2": [
+        -10347.608500974124,
+        7216.636262659208,
+        -0.7261988719507482
+      ],
+      "refined_pose2": [
+        -10357.858500974124,
+        7218.386262659208,
+        -0.745833826035684
+      ],
+      "refinement": "proposal",
+      "local_search_seed_pose2": [
+        -10357.858500974124,
+        7218.386262659208,
+        -0.745833826035684
+      ],
+      "observable_rank": 3,
+      "information_eigenvalues": [
+        0.021686372544465628,
+        0.06447537325376076,
+        0.4853727606415569
+      ],
+      "horizontal_error_m": 1.0529511051505753,
+      "yaw_error_deg": -0.3464852945850081,
+      "current_window_recorded_rank": 2,
+      "diagnostics": {
+        "particle_count": 19,
+        "bathymetry_points": 353,
+        "backscatter_points": 353,
+        "bathymetry_observability": 0.8540235175718522,
+        "backscatter_observability": 0.750590845873073,
+        "best_bathymetry_normalized_loss": 0.06273524376495258,
+        "best_backscatter_correlation": 0.8135147998461141,
+        "best_bathymetry_valid_fraction": 1.0,
+        "best_backscatter_valid_fraction": 1.0,
+        "log_likelihood_ratio_min": 3.8357273100005593,
+        "log_likelihood_ratio_max": 3.9039087714200655,
+        "log_likelihood_ratio_std": 0.01897879730316807
+      }
+    }
+  ]
+}

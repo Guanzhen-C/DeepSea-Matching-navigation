@@ -21,6 +21,8 @@ def test_missing_available_memory_cannot_be_assumed_safe():
 def test_launcher_is_bounded_and_never_kills_other_jobs():
     source = (ROOT/'standalone/run_chelan_guarded.py').read_text()
     assert 'MemoryMax=7G' in source
+    assert 'MemoryHigh=7G' in source
+    assert 'MemoryHigh=6G' not in source
     assert 'MemorySwapMax=0' in source
     assert 'available < 12 * GIB' in source
     assert 'gpu_free_mib < 2048' in source
