@@ -1,0 +1,34 @@
+{
+  "kind": "host_only_inertial_channel_portability_control_plan",
+  "created_local_date": "2026-10-22",
+  "navigation_implementation_changed": false,
+  "full_mission_interrupted": false,
+  "source_run": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live",
+  "raw_events": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/sensor_events.osh.gz",
+  "bundle": "downloads/hil_bundles/lake-v2",
+  "profile": "lake",
+  "cutoff_s": 6666.6,
+  "phases": [
+    "prepare immutable inertial/sonar-clock cache preserving all original sequence numbers",
+    "original-PC NumPy replay of frozen DR channel",
+    "verify complete requested-prefix parity with original native PC DR; do not interpret alternate version until verified",
+    "only after parity is verified: fresh-process NumPy 1.26 control on the identical cache"
+  ],
+  "alternate_python": "downloads/hil_audits/pc_numpy126_py312/bin/python",
+  "limits": {
+    "MemoryHigh": "1G",
+    "MemoryMax": "1G",
+    "MemorySwapMax": "0",
+    "CPUQuota": "50%",
+    "Nice": 19,
+    "IOSchedulingClass": "idle",
+    "CUDA_VISIBLE_DEVICES": ""
+  },
+  "service_name_for_prepare": "oceansim-dr-cache-prepare-20261022.service",
+  "status_at_creation": "planned_not_launched",
+  "tests": {
+    "targeted_cpu_tests_passed": 8,
+    "real_frozen_initializer_smoke": "15x15 covariance, no CUDA initialized"
+  },
+  "full_route_acceptance": false
+}
