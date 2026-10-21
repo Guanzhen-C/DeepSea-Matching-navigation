@@ -1,0 +1,142 @@
+{
+  "kind": "completed_host_only_inertial_channel_control_not_HIL_acceptance",
+  "cache": {
+    "format": "oceansim.inertial_channel_diagnostic.v1",
+    "profile": "lake",
+    "cutoff_s": 6666.6,
+    "baseline_sha": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "source_events": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/sensor_events.osh.gz",
+    "source_counts": {
+      "boot": 1,
+      "sonar": 33334,
+      "imu": 333330,
+      "depth": 66666,
+      "dvl": 33333
+    },
+    "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+    "complete_requested_prefix": true,
+    "whole_source_stream_audited": false,
+    "acoustic_arrays_excluded": true,
+    "sonar_clocks_retained": true,
+    "full_route_acceptance": false,
+    "elapsed_wall_s": 185.85345470499306,
+    "cache_bytes": 39352982
+  },
+  "original_PC_DR_only_summary": {
+    "format": "oceansim.inertial_channel_diagnostic.v1",
+    "mode": "CPU-only inertial-channel control, not full HIL",
+    "profile": "lake",
+    "source_sha256": "649daf3dd3bc5d3997c92065eacc49cf5597c493afc12b99f426e2705efbf2b7",
+    "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+    "cutoff_s": 6666.6,
+    "samples": 33334,
+    "source_counts": {
+      "boot": 1,
+      "sonar": 33334,
+      "imu": 333330,
+      "depth": 66666,
+      "dvl": 33333
+    },
+    "accepted_updates": {
+      "depth_accepted": 66666,
+      "dvl_accepted": 33333
+    },
+    "numpy_version": "2.3.1",
+    "python_version": "3.12.14",
+    "machine": "x86_64",
+    "cuda_visible_devices": "",
+    "outputs_sha256": "ff06943b4b2c56703aa0832945ea7d78f21788e90bb0cf89c2001f3ffa56c72d",
+    "elapsed_wall_s": 59.72328896699764,
+    "truth_after_seed_consumed": false,
+    "navigation_parameters_changed": false,
+    "native_PC_parity_must_be_verified_before_alternate_version": true,
+    "full_route_acceptance": false
+  },
+  "original_PC_DR_only_vs_native": {
+    "samples": 33334,
+    "cutoff_s": 6666.6,
+    "maximum_component_differences": {
+      "position_m": 0,
+      "rotation_component": 0
+    },
+    "first_nonzero_difference": null,
+    "exactly_equal": true,
+    "native_parity_within_tolerance": true,
+    "truth_used": false,
+    "full_route_acceptance": false
+  },
+  "numpy126_DR_only_summary": {
+    "format": "oceansim.inertial_channel_diagnostic.v1",
+    "mode": "CPU-only inertial-channel control, not full HIL",
+    "profile": "lake",
+    "source_sha256": "649daf3dd3bc5d3997c92065eacc49cf5597c493afc12b99f426e2705efbf2b7",
+    "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+    "cutoff_s": 6666.6,
+    "samples": 33334,
+    "source_counts": {
+      "boot": 1,
+      "sonar": 33334,
+      "imu": 333330,
+      "depth": 66666,
+      "dvl": 33333
+    },
+    "accepted_updates": {
+      "depth_accepted": 66666,
+      "dvl_accepted": 33333
+    },
+    "numpy_version": "1.26.4",
+    "python_version": "3.12.14",
+    "machine": "x86_64",
+    "cuda_visible_devices": "",
+    "outputs_sha256": "0e2ddb661142d4ba7dcd86c77d9fa4f222698c8ea7df2ae54a12b71dec1acec2",
+    "elapsed_wall_s": 61.68628071299463,
+    "truth_after_seed_consumed": false,
+    "navigation_parameters_changed": false,
+    "native_PC_parity_must_be_verified_before_alternate_version": true,
+    "full_route_acceptance": false
+  },
+  "numpy126_vs_original_PC": {
+    "samples": 33334,
+    "cutoff_s": 6666.6,
+    "maximum_component_differences": {
+      "position_m": 0,
+      "rotation_component": 0
+    },
+    "first_nonzero_difference": null,
+    "exactly_equal": true,
+    "native_parity_within_tolerance": true,
+    "truth_used": false,
+    "full_route_acceptance": false
+  },
+  "numpy126_vs_Jetson_returned": {
+    "samples": 33334,
+    "cutoff_s": 6666.6,
+    "maximum_component_differences": {
+      "position_m": 13.618105476916753,
+      "rotation_component": 0.009271721563114177
+    },
+    "first_nonzero_difference": {
+      "timestamp": 0,
+      "field": "dr_rotation",
+      "maximum_component_difference": 3.046954890835366e-19
+    },
+    "exactly_equal": false,
+    "native_parity_within_tolerance": false,
+    "truth_used": false,
+    "full_route_acceptance": false
+  },
+  "conclusions": [
+    "The original-PC DR-only partition reproduces the complete requested native prefix exactly, including acoustic-clock propagation.",
+    "Changing NumPy from 2.3.1 to 1.26.4 on this same PC does not reproduce the Jetson DR discrepancy.",
+    "This does not isolate ARM numerical libraries from the production ARM execution path; no ARM DR-only control has run.",
+    "No formal estimator states, gates, source code, live inputs or operating-system controllers were modified."
+  ],
+  "limitations": [
+    "CPU-only DR control, not full frontend/backend or live ROS performance acceptance.",
+    "The compared Jetson stream is the network return; final complete board artifact equality audit remains pending.",
+    "The NumPy environment change includes its numerical-library environment; it does not establish a unique cause.",
+    "The CPUQuota properties are configuration requests; cpu.max is absent. Memory constraints were directly observed."
+  ],
+  "formal_HIL_mission_continues": true,
+  "full_route_acceptance": false
+}
