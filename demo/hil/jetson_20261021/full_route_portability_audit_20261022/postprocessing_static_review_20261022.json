@@ -1,0 +1,64 @@
+{
+  "kind": "static_postprocessing_memory_and_data_provenance_review_not_runtime_acceptance",
+  "reviewed_local_date": "2026-10-22",
+  "code_sha256": {
+    "standalone/run_hil_full_missions.py": "9cfea90bc12ee231029e4bb68d61636c20dc2680d54c10eeb64ea61d11cecd56",
+    "standalone/plot_hil_results.py": "5b24286a323c0dac027a2793aeb3c4e83f38c190b3a02431f6c7fd4c787bca05",
+    "standalone/terrain_plot_mesh.py": "6c9a369f327a3234f8e8a412c280d735bd6f1ae0af5a0d0206ddfa8804e9a1df",
+    "standalone/analyze_hil_relative_motion.py": "d25e9803d621e49b669993082d1cdf40e7517646236805b5fa1b1a8077da75bb",
+    "standalone/hil/score_board_results.py": "59d6d1fef241e168ad103280bf81147c16564743481d6c37b6b231ce199e31c6",
+    "standalone/hil/capture_native.py": "b757d786f54b4ef0b7dd219101ac417c4685337af6bea1e41d319189623271ea",
+    "standalone/hil/recording.py": "17cbba9445f7b306297a4815dc736fbe0b0983252ed1b13e17ef68c9f42151af",
+    "standalone/hil/protocol.py": "5dc300eee2d80098c84970f1578956e55289fd7d90c1cd497458e84d5cc0bfca",
+    "downloads/hil_bundles/lake-v2/isaacsim/oceansim/slam/real_bathymetry.py": "4bb11f9bc61ed760bbbb18368b637610325c26413e86c4565dc5666fb819ad38"
+  },
+  "MAX_PACKET_bytes": 33554432,
+  "structured_trajectory_storage_example": {
+    "samples": 250000,
+    "bytes_per_sample_including_rotations": 536,
+    "direct_array_bytes": 134000000,
+    "direct_array_MiB": 127.7923583984375,
+    "excludes_transient_RPE_arrays_python_and_matplotlib_GTSAM_renderer_RSS": true
+  },
+  "local_frozen_map_provenance": {
+    "lake_resolution_m": 6,
+    "lake_source_native_resolution_m": 3,
+    "lake_shape": [
+      8558,
+      7974
+    ],
+    "lake_measured_backscatter_fraction_of_bathymetry": 0.961189320838896,
+    "sea_prepared_resolution_m": 5,
+    "sea_shape": [
+      3534,
+      5842
+    ],
+    "sea_measured_backscatter_fraction_of_bathymetry": 0.9866050206850837,
+    "current_lake_effective_bathymetry": "/home/cgz/OceanSim/downloads/hil_bundles/lake-v2/map",
+    "current_lake_subgrid_reflectivity_amplitude": 0.18,
+    "current_lake_terrain_prior_surface": "low-pass",
+    "not_a_new_external_provenance_or_license_verification": true
+  },
+  "inspected_paths": {
+    "postprocessing_order": "run_hil_full_missions.wait_existing requires all existing participants terminal before finalize; figure subprocess is CPU-only and finishes before the next mission launch.",
+    "online_capture_finish": "capture_native.Instrument.visit_Try inserts live stream finish before original host-only final optimize/reporting.",
+    "trajectory_loading": "plot_hil_results.load_run streams paired host_reference and returned_estimator_outputs into preallocated numeric pose/time/error arrays; it does not load sensor_events into a whole-recording list.",
+    "output_equality": "run_hil_full_missions.check_returned_poses streams actual board and network-return files, checking all six pose channels and input sequence.",
+    "sensor_recording": "recording.read_packets yields one length-bounded packet; protocol.unpack validates each packet SHA256 and numeric array envelope.",
+    "terrain_plot": "elevation and valid-mask NPYs are memory-mapped; display stride targets about 500 cells along the longest dimension. terrain_plot_mesh.measured_surface scans row bands and only gathers used sampled vertices; NoData cells are not bridged.",
+    "final_graph": "Frozen pose_graph delegates to native GTSAM incremental/global and fixed-lag updates; this review is not a measured solver fill-in/RSS bound."
+  },
+  "findings": [
+    "No whole-mission raw sonar packet list was found in the inspected statistics or plotting path.",
+    "Direct persistent numeric trajectory-array storage scales with output pose count, not the total size of raw acoustic arrays.",
+    "This is a static review, not a full-route runtime memory measurement or guarantee against OOM in native final optimization/rendering.",
+    "Current lake and prepared sea maps include measured bathymetry and registered backscatter. They are not purely synthetic reflectivity maps.",
+    "The current lake effective subgrid reflectivity amplitude is 0.18. Source code multiplies measured reflectivity by a procedural unresolved-reflectivity factor, then generates noisy simulated sonar observations.",
+    "Measured-map provenance, procedural subgrid augmentation, and synthetic sensor observations must be distinguished. These are not physical raw-ping field trials or full-wave acoustic-model validation.",
+    "Prior navigation and simulated observations derive from related survey products; this is not an independent held-out-map generalization proof."
+  ],
+  "formal_navigation_or_runtime_configuration_changed": false,
+  "new_Jetson_or_GPU_workload": false,
+  "all_final_memory_runtime_evidence_still_pending": true,
+  "full_route_acceptance": false
+}
