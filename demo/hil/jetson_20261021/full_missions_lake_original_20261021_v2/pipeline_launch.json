@@ -1,0 +1,24 @@
+{
+  "kind": "actual_coordinator_launch_provenance_not_full_mission_completion",
+  "recorded_utc": "2026-10-21 14:51:46 UTC",
+  "implementation_commit": "763205f6b7f26a4577ef23ce9b405ad304dcaebe",
+  "coordinator_source_sha256": "9cfea90bc12ee231029e4bb68d61636c20dc2680d54c10eeb64ea61d11cecd56",
+  "actual_systemd_properties": "MainPID=2345655\nExecMainStartTimestamp=Wed 2026-10-21 22:45:14 CST\nExecStart={ path=/usr/bin/flock ; argv[]=/usr/bin/flock --nonblock /run/user/1000/oceansim-hil-full-missions.lock /usr/bin/env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 PYTHONPATH=/home/cgz/OceanSim:/home/cgz/OceanSim/isaacsim /home/cgz/.conda/envs/isaacsim-6.0/bin/python -m standalone.run_hil_full_missions --pilot /home/cgz/OceanSim/demo/hil/jetson_20261021/sea_live_5km_canonical_v3 --lake-short /home/cgz/OceanSim/demo/hil/jetson_20261021/lake_live_600m_original_order_v1 --lake-correspondence-order original --sea-correspondence-order spatial-canonical --output /home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2 --run-full-missions ; ignore_errors=no ; start_time=[Wed 2026-10-21 22:45:14 CST] ; stop_time=[n/a] ; pid=2345655 ; code=(null) ; status=0/0 }\nCPUQuotaPerSecUSec=1s\nMemoryMax=3221225472\nMemorySwapMax=0\nId=oceansim-hil-full-missions-original-lake-20261021-v2.service\nActiveState=active\n",
+  "global_lock": "/run/user/1000/oceansim-hil-full-missions.lock",
+  "selected_correspondence_order": {
+    "lake": "original",
+    "sea": "spatial-canonical"
+  },
+  "existing_sea_live_5km_reused_not_rerun": true,
+  "new_lake_live_short": "/home/cgz/OceanSim/demo/hil/jetson_20261021/lake_live_600m_original_order_v1",
+  "original_lake_offline_control": "/home/cgz/OceanSim/demo/hil/jetson_20261021/lake_5km_portability_audit_20261021/original_order_offline_accuracy_review.json",
+  "failed_v1_records_overwritten": false,
+  "ordered_remaining_stages": [
+    "live original-order lake 5 km review",
+    "live original-order lake approximately 47.116 km full route",
+    "live unchanged spatial-order sea approximately 73.070 km full route"
+  ],
+  "accuracy_review_limit_relative_change": 0.1,
+  "navigation_gates_or_sensor_rates_modified": false,
+  "full_route_completion_claim": false
+}

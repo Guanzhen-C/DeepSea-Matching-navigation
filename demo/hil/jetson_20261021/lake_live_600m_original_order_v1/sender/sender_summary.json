@@ -1,0 +1,27 @@
+{
+  "status": "completed",
+  "mode": "realtime",
+  "simulated_duration_s": 400.0,
+  "wall_sensor_duration_s": 402.9002012109995,
+  "maximum_source_lateness_s": 1.8573690180055564,
+  "maximum_in_flight_events": 128,
+  "samples": 2001,
+  "events": {
+    "boot": 1,
+    "sonar": 2001,
+    "imu": 20000,
+    "depth": 4000,
+    "dvl": 2000,
+    "finish": 1
+  },
+  "last_consumed_sequence": 28002,
+  "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+  "input_source": "live_Isaac_sensor_stream",
+  "skipped_events": 0,
+  "full_route_test": false,
+  "result_arrival_lateness_s": {
+    "maximum": 3.6972786270052893,
+    "p95": 3.2105861170042758,
+    "mean": 1.098488670731328
+  }
+}
