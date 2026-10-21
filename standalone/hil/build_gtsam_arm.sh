@@ -8,6 +8,7 @@ export TMPDIR="${TASK_ROOT}/tmp"
 export PIP_CACHE_DIR="${TASK_ROOT}/pip-cache"
 test "$(uname -m)" = aarch64
 test -x "${TASK_ROOT}/venv/bin/python"
+"${TASK_ROOT}/venv/bin/python" -c 'from packaging.utils import canonicalize_version; canonicalize_version("4.3a2", strip_trailing_zero=False)'
 test -f "${TASK_ROOT}/wheels/gtsam-${SOURCE_COMMIT}.tar.gz"
 test "$(df --output=avail -k "${TASK_ROOT}" | tail -1)" -gt 12582912
 if [[ ! -f "${SOURCE_ROOT}/CMakeLists.txt" ]]; then
