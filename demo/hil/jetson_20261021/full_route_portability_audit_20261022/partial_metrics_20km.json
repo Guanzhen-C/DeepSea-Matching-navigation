@@ -1,0 +1,213 @@
+{
+  "kind": "partial_approximately_20km_same_epoch_statistics_not_full_route_acceptance",
+  "samples": 66667,
+  "prefix_end_sensor_timestamp_s": 13333.2,
+  "truth_arc_m": 19999.79509646632,
+  "metrics": {
+    "original_PC": {
+      "dr": {
+        "rmse_m": 127.87936834594889,
+        "p95_m": 315.9948990890964,
+        "median_m": 65.43915443420688,
+        "maximum_m": 380.42480666088295,
+        "final_m": 380.42480666088295
+      },
+      "local": {
+        "rmse_m": 124.84069477536201,
+        "p95_m": 326.42363881540297,
+        "median_m": 51.07692352353145,
+        "maximum_m": 392.1019747821826,
+        "final_m": 392.1019747821826
+      },
+      "global": {
+        "rmse_m": 5.989386855583469,
+        "p95_m": 11.25266116433985,
+        "median_m": 4.016073584352602,
+        "maximum_m": 26.771886828399083,
+        "final_m": 3.265045430925775
+      }
+    },
+    "returned_Jetson": {
+      "dr": {
+        "rmse_m": 122.250201156216,
+        "p95_m": 285.5791385880329,
+        "median_m": 70.78121899865111,
+        "maximum_m": 349.5260714769047,
+        "final_m": 349.5260714769047
+      },
+      "local": {
+        "rmse_m": 117.35317045231633,
+        "p95_m": 294.3282652250182,
+        "median_m": 57.89801891012038,
+        "maximum_m": 359.7122249644757,
+        "final_m": 359.7122249644757
+      },
+      "global": {
+        "rmse_m": 6.362761798183205,
+        "p95_m": 12.315162793011812,
+        "median_m": 3.927323271482362,
+        "maximum_m": 33.464208265273946,
+        "final_m": 2.1277156438747222
+      }
+    }
+  },
+  "relative_change_Jetson_vs_original_PC": {
+    "dr": {
+      "rmse_m": -0.044019354040789826,
+      "p95_m": -0.0962539603922139
+    },
+    "local": {
+      "rmse_m": -0.059976631310156514,
+      "p95_m": -0.09832429326154024
+    },
+    "global": {
+      "rmse_m": 0.06233942665628045,
+      "p95_m": 0.09442225382552816
+    }
+  },
+  "inter_estimator_position_differences_3d_m": {
+    "dr": {
+      "rmse_m": 13.049080535342204,
+      "p95_m": 32.38929090523942,
+      "median_m": 7.204561701178214,
+      "maximum_m": 40.75773160127892,
+      "final_m": 34.859214842226216
+    },
+    "local": {
+      "rmse_m": 12.867855007604197,
+      "p95_m": 31.733673370250095,
+      "median_m": 7.319966770617618,
+      "maximum_m": 40.137381238885126,
+      "final_m": 34.1848562107556
+    },
+    "global": {
+      "rmse_m": 4.361091751690114,
+      "p95_m": 9.520338095940028,
+      "median_m": 1.3485227105069149,
+      "maximum_m": 26.7897902934472,
+      "final_m": 2.2165344886244216
+    }
+  },
+  "disjoint_prefix_segments": {
+    "first_approximately_10km": {
+      "samples": 33334,
+      "start_sensor_timestamp_s": 0,
+      "end_sensor_timestamp_s": 6666.6,
+      "metrics": {
+        "original_PC": {
+          "dr": {
+            "rmse_m": 46.857867017405304,
+            "p95_m": 73.06639573254358,
+            "median_m": 45.31559748303069,
+            "maximum_m": 78.11527963518397,
+            "final_m": 54.55206907060542
+          },
+          "local": {
+            "rmse_m": 42.78711646171241,
+            "p95_m": 68.93244847838346,
+            "median_m": 39.03811962924326,
+            "maximum_m": 73.62252013587407,
+            "final_m": 37.83953442496523
+          },
+          "global": {
+            "rmse_m": 6.395939322419276,
+            "p95_m": 13.224230321778897,
+            "median_m": 3.8919705160655313,
+            "maximum_m": 26.771886828399083,
+            "final_m": 4.359089611051879
+          }
+        },
+        "returned_Jetson": {
+          "dr": {
+            "rmse_m": 49.03222250689975,
+            "p95_m": 73.75158285457657,
+            "median_m": 45.31013781987234,
+            "maximum_m": 78.70454352291051,
+            "final_m": 67.06276091919636
+          },
+          "local": {
+            "rmse_m": 45.09554290716905,
+            "p95_m": 69.2911909256601,
+            "median_m": 42.43606738088827,
+            "maximum_m": 74.26550819033142,
+            "final_m": 55.883360342707284
+          },
+          "global": {
+            "rmse_m": 7.06992240838996,
+            "p95_m": 14.343951111222529,
+            "median_m": 3.5912771587500676,
+            "maximum_m": 33.464208265273946,
+            "final_m": 5.726923482325466
+          }
+        }
+      }
+    },
+    "second_approximately_10km": {
+      "samples": 33333,
+      "start_sensor_timestamp_s": 6666.8,
+      "end_sensor_timestamp_s": 13333.2,
+      "metrics": {
+        "original_PC": {
+          "dr": {
+            "rmse_m": 174.6740699821774,
+            "p95_m": 353.80078854973897,
+            "median_m": 99.48849051700154,
+            "maximum_m": 380.42480666088295,
+            "final_m": 380.42480666088295
+          },
+          "local": {
+            "rmse_m": 171.28944347758429,
+            "p95_m": 364.632124895595,
+            "median_m": 59.125292119219296,
+            "maximum_m": 392.1019747821826,
+            "final_m": 392.1019747821826
+          },
+          "global": {
+            "rmse_m": 5.553135955074843,
+            "p95_m": 10.614327080462068,
+            "median_m": 4.105470589684408,
+            "maximum_m": 16.677169139207653,
+            "final_m": 3.265045430925775
+          }
+        },
+        "returned_Jetson": {
+          "dr": {
+            "rmse_m": 165.790351811714,
+            "p95_m": 325.3691599904464,
+            "median_m": 106.75611706985063,
+            "maximum_m": 349.5260714769047,
+            "final_m": 349.5260714769047
+          },
+          "local": {
+            "rmse_m": 159.71937073695457,
+            "p95_m": 334.7459612394431,
+            "median_m": 65.98488777630959,
+            "maximum_m": 359.7122249644757,
+            "final_m": 359.7122249644757
+          },
+          "global": {
+            "rmse_m": 5.566451972790216,
+            "p95_m": 10.837673873532985,
+            "median_m": 4.224958698518499,
+            "maximum_m": 20.118157232136113,
+            "final_m": 2.1277156438747222
+          }
+        }
+      }
+    }
+  },
+  "navigation_gates_changed": false,
+  "trajectory_alignment_applied": false,
+  "truth_sent_to_board": false,
+  "whole_input_stream_integrity_audited": false,
+  "complete_actual_board_log_collection_audited": false,
+  "full_route_acceptance": false,
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/sender/returned_estimator_outputs.osh.gz"
+  },
+  "inputs_still_growing": true,
+  "original_full_run_accuracy_review_relative_limit": 0.1,
+  "partial_metrics_are_not_full_route_gate_decisions": true,
+  "method": "66667 aligned uniformly spaced 5 Hz outputs from 0 to 13333.2 s. All selected truth and position arrays shape/finite checked. Unaligned three-dimensional Euclidean errors against PC-only truth, empirical RMSE/P95 over the entire requested prefix. Disjoint segments are descriptive, not independent repeated experiments. No sonar, IMU, DVL, gates, states, or formal initialization changed."
+}
