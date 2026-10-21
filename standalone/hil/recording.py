@@ -42,6 +42,10 @@ class Recorder:
         self.samples = 0
         self.counts = {}
         self.closed = False
+        self.live = None
+        if os.environ.get("OCEANSIM_HIL_SOCKET"):
+            from standalone.hil.live_ipc import LiveProducer
+            self.live = LiveProducer(os.environ["OCEANSIM_HIL_SOCKET"])
 
     def emit(self, kind, stamp, payload):
         event = dict(schema=1, sequence=self.order.next_sequence, kind=kind, timestamp=float(stamp), payload=payload)
@@ -49,6 +53,8 @@ class Recorder:
         packet = pack(event)
         self.events.write(LENGTH.pack(len(packet)))
         self.events.write(packet)
+        if self.live is not None:
+            self.live.send(packet, event["sequence"])
         self.last_stamp = float(stamp)
         self.counts[kind] = self.counts.get(kind, 0) + 1
         if time.monotonic() - self.last_flush >= 5.:
@@ -84,8 +90,16 @@ class Recorder:
     def finish(self, status, reason):
         if self.closed:
             return
-        if self.order.next_sequence:
-            self.emit("finish", self.last_stamp, {})
+        delivery_error = None
+        try:
+            if self.order.next_sequence and not self.order.finished:
+                self.emit("finish", self.last_stamp, {})
+            if self.live is not None:
+                self.live.finish()
+        except Exception as exc:
+            delivery_error = exc
+            status = "failed"
+            reason = f"live_delivery_failure: {type(exc).__name__}: {exc}"
         self.flush()
         self.events.close()
         self.reference.close()
@@ -97,5 +111,8 @@ class Recorder:
         summary = dict(status=status, termination_reason=reason, profile=self.profile,
                        baseline_sha=self.baseline_sha, samples=self.samples, events=self.counts,
                        sensor_truth_fields_transmitted=False,
+                       delivery="live_ROS2_to_Jetson" if self.live else "local_native_capture_only",
                        reference_file_host_only="host_reference.osh.gz")
         (self.directory / "recording_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+        if delivery_error is not None:
+            raise delivery_error

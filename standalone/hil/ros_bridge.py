@@ -16,6 +16,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import socket
+import subprocess
 import time
 
 import rclpy
@@ -52,6 +54,23 @@ class Receiver(Node):
         self.output = gzip.open(args.output / "estimator_outputs.osh.gz", "xb", compresslevel=1)
         self.started = time.monotonic()
         self.counts = {}
+        self.resource_stream = None
+        self.resource_process = None
+        if Path("/usr/bin/tegrastats").is_file():
+            self.resource_stream = (args.output / "tegrastats.log").open("x", buffering=1)
+            self.resource_process = subprocess.Popen(["/usr/bin/tegrastats", "--interval", "1000"],
+                stdout=self.resource_stream, stderr=subprocess.STDOUT)
+
+    def close_resource_monitor(self):
+        if self.resource_process is not None:
+            # Terminate only the monitor this receiver created, never --stop.
+            self.resource_process.terminate()
+            try:
+                self.resource_process.wait(timeout=3.)
+            except subprocess.TimeoutExpired:
+                self.resource_process.kill()
+                self.resource_process.wait(timeout=3.)
+            self.resource_stream.close()
 
     def consume(self, msg):
         packet = bytes(msg.data)
@@ -123,6 +142,7 @@ class Sender(Node):
         self.maximum_pending = 0
         self.output_samples = 0
         self.output = gzip.open(args.output / "returned_estimator_outputs.osh.gz", "xb", compresslevel=1)
+        self.live_connection = None
 
     def acknowledge(self, msg):
         response = unpack(bytes(msg.data))
@@ -137,6 +157,9 @@ class Sender(Node):
             return
         self.pending.pop(sequence)
         self.last_ack = sequence
+        if self.live_connection is not None:
+            from standalone.hil.live_ipc import send_packet
+            send_packet(self.live_connection, pack(response))
         if response["result"] is not None:
             packet = pack(response["result"])
             self.output.write(LENGTH.pack(len(packet)))
@@ -145,6 +168,8 @@ class Sender(Node):
 
     def spin_until(self, predicate, timeout_s=120.):
         deadline = time.monotonic() + timeout_s
+        if self.error:
+            raise RuntimeError(self.error)
         while not predicate():
             if self.error:
                 raise RuntimeError(self.error)
@@ -159,7 +184,26 @@ class Sender(Node):
         start = None
         last_stamp = 0.
         counts = {}
-        for event in read_packets(self.args.events):
+        live_server = None
+        if self.args.live_socket:
+            live_server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            live_server.bind(str(self.args.live_socket))
+            os.chmod(self.args.live_socket, 0o600)
+            live_server.listen(1)
+            live_server.settimeout(120.)
+            self.live_connection, _ = live_server.accept()
+            self.live_connection.settimeout(120.)
+
+        def live_events():
+            from standalone.hil.live_ipc import read_packet
+            while True:
+                item = unpack(read_packet(self.live_connection))
+                yield item
+                if item["kind"] == "finish":
+                    return
+
+        source = live_events() if self.live_connection is not None else read_packets(self.args.events)
+        for event in source:
             order.accept(event)
             if self.args.mode == "lockstep":
                 self.spin_until(lambda: not self.pending)
@@ -172,7 +216,7 @@ class Sender(Node):
                 if start is None:
                     self.spin_until(lambda: not self.pending)
                     start = time.monotonic()
-                if self.args.mode == "realtime":
+                if self.args.mode == "realtime" and event["kind"] != "finish":
                     target = start + event["timestamp"]
                     while time.monotonic() < target:
                         rclpy.spin_once(self, timeout_sec=max(0., min(.02, target - time.monotonic())))
@@ -188,12 +232,16 @@ class Sender(Node):
             raise ValueError("recording has no finish event")
         self.spin_until(lambda: not self.pending)
         self.output.close()
+        if self.live_connection is not None:
+            self.live_connection.close()
+            live_server.close()
         summary = dict(status="completed", mode=self.args.mode, simulated_duration_s=last_stamp,
                        wall_sensor_duration_s=time.monotonic() - (start or time.monotonic()),
                        maximum_source_lateness_s=self.maximum_lateness_s,
                        maximum_in_flight_events=self.maximum_pending, samples=self.output_samples,
                        events=counts, last_consumed_sequence=self.last_ack,
                        transport="ROS2 Humble reliable UDP direct-NIC whitelist",
+                       input_source="live_Isaac_sensor_stream" if self.live_connection else "completed_native_recording",
                        skipped_events=0, full_route_test=False)
         (self.args.output / "sender_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         print(json.dumps(summary, indent=2), flush=True)
@@ -205,12 +253,14 @@ def main():
     p.add_argument("--profile", choices=("lake", "sea"))
     p.add_argument("--bundle", type=Path)
     p.add_argument("--events", type=Path)
+    p.add_argument("--live-socket", type=Path, help="PC-only local Unix socket for a live Isaac producer")
     p.add_argument("--mode", choices=("lockstep", "realtime"), default="lockstep")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     if os.environ.get("ROS_DOMAIN_ID") != "177" or not os.environ.get("FASTRTPS_DEFAULT_PROFILES_FILE"):
         p.error("require isolated ROS_DOMAIN_ID=177 and explicit per-host FASTRTPS_DEFAULT_PROFILES_FILE")
-    if args.output.exists() or (args.role == "sender" and not args.events) or (args.role == "receiver" and not (args.bundle and args.profile)):
+    if (args.output.exists() or (args.role == "sender" and bool(args.events) == bool(args.live_socket))
+            or (args.role == "receiver" and not (args.bundle and args.profile))):
         p.error("fresh output and role-specific inputs required")
     args.output.mkdir(parents=True)
     rclpy.init()
@@ -233,6 +283,8 @@ def main():
     finally:
         if node:
             node.output.close()
+            if isinstance(node, Receiver):
+                node.close_resource_monitor()
             node.destroy_node()
         rclpy.shutdown()
 

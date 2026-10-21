@@ -75,11 +75,16 @@ class Instrument(ast.NodeTransformer):
             return ast.parse("hil_capture.reference_sample(sim_time, truth, slam, dead_reckoning, global_rotation, global_position)").body + [node]
         return self.generic_visit(node)
 
-    def visit_Expr(self, node):
-        if self.in_main and isinstance(node.value, ast.Call) and ast.unparse(node.value.func) == "simulation_app.close":
+    def visit_Try(self, node):
+        node = self.generic_visit(node)
+        if self.in_main and any(isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
+                                and ast.unparse(n.value.func) == "slam.pose_graph.optimize"
+                                for n in node.finalbody):
             self.hooks.append("finish")
-            return ast.parse("hil_capture.finish(run_status, termination_reason)").body + [node]
-        return self.generic_visit(node)
+            # End the live sensor stream BEFORE host-only posterior reporting.
+            # A long final smoothing/report must not be charged as sensor lag.
+            node.finalbody = ast.parse("hil_capture.finish(run_status, termination_reason)").body + node.finalbody
+        return node
 
 
 def main():
@@ -87,12 +92,14 @@ def main():
     p.add_argument("--profile", required=True, choices=BASELINES)
     p.add_argument("--bundle", required=True, type=Path)
     p.add_argument("--output", required=True, type=Path)
-    p.add_argument("--distance-m", type=float, default=600.)
+    scope = p.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--distance-m", type=float)
+    scope.add_argument("--full-route", action="store_true")
     args = p.parse_args()
     args.bundle = args.bundle.resolve()
     args.output = args.output.resolve()
-    if args.output.exists() or not 0 < args.distance_m <= 5000:
-        p.error("fresh output and positive short correctness capture (<=5 km) required")
+    if args.output.exists() or (not args.full_route and not 0 < args.distance_m <= 5000):
+        p.error("fresh output and positive short capture (<=5 km), or explicit --full-route required")
     source = args.bundle / "standalone/large_scale_slam_isaac_demo.py"
     tree, digest = source_tree(source, args.profile)
     transform = Instrument(args.bundle)
@@ -103,7 +110,7 @@ def main():
     ast.fix_missing_locations(tree)
     args.output.mkdir(parents=True)
     recorder = Recorder(args.output, args.profile, BASELINES[args.profile][0])
-    argv = launcher_argv(args.bundle, args.profile, args.output, args.distance_m)
+    argv = launcher_argv(args.bundle, args.profile, args.output, args.distance_m or 0.)
     (args.output / "capture_manifest.json").write_text(json.dumps(dict(
         source_sha256=digest, profile=args.profile, hooks=transform.hooks, argv=argv,
         purpose="native sensor capture and parity reference, not network HIL"), indent=2) + "\n")
