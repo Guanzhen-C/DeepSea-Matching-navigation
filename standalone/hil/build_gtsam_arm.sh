@@ -28,4 +28,4 @@ cmake --build "${TASK_ROOT}/build/gtsam-arm" --parallel 1
 cmake --install "${TASK_ROOT}/build/gtsam-arm"
 cd "${TASK_ROOT}/build/gtsam-arm/python"
 "${TASK_ROOT}/venv/bin/python" -m pip install --no-cache-dir --no-deps --no-build-isolation .
-"${TASK_ROOT}/venv/bin/python" -c 'import gtsam, gtsam_unstable; assert hasattr(gtsam_unstable, "IncrementalFixedLagSmoother"); print("GTSAM fixed-lag import OK")'
+"${TASK_ROOT}/venv/bin/python" -c 'import gtsam, gtsam_unstable; assert hasattr(gtsam, "IncrementalFixedLagSmoother") or hasattr(gtsam_unstable, "IncrementalFixedLagSmoother"); print("GTSAM fixed-lag import OK")'

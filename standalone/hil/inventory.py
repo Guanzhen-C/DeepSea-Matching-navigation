@@ -33,7 +33,7 @@ def main():
         try:
             module = importlib.import_module(name)
             record = dict(available=True, path=module.__file__)
-            if name == "gtsam_unstable":
+            if name in ("gtsam", "gtsam_unstable"):
                 record["IncrementalFixedLagSmoother"] = hasattr(module, "IncrementalFixedLagSmoother")
             if name == "torch":
                 record["cuda_available"] = module.cuda.is_available()
@@ -54,7 +54,8 @@ def main():
         result["L4T"] = Path("/etc/nv_tegra_release").read_text().splitlines()[0]
     result["full_native_runtime_ready"] = (
         result["backends"]["gtsam"].get("available", False)
-        and result["backends"]["gtsam_unstable"].get("IncrementalFixedLagSmoother", False)
+        and (result["backends"]["gtsam"].get("IncrementalFixedLagSmoother", False)
+             or result["backends"]["gtsam_unstable"].get("IncrementalFixedLagSmoother", False))
         and result["backends"]["torch"].get("cuda_available", False)
         and "float64_solve" in result["backends"]["torch"]
         and result["backends"]["cv2"].get("available", False))

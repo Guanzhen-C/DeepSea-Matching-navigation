@@ -85,7 +85,7 @@ def main():
         p.error("board HIL interface code differs from this committed implementation; synchronize before testing")
     preflight = remote([REMOTE + "/venv/bin/python", "-c",
         "import gtsam,gtsam_unstable,torch; "
-        "assert hasattr(gtsam_unstable,'IncrementalFixedLagSmoother'); "
+        "assert hasattr(gtsam,'IncrementalFixedLagSmoother') or hasattr(gtsam_unstable,'IncrementalFixedLagSmoother'); "
         "assert torch.cuda.is_available(); "
         "a=torch.eye(3,dtype=torch.float64,device='cuda'); "
         "torch.linalg.solve_ex(a,a); print('native GTSAM fixed-lag + CUDA solve ready')"])
