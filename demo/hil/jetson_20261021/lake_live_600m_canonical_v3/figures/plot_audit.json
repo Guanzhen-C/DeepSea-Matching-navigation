@@ -1,0 +1,48 @@
+{
+  "profile": "lake",
+  "full_route": false,
+  "samples": 2001,
+  "distance_m": 599.9968893961066,
+  "mode": "realtime",
+  "live_Isaac": true,
+  "online_board_errors": {
+    "dr": {
+      "rmse_m": 2.772599822380028,
+      "median_m": 2.4951231625327837,
+      "p95_m": 4.548635933873591,
+      "p99_m": 4.678586068991626,
+      "max_m": 4.749393456448813,
+      "final_m": 4.745556555304784
+    },
+    "local": {
+      "rmse_m": 1.4805857122747073,
+      "median_m": 1.5682857953638272,
+      "p95_m": 1.888345994873932,
+      "p99_m": 1.9316666508628242,
+      "max_m": 1.9417304974664826,
+      "final_m": 1.5479438466279922
+    },
+    "global": {
+      "rmse_m": 1.3575122694752617,
+      "median_m": 1.4359411026230031,
+      "p95_m": 1.7152195209284846,
+      "p99_m": 1.8529931979669412,
+      "max_m": 1.9209418102028744,
+      "final_m": 1.769182685249256
+    }
+  },
+  "trajectory_alignment_applied": false,
+  "world_truth_sent_to_board_after_seed": false,
+  "terrain_plot": {
+    "input_resolution_m": 6.0,
+    "display_lod_m": 6.0,
+    "vertical_display_exaggeration": 1.5246912546765248,
+    "no_trajectory_coordinate_offsets": true,
+    "no_interpolation_across_NoData": true,
+    "all_online_samples_plotted": true
+  },
+  "input_sha256": {
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/lake_live_600m_canonical_v3/native_reference/host_reference.osh.gz": "062a5c55d42ba2e2dd9e54f8522bb016ed6f10aad30d9adc6f3f2657627cac27",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/lake_live_600m_canonical_v3/sender/returned_estimator_outputs.osh.gz": "7b5c7a5bffa454ae8fda73c67c0999a9e3cde86b544f51f1379713321cfdaf0b"
+  }
+}
