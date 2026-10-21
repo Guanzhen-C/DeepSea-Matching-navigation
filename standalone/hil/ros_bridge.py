@@ -111,6 +111,13 @@ class Receiver(Node):
                 encoded = pack(result)
                 self.output.write(LENGTH.pack(len(encoded)))
                 self.output.write(encoded)
+                if result["ping_count"] % 50 == 0:
+                    progress = {k: v.tolist() if hasattr(v, "tolist") else v for k, v in result.items()}
+                    temporary = self.args.output / "progress.json.tmp"
+                    temporary.write_text(json.dumps(progress, indent=2) + "\n")
+                    temporary.replace(self.args.output / "progress.json")
+                    self.output.flush()
+                    os.fsync(self.output.fileobj.fileno())
             response = pack(dict(sequence=sequence, status="consumed", result=result, processing_wall_s=elapsed))
             self.cache[sequence] = (digest, response)
             while len(self.cache) > 128:
@@ -140,6 +147,8 @@ class Sender(Node):
         self.error = None
         self.maximum_lateness_s = 0.
         self.maximum_pending = 0
+        self.source_clock_start = None
+        self.result_lateness_s = []
         self.output_samples = 0
         self.output = gzip.open(args.output / "returned_estimator_outputs.osh.gz", "xb", compresslevel=1)
         self.live_connection = None
@@ -155,12 +164,17 @@ class Sender(Node):
         if sequence != self.last_ack + 1 or sequence not in self.pending:
             self.error = "missing or reordered consumption acknowledgement"
             return
-        self.pending.pop(sequence)
+        published_at = self.pending.pop(sequence)
         self.last_ack = sequence
         if self.live_connection is not None:
             from standalone.hil.live_ipc import send_packet
             send_packet(self.live_connection, pack(response))
         if response["result"] is not None:
+            response["result"]["transport_and_processing_roundtrip_s"] = time.monotonic() - published_at
+            if self.args.mode == "realtime" and self.source_clock_start is not None:
+                lateness = time.monotonic() - self.source_clock_start - response["result"]["timestamp"]
+                response["result"]["arrival_lateness_s"] = lateness
+                self.result_lateness_s.append(lateness)
             packet = pack(response["result"])
             self.output.write(LENGTH.pack(len(packet)))
             self.output.write(packet)
@@ -216,6 +230,7 @@ class Sender(Node):
                 if start is None:
                     self.spin_until(lambda: not self.pending)
                     start = time.monotonic()
+                    self.source_clock_start = start
                 if self.args.mode == "realtime" and event["kind"] != "finish":
                     target = start + event["timestamp"]
                     while time.monotonic() < target:
@@ -243,6 +258,10 @@ class Sender(Node):
                        transport="ROS2 Humble reliable UDP direct-NIC whitelist",
                        input_source="live_Isaac_sensor_stream" if self.live_connection else "completed_native_recording",
                        skipped_events=0, full_route_test=False)
+        if self.result_lateness_s:
+            import numpy as np
+            summary["result_arrival_lateness_s"] = dict(maximum=max(self.result_lateness_s),
+                p95=float(np.percentile(self.result_lateness_s, 95)), mean=float(np.mean(self.result_lateness_s)))
         (self.args.output / "sender_summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         print(json.dumps(summary, indent=2), flush=True)
 

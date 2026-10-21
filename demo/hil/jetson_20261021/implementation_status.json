@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-10-21T16:42:00+08:00",
+  "updated_at": "2026-10-21T16:52:00+08:00",
   "scope": "湖底和海底冻结算法的完整前后端 Jetson AGX Orin 传感器注入硬件在环，非实船试验、非控制器闭环",
   "complete": false,
   "network": {
@@ -23,12 +23,20 @@
     "existing_system_python_unmodified": true,
     "torch": "2.5.0a0+872d972e41.nv24.08",
     "cuda_float64_solve_and_svd": "passed",
-    "feature_CPU_CUDA_consensus_parity": "1 passed on the Jetson",
+    "feature_CPU_CUDA_consensus_parity": "all 12 original frontend tests passed on the Jetson, including CUDA consensus and image tracking",
+    "OpenCV": "4.10.0.82, same package version as PC reference",
+    "SciPy": "1.13.1, same package version as PC reference; supported by board NumPy 1.26.4",
     "original_native_BBS3D": "8 tests passed on the Jetson; native synthetic recovery test executed, not skipped",
     "GTSAM": "4.3a2 C++ and unstable libraries compiled; Python bindings still compiling at this checkpoint",
-    "GTSAM_build_user_unit": "oceansim-hil-build-gtsam-20261021.service",
+    "GTSAM_build_user_unit": "oceansim-hil-build-gtsam-serial-20261021.service",
+    "GTSAM_build_status": "original parallel job hit its isolated memory limit; existing objects retained and remaining binding translation units now compile sequentially, not a full rebuild",
     "GTSAM_memory_max_GiB": 16,
     "GTSAM_swap_max_bytes": 0
+  },
+  "host_regression": {
+    "tests_passed": 455,
+    "warning": "original PC environment has SciPy 1.13.1 / NumPy 2.3.1 compatibility warning; no test failed; original baseline environment was not changed",
+    "junit": "host_tests_live_final.xml"
   },
   "lake": {
     "frozen_algorithm_commit": "204d3e24048a8b515616d9305b7516221bcf8fed",

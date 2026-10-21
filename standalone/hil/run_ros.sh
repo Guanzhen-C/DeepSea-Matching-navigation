@@ -8,7 +8,9 @@ fi
 HIL_SIDE="$2"
 shift 2
 HIL_CODE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+set +u  # ROS setup scripts intentionally probe unset environment variables.
 source /opt/ros/humble/setup.bash
+set -u
 export PYTHONPATH="${HIL_CODE_ROOT}:${PYTHONPATH:-}"
 export ROS_DOMAIN_ID=177 ROS_LOCALHOST_ONLY=0 RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 unset ROS_DISCOVERY_SERVER ROS_SUPER_CLIENT

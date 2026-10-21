@@ -22,7 +22,9 @@ cmake -S "${SOURCE_ROOT}" -B "${TASK_ROOT}/build/gtsam-arm" -G Ninja \
     -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF -DGTSAM_BUILD_PYTHON=ON \
     -DPYTHON_EXECUTABLE="${TASK_ROOT}/venv/bin/python" \
     -DGTSAM_PYTHON_VERSION=3.10
-cmake --build "${TASK_ROOT}/build/gtsam-arm" --parallel 2
+# Binding translation units can each exceed 8 GiB at -O3 on ARM. Compile
+# sequentially; this preserves native optimization and does not change math.
+cmake --build "${TASK_ROOT}/build/gtsam-arm" --parallel 1
 cmake --install "${TASK_ROOT}/build/gtsam-arm"
 cd "${TASK_ROOT}/build/gtsam-arm/python"
 "${TASK_ROOT}/venv/bin/python" -m pip install --no-cache-dir --no-deps --no-build-isolation .
