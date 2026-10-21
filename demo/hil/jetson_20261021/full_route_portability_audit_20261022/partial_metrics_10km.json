@@ -1,0 +1,82 @@
+{
+  "kind": "partial_10km_same_epoch_error_statistics_not_full_route_acceptance",
+  "samples": 33334,
+  "prefix_end_sensor_timestamp_s": 6666.6,
+  "truth_arc_m": 9999.894307313361,
+  "metrics": {
+    "original_PC": {
+      "dr": {
+        "rmse_m": 46.857867017405304,
+        "p95_m": 73.06639573254358,
+        "median_m": 45.31559748303069,
+        "maximum_m": 78.11527963518397,
+        "final_m": 54.55206907060542
+      },
+      "local": {
+        "rmse_m": 42.78711646171241,
+        "p95_m": 68.93244847838346,
+        "median_m": 39.03811962924326,
+        "maximum_m": 73.62252013587407,
+        "final_m": 37.83953442496523
+      },
+      "global": {
+        "rmse_m": 6.395939322419276,
+        "p95_m": 13.224230321778897,
+        "median_m": 3.8919705160655313,
+        "maximum_m": 26.771886828399083,
+        "final_m": 4.359089611051879
+      }
+    },
+    "returned_Jetson": {
+      "dr": {
+        "rmse_m": 49.03222250689975,
+        "p95_m": 73.75158285457657,
+        "median_m": 45.31013781987234,
+        "maximum_m": 78.70454352291051,
+        "final_m": 67.06276091919636
+      },
+      "local": {
+        "rmse_m": 45.09554290716905,
+        "p95_m": 69.2911909256601,
+        "median_m": 42.43606738088827,
+        "maximum_m": 74.26550819033142,
+        "final_m": 55.883360342707284
+      },
+      "global": {
+        "rmse_m": 7.06992240838996,
+        "p95_m": 14.343951111222529,
+        "median_m": 3.5912771587500676,
+        "maximum_m": 33.464208265273946,
+        "final_m": 5.726923482325466
+      }
+    }
+  },
+  "relative_change_Jetson_vs_original_PC": {
+    "dr": {
+      "rmse_m": 0.046403210984545806,
+      "p95_m": 0.009377595749229028
+    },
+    "local": {
+      "rmse_m": 0.05395143763712862,
+      "p95_m": 0.0052042609133367
+    },
+    "global": {
+      "rmse_m": 0.1053767166940145,
+      "p95_m": 0.08467190620535181
+    }
+  },
+  "navigation_gates_changed": false,
+  "trajectory_alignment_applied": false,
+  "truth_sent_to_board": false,
+  "whole_input_stream_integrity_audited": false,
+  "complete_actual_board_log_collection_audited": false,
+  "full_route_acceptance": false,
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/sender/returned_estimator_outputs.osh.gz"
+  },
+  "inputs_still_growing": true,
+  "original_full_run_accuracy_review_relative_limit": 0.1,
+  "partial_metrics_are_not_full_route_gate_decisions": true,
+  "method": "33334 same-sensor-timestamp samples from 0 to 6666.6 s, verified uniform 5 Hz; unaligned three-dimensional Euclidean errors against PC-only truth; RMSE and empirical P95 over the complete requested prefix. No sonar/IMU/DVL inputs or navigation states were modified."
+}
