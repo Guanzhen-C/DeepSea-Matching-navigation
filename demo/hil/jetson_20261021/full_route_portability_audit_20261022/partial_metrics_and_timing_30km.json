@@ -1,0 +1,392 @@
+{
+  "kind": "partial_approximately_30km_same_epoch_accuracy_and_timing_not_full_route_acceptance",
+  "samples": 100001,
+  "prefix_end_sensor_timestamp_s": 20000,
+  "truth_arc_m": 29999.99908782037,
+  "metrics": {
+    "original_PC": {
+      "dr": {
+        "rmse_m": 277.8981215192018,
+        "p95_m": 593.3362602982503,
+        "median_m": 98.9016087117055,
+        "maximum_m": 646.726742820372,
+        "final_m": 114.85359069021794
+      },
+      "local": {
+        "rmse_m": 283.11138623572987,
+        "p95_m": 604.565145309942,
+        "median_m": 69.82719095028095,
+        "maximum_m": 656.9001845363921,
+        "final_m": 85.68378762585186
+      },
+      "global": {
+        "rmse_m": 5.791633962637443,
+        "p95_m": 10.671177773335742,
+        "median_m": 3.9354883724477365,
+        "maximum_m": 26.771886828399083,
+        "final_m": 5.318761202322077
+      }
+    },
+    "returned_Jetson": {
+      "dr": {
+        "rmse_m": 255.95497697961213,
+        "p95_m": 560.9039696473214,
+        "median_m": 99.52813201222254,
+        "maximum_m": 614.8555459089,
+        "final_m": 105.58936434231994
+      },
+      "local": {
+        "rmse_m": 259.77390728939343,
+        "p95_m": 571.4152507421325,
+        "median_m": 68.72951347121918,
+        "maximum_m": 623.827949549751,
+        "final_m": 69.15411399702641
+      },
+      "global": {
+        "rmse_m": 6.042086364257671,
+        "p95_m": 10.888026813614664,
+        "median_m": 3.9617494187283424,
+        "maximum_m": 33.464208265273946,
+        "final_m": 5.473191558345633
+      }
+    }
+  },
+  "relative_change_Jetson_vs_original_PC": {
+    "dr": {
+      "rmse_m": -0.07896111143044737,
+      "p95_m": -0.054660894371475366
+    },
+    "local": {
+      "rmse_m": -0.08243214537088495,
+      "p95_m": -0.054832626103204385
+    },
+    "global": {
+      "rmse_m": 0.04324382432245,
+      "p95_m": 0.020321003443571684
+    }
+  },
+  "inter_estimator_position_differences_3d_m": {
+    "dr": {
+      "rmse_m": 28.621827638653247,
+      "p95_m": 59.4133647267774,
+      "median_m": 12.390184976219775,
+      "maximum_m": 68.35360577832704,
+      "final_m": 25.082908714478204
+    },
+    "local": {
+      "rmse_m": 28.332019788162608,
+      "p95_m": 59.053268380757515,
+      "median_m": 12.15803001186031,
+      "maximum_m": 68.06545065770901,
+      "final_m": 24.885548651280093
+    },
+    "global": {
+      "rmse_m": 4.141846056333862,
+      "p95_m": 8.639017426181505,
+      "median_m": 1.6587884475051662,
+      "maximum_m": 26.7897902934472,
+      "final_m": 2.662345637206381
+    }
+  },
+  "disjoint_prefix_segments": {
+    "first_approximately_10km": {
+      "samples": 33334,
+      "start_sensor_timestamp_s": 0,
+      "end_sensor_timestamp_s": 6666.6,
+      "metrics": {
+        "original_PC": {
+          "dr": {
+            "rmse_m": 46.857867017405304,
+            "p95_m": 73.06639573254358,
+            "median_m": 45.31559748303069,
+            "maximum_m": 78.11527963518397,
+            "final_m": 54.55206907060542
+          },
+          "local": {
+            "rmse_m": 42.78711646171241,
+            "p95_m": 68.93244847838346,
+            "median_m": 39.03811962924326,
+            "maximum_m": 73.62252013587407,
+            "final_m": 37.83953442496523
+          },
+          "global": {
+            "rmse_m": 6.395939322419276,
+            "p95_m": 13.224230321778897,
+            "median_m": 3.8919705160655313,
+            "maximum_m": 26.771886828399083,
+            "final_m": 4.359089611051879
+          }
+        },
+        "returned_Jetson": {
+          "dr": {
+            "rmse_m": 49.03222250689975,
+            "p95_m": 73.75158285457657,
+            "median_m": 45.31013781987234,
+            "maximum_m": 78.70454352291051,
+            "final_m": 67.06276091919636
+          },
+          "local": {
+            "rmse_m": 45.09554290716905,
+            "p95_m": 69.2911909256601,
+            "median_m": 42.43606738088827,
+            "maximum_m": 74.26550819033142,
+            "final_m": 55.883360342707284
+          },
+          "global": {
+            "rmse_m": 7.06992240838996,
+            "p95_m": 14.343951111222529,
+            "median_m": 3.5912771587500676,
+            "maximum_m": 33.464208265273946,
+            "final_m": 5.726923482325466
+          }
+        }
+      }
+    },
+    "second_approximately_10km": {
+      "samples": 33333,
+      "start_sensor_timestamp_s": 6666.8,
+      "end_sensor_timestamp_s": 13333.2,
+      "metrics": {
+        "original_PC": {
+          "dr": {
+            "rmse_m": 174.6740699821774,
+            "p95_m": 353.80078854973897,
+            "median_m": 99.48849051700154,
+            "maximum_m": 380.42480666088295,
+            "final_m": 380.42480666088295
+          },
+          "local": {
+            "rmse_m": 171.28944347758429,
+            "p95_m": 364.632124895595,
+            "median_m": 59.125292119219296,
+            "maximum_m": 392.1019747821826,
+            "final_m": 392.1019747821826
+          },
+          "global": {
+            "rmse_m": 5.553135955074843,
+            "p95_m": 10.614327080462068,
+            "median_m": 4.105470589684408,
+            "maximum_m": 16.677169139207653,
+            "final_m": 3.265045430925775
+          }
+        },
+        "returned_Jetson": {
+          "dr": {
+            "rmse_m": 165.790351811714,
+            "p95_m": 325.3691599904464,
+            "median_m": 106.75611706985063,
+            "maximum_m": 349.5260714769047,
+            "final_m": 349.5260714769047
+          },
+          "local": {
+            "rmse_m": 159.71937073695457,
+            "p95_m": 334.7459612394431,
+            "median_m": 65.98488777630959,
+            "maximum_m": 359.7122249644757,
+            "final_m": 359.7122249644757
+          },
+          "global": {
+            "rmse_m": 5.566451972790216,
+            "p95_m": 10.837673873532985,
+            "median_m": 4.224958698518499,
+            "maximum_m": 20.118157232136113,
+            "final_m": 2.1277156438747222
+          }
+        }
+      }
+    },
+    "third_approximately_10km": {
+      "samples": 33334,
+      "start_sensor_timestamp_s": 13333.4,
+      "end_sensor_timestamp_s": 20000,
+      "metrics": {
+        "original_PC": {
+          "dr": {
+            "rmse_m": 446.0650243452364,
+            "p95_m": 626.3662092761132,
+            "median_m": 448.51444076385286,
+            "maximum_m": 646.726742820372,
+            "final_m": 114.85359069021794
+          },
+          "local": {
+            "rmse_m": 457.4755031014892,
+            "p95_m": 636.1605171052115,
+            "median_m": 462.45277629617715,
+            "maximum_m": 656.9001845363921,
+            "final_m": 85.68378762585186
+          },
+          "global": {
+            "rmse_m": 5.374349444387204,
+            "p95_m": 10.27240418648114,
+            "median_m": 3.746581286399164,
+            "maximum_m": 13.767344833692961,
+            "final_m": 5.318761202322077
+          }
+        },
+        "returned_Jetson": {
+          "dr": {
+            "rmse_m": 408.22433826465334,
+            "p95_m": 591.6913816762544,
+            "median_m": 407.3328268457126,
+            "maximum_m": 614.8555459089,
+            "final_m": 105.58936434231994
+          },
+          "local": {
+            "rmse_m": 418.2132281570147,
+            "p95_m": 600.3230612613429,
+            "median_m": 419.2698265486123,
+            "maximum_m": 623.827949549751,
+            "final_m": 69.15411399702641
+          },
+          "global": {
+            "rmse_m": 5.3433198326622415,
+            "p95_m": 9.271073891621585,
+            "median_m": 4.011010805934978,
+            "maximum_m": 20.318027376348606,
+            "final_m": 5.473191558345633
+          }
+        }
+      }
+    }
+  },
+  "timing": {
+    "entire_prefix": {
+      "arrival_lateness": {
+        "maximum_s": 518.0212774430111,
+        "p95_s": 379.59489741701327,
+        "mean_s": 125.53083918388397,
+        "last_s": 516.2786013110017
+      },
+      "transport_and_processing_roundtrip": {
+        "maximum_s": 110.52441004601133,
+        "p95_s": 3.312605679995613,
+        "mean_s": 1.7322745697237123,
+        "last_s": 1.6272842930047773
+      },
+      "processing_wall": {
+        "maximum_s": 109.09935655300069,
+        "p95_s": 0.1938582380025764,
+        "mean_s": 0.1707025484187777,
+        "last_s": 0.14030153500061715
+      }
+    },
+    "last_600_sensor_seconds": {
+      "arrival_lateness": {
+        "maximum_s": 518.0212774430111,
+        "p95_s": 513.6418105979974,
+        "mean_s": 454.5801827667645,
+        "last_s": 516.2786013110017
+      },
+      "transport_and_processing_roundtrip": {
+        "maximum_s": 7.060510602022987,
+        "p95_s": 4.433193347998895,
+        "mean_s": 2.3600322821962445,
+        "last_s": 1.6272842930047773
+      },
+      "processing_wall": {
+        "maximum_s": 5.33545830300136,
+        "p95_s": 0.21030198399967048,
+        "mean_s": 0.20969318153744892,
+        "last_s": 0.14030153500061715
+      }
+    },
+    "selected_slowest_sonar_epochs": [
+      {
+        "timestamp": 8190,
+        "processing_wall_s": 109.09935655300069,
+        "arrival_lateness_s": 200.72568432000116,
+        "transport_and_processing_roundtrip_s": 110.4007642390061,
+        "terrain_match_attempts": 273,
+        "terrain_prior_accepts": 207,
+        "keyframes": 297
+      },
+      {
+        "timestamp": 12570,
+        "processing_wall_s": 9.365262649000215,
+        "arrival_lateness_s": 88.07784828401054,
+        "transport_and_processing_roundtrip_s": 10.90103646100033,
+        "terrain_match_attempts": 419,
+        "terrain_prior_accepts": 308,
+        "keyframes": 455
+      },
+      {
+        "timestamp": 12540,
+        "processing_wall_s": 8.175590445003763,
+        "arrival_lateness_s": 82.58850418499787,
+        "transport_and_processing_roundtrip_s": 9.668028444983065,
+        "terrain_match_attempts": 418,
+        "terrain_prior_accepts": 307,
+        "keyframes": 454
+      },
+      {
+        "timestamp": 12210,
+        "processing_wall_s": 6.93276956200134,
+        "arrival_lateness_s": 83.6232359050191,
+        "transport_and_processing_roundtrip_s": 8.275751932000276,
+        "terrain_match_attempts": 407,
+        "terrain_prior_accepts": 304,
+        "keyframes": 442
+      },
+      {
+        "timestamp": 12510,
+        "processing_wall_s": 6.9276005729989265,
+        "arrival_lateness_s": 78.47497809000197,
+        "transport_and_processing_roundtrip_s": 8.539187726011733,
+        "terrain_match_attempts": 417,
+        "terrain_prior_accepts": 307,
+        "keyframes": 452
+      },
+      {
+        "timestamp": 12240,
+        "processing_wall_s": 6.071583636003197,
+        "arrival_lateness_s": 86.07396360099665,
+        "transport_and_processing_roundtrip_s": 7.58393412901205,
+        "terrain_match_attempts": 408,
+        "terrain_prior_accepts": 304,
+        "keyframes": 443
+      },
+      {
+        "timestamp": 12090,
+        "processing_wall_s": 5.91089883800305,
+        "arrival_lateness_s": 80.01824691300862,
+        "transport_and_processing_roundtrip_s": 7.410004809004022,
+        "terrain_match_attempts": 403,
+        "terrain_prior_accepts": 304,
+        "keyframes": 437
+      },
+      {
+        "timestamp": 19380,
+        "processing_wall_s": 5.5673758539996925,
+        "arrival_lateness_s": 401.8285517390177,
+        "transport_and_processing_roundtrip_s": 7.257994977990165,
+        "terrain_match_attempts": 646,
+        "terrain_prior_accepts": 479,
+        "keyframes": 697
+      }
+    ],
+    "arrival_clock": "same PC monotonic clock relative to nominal 1x sensor time, boot warmup excluded",
+    "processing_scope": "entire board sonar-event consumer, excludes other IMU/DVL/depth events",
+    "pure_network_latency": false,
+    "hard_realtime_acceptance": false
+  },
+  "consistency_checks": {
+    "prior_20km_accuracy_metrics_exactly_reproduced": true,
+    "prior_20km_truth_arc_exactly_reproduced": true,
+    "prior_23km_prefix_timing_exactly_reproduced": true,
+    "uniform_5Hz_timestamps_and_finite_3D_arrays": true
+  },
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/sender/returned_estimator_outputs.osh.gz"
+  },
+  "inputs_still_growing": true,
+  "navigation_gates_changed": false,
+  "trajectory_alignment_applied": false,
+  "truth_sent_to_board": false,
+  "whole_input_stream_integrity_audited": false,
+  "complete_actual_board_log_collection_audited": false,
+  "original_full_run_accuracy_review_relative_limit": 0.1,
+  "partial_metrics_are_not_full_route_gate_decisions": true,
+  "full_route_acceptance": false,
+  "method": "100001 aligned uniformly spaced 5 Hz samples, 0 to 20000.0 s. Unaligned 3D Euclidean errors against PC-only truth. All selected truth/position arrays shape and finite checked. Segments are descriptive, not independent repeated experiments. No navigation states, gates, initialization or physical rates changed. Read-only CPU analysis with CUDA hidden, single-thread BLAS/OMP/MKL and Nice19; formal mission continues. Timing includes source pacing/backpressure and earlier disclosed host diagnostic overlap; good same-epoch ATE does not prove timely wall-clock navigation/control."
+}
