@@ -1,0 +1,40 @@
+{
+  "format": "oceansim.inertial_channel_diagnostic.v1",
+  "mode": "CPU-only inertial-channel control, not full HIL",
+  "profile": "lake",
+  "source_sha256": "649daf3dd3bc5d3997c92065eacc49cf5597c493afc12b99f426e2705efbf2b7",
+  "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+  "cutoff_s": 6666.6,
+  "samples": 33334,
+  "source_counts": {
+    "boot": 1,
+    "sonar": 33334,
+    "imu": 333330,
+    "depth": 66666,
+    "dvl": 33333
+  },
+  "accepted_updates": {
+    "depth_accepted": 66666,
+    "dvl_accepted": 33333
+  },
+  "numpy_version": "2.3.1",
+  "python_version": "3.12.14",
+  "machine": "x86_64",
+  "cuda_visible_devices": "",
+  "outputs_sha256": "848e2a26515d11fa0216de15126ca368f13761aec01b888db8948c91f3431165",
+  "elapsed_wall_s": 60.15625230500882,
+  "truth_after_seed_consumed": false,
+  "navigation_parameters_changed": false,
+  "native_PC_parity_must_be_verified_before_alternate_version": true,
+  "full_route_acceptance": false,
+  "counterfactual_initialization": {
+    "role": "pc",
+    "source_epoch_s": 0.0,
+    "pair_sha256": "64927cae776b7a670418a8528d4d10b6e134ce6e81799160ea8addeef913368d",
+    "pair_maximum_component_difference": 3.046954890835366e-19,
+    "diagnostic_only_not_a_production_candidate": true,
+    "formal_initialization_unchanged": true,
+    "actual_rotation_delta_from_original_PC_initialization": 0.0,
+    "other_nominal_states_and_covariance_unchanged": true
+  }
+}

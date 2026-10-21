@@ -1,0 +1,81 @@
+{
+  "kind": "completed_host_only_initial_rotation_sensitivity_not_HIL_acceptance",
+  "completed_local_date": "2026-10-22",
+  "status": "completed_diagnostic_sensitivity_observed_not_a_fix",
+  "profile": "lake",
+  "cutoff_s": 6666.6,
+  "samples": 33334,
+  "controlled_variable": "post-initialization rotation matrix only",
+  "maximum_initial_rotation_component_difference": 3.046954890835366e-19,
+  "pair_sha256": "64927cae776b7a670418a8528d4d10b6e134ce6e81799160ea8addeef913368d",
+  "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+  "qualification": {
+    "report": "pc_placebo_native_parity.json",
+    "samples": 33334,
+    "maximum_position_component_difference_m": 0,
+    "maximum_rotation_component_difference": 0,
+    "exactly_equal": true,
+    "qualified_before_ARM_rotation_case_started": true
+  },
+  "sensitivity_vs_qualified_PC_placebo": {
+    "report": "arm0_vs_qualified_pc_placebo.json",
+    "samples": 33334,
+    "maximum_position_component_difference_m": 19.95259754968538,
+    "maximum_rotation_component_difference": 0.013729049556298056,
+    "values_are_not_3D_ATE_or_RMSE": true
+  },
+  "difference_vs_network_returned_ARM": {
+    "report": "arm0_vs_network_returned_ARM.json",
+    "samples": 33334,
+    "maximum_position_component_difference_m": 26.696827779673185,
+    "maximum_rotation_component_difference": 0.01694088779474706,
+    "first_nonzero": {
+      "timestamp": 0.2,
+      "field": "dr_rotation",
+      "maximum_component_difference": 1.2640171027922253e-15
+    },
+    "reproduces_actual_ARM_trajectory": false
+  },
+  "preserved_controls": {
+    "frozen_source": true,
+    "original_event_sequence_and_measurement_values": true,
+    "same_host_python_numpy_and_libraries": true,
+    "all_other_initial_nominal_states_and_covariance": true,
+    "same_filter_configuration": true,
+    "depth_accepted_each_case": 66666,
+    "dvl_accepted_each_case": 33333,
+    "acoustic_arrays_not_consumed": true,
+    "ongoing_truth_not_consumed": true,
+    "formal_navigation_initialization_parameters_and_runtime_unchanged": true
+  },
+  "conclusions": [
+    "Changing only the recorded sub-roundoff-scale initial rotation component on the same PC is sufficient to produce metre-scale DR differences over this prefix.",
+    "This establishes numerical sensitivity in the controlled frozen DR chain, not a unique failing operation, physical sensor cause, or validated remedy.",
+    "The counterfactual does not reproduce the actual returned ARM DR trajectory; ARM numerical-library and full execution-path differences remain unresolved.",
+    "No formal full-route acceptance decision, navigation change, threshold relaxation or new Jetson workload is implied."
+  ],
+  "procedure_note": "One preliminary compare was mistakenly started while the diagnostic gzip writer was active and raised EOFError. It created no report and was discarded. The 33334-sample comparison was then run after the completed summary existed, without restarting either replay or the formal simulation.",
+  "limitations": [
+    "Only the first 6666.6 seconds (approximately 10 km) and the independent DR channel were controlled.",
+    "This is a PC counterfactual, not an ARM DR-only execution; no standalone ARM control has run.",
+    "The ARM comparison uses network returns; the full-route actual-board-artifact equality audit is still pending.",
+    "Initial rotations are post-initialization matrices, not changed physical initial truth.",
+    "CPU quotas were requests only: cpu.max is absent. Actual memory.max=1 GiB, Nice=19 and NLWP=1 were observed.",
+    "Host diagnostics overlapped with the live HIL run; performance is not a clean-room exclusive benchmark.",
+    "Diagnostic results and all prior high-error samples are retained, not substituted into production output."
+  ],
+  "evidence_files": [
+    "actual_launches.json",
+    "pc_rotation_placebo/replay/replay_summary.json",
+    "arm_rotation_counterfactual/replay/replay_summary.json",
+    "pc_placebo_native_parity.json",
+    "arm0_vs_qualified_pc_placebo.json",
+    "arm0_vs_network_returned_ARM.json",
+    "host_cpu_tests.xml"
+  ],
+  "original_full_suite_status": "568 passed previously; not rerun alongside the active GPU source",
+  "targeted_host_diagnostic_tests": 10,
+  "formal_lake_full_run_continues": true,
+  "sea_full_run_started": false,
+  "full_route_acceptance": false
+}
