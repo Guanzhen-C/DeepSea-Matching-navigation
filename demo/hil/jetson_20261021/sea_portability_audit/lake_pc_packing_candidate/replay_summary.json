@@ -1,0 +1,43 @@
+{
+  "status": "completed",
+  "mode": "raw_sensor_replay_not_network_realtime_HIL",
+  "extraction": {
+    "profile": "lake",
+    "baseline_sha": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "source_sha256": "649daf3dd3bc5d3997c92065eacc49cf5597c493afc12b99f426e2705efbf2b7",
+    "initialization_lines": [
+      2435,
+      5388
+    ],
+    "sonar_lines": [
+      5841,
+      8131
+    ],
+    "diagnostic_truth_replacements": [
+      3080,
+      3368,
+      6738
+    ],
+    "native_parity_validated": false,
+    "deployment_candidate": {
+      "name": "layout_only_intensity_packing",
+      "frozen_method_sha256": "324a8f2c942152e562db815c2a0dcf557cb2d919aad1a6cf1c5b274e1e4d35b4",
+      "altered_plane_fit_or_thresholds": false,
+      "paired_full_engine_validation_required": true
+    }
+  },
+  "profile": "lake",
+  "event_counts": {
+    "sonar": 2001,
+    "imu": 20000,
+    "depth": 4000,
+    "dvl": 2000
+  },
+  "simulated_duration_s": 400.0,
+  "wall_duration_s": 148.1165917049948,
+  "achieved_time_scale": 2.7005752387057607,
+  "output_samples": 2001,
+  "maximum_sonar_processing_s": 1.1349117630015826,
+  "p95_sonar_processing_s": 0.07994668999162968,
+  "no_truth_input_after_initial_seed": true
+}

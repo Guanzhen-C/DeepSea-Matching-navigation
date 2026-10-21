@@ -1,0 +1,233 @@
+{
+  "status": "needs_review",
+  "build_unit": "oceansim-hil-build-gtsam-serial-20261021.service",
+  "stages": [
+    {
+      "name": "lake_600m_lockstep",
+      "sender": {
+        "status": "completed",
+        "mode": "lockstep",
+        "simulated_duration_s": 400.0,
+        "wall_sensor_duration_s": 627.9236140059948,
+        "maximum_source_lateness_s": 0.0,
+        "maximum_in_flight_events": 1,
+        "samples": 2001,
+        "events": {
+          "boot": 1,
+          "sonar": 2001,
+          "imu": 20000,
+          "depth": 4000,
+          "dvl": 2000,
+          "finish": 1
+        },
+        "last_consumed_sequence": 28002,
+        "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+        "input_source": "completed_native_recording",
+        "skipped_events": 0,
+        "full_route_test": false
+      },
+      "metrics": {
+        "samples": 2001,
+        "end_timestamp_s": 400.0,
+        "board": {
+          "dr": {
+            "rmse_m": 2.772599822380028,
+            "median_m": 2.4951231625327837,
+            "p95_m": 4.548635933873591,
+            "p99_m": 4.678586068991626,
+            "max_m": 4.749393456448813,
+            "final_m": 4.745556555304784
+          },
+          "local": {
+            "rmse_m": 1.4935174875598203,
+            "median_m": 1.6188860877448166,
+            "p95_m": 1.8365713618817474,
+            "p99_m": 1.8751314478393786,
+            "max_m": 1.8875400925928827,
+            "final_m": 1.6210676802548014
+          },
+          "global": {
+            "rmse_m": 1.3609765644411804,
+            "median_m": 1.3963657895887114,
+            "p95_m": 1.7331896352705636,
+            "p99_m": 1.8979082663189104,
+            "max_m": 1.968482195065018,
+            "final_m": 1.711109744952559
+          }
+        },
+        "native": {
+          "dr": {
+            "rmse_m": 2.772599809972755,
+            "median_m": 2.4951231617794067,
+            "p95_m": 4.548635811980067,
+            "p99_m": 4.678586003059616,
+            "max_m": 4.749393401604814,
+            "final_m": 4.745556500089776
+          },
+          "local": {
+            "rmse_m": 1.4910382495071992,
+            "median_m": 1.6114146968931495,
+            "p95_m": 1.8352210658487265,
+            "p99_m": 1.8739602905558777,
+            "max_m": 1.8875641728561623,
+            "final_m": 1.6065834249595885
+          },
+          "global": {
+            "rmse_m": 1.3655379932367981,
+            "median_m": 1.4067289169098165,
+            "p95_m": 1.7378764431511093,
+            "p99_m": 1.9074229277866386,
+            "max_m": 1.9789372129657528,
+            "final_m": 1.7378764431511093
+          }
+        },
+        "maximum_board_to_native_position_difference_m": {
+          "dr": 1.9708373307394648e-07,
+          "local": 0.027749488251823506,
+          "global": 0.03297214710711287
+        },
+        "RMSE_P95_relative_changes": {
+          "dr": {
+            "rmse_m": 4.474959958145064e-09,
+            "p95_m": 2.679781996306474e-08
+          },
+          "local": {
+            "rmse_m": 0.001662759525746793,
+            "p95_m": 0.0007357675095105431
+          },
+          "global": {
+            "rmse_m": -0.003340389515494535,
+            "p95_m": -0.002696859088582637
+          }
+        },
+        "full_route_acceptance": false,
+        "interpretation": "aligned cross-architecture measurements only; confirm mission completion and resource/latency evidence separately"
+      },
+      "board_unit": "oceansim-hil-lake-lockstep-20261021-171257-549481.service",
+      "host_unit": "oceansim-hil-lake-lockstep-20261021-171257-549481-sender.service"
+    },
+    {
+      "name": "sea_600m_lockstep",
+      "sender": {
+        "status": "completed",
+        "mode": "lockstep",
+        "simulated_duration_s": 400.0,
+        "wall_sensor_duration_s": 710.6558439159999,
+        "maximum_source_lateness_s": 0.0,
+        "maximum_in_flight_events": 1,
+        "samples": 2001,
+        "events": {
+          "boot": 1,
+          "sonar": 2001,
+          "imu": 20000,
+          "depth": 4000,
+          "dvl": 2000,
+          "finish": 1
+        },
+        "last_consumed_sequence": 28002,
+        "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+        "input_source": "completed_native_recording",
+        "skipped_events": 0,
+        "full_route_test": false
+      },
+      "metrics": {
+        "samples": 2001,
+        "end_timestamp_s": 400.0,
+        "board": {
+          "dr": {
+            "rmse_m": 2.645514588953045,
+            "median_m": 2.3528591771440737,
+            "p95_m": 4.278677750895596,
+            "p99_m": 4.429341921049348,
+            "max_m": 4.477136028693297,
+            "final_m": 4.477136028693297
+          },
+          "local": {
+            "rmse_m": 1.5726304487189575,
+            "median_m": 1.3319142048485944,
+            "p95_m": 2.626296210275755,
+            "p99_m": 2.7762217796317414,
+            "max_m": 2.7991596507805445,
+            "final_m": 2.7879088562843743
+          },
+          "global": {
+            "rmse_m": 0.8654340809881309,
+            "median_m": 0.7416831972427866,
+            "p95_m": 1.5053700558587122,
+            "p99_m": 1.568556853407464,
+            "max_m": 1.5881961201157915,
+            "final_m": 1.4886777371478896
+          }
+        },
+        "native": {
+          "dr": {
+            "rmse_m": 2.645514588585127,
+            "median_m": 2.352859179209066,
+            "p95_m": 4.278677718867558,
+            "p99_m": 4.429341914192267,
+            "max_m": 4.477135997238271,
+            "final_m": 4.477135997238271
+          },
+          "local": {
+            "rmse_m": 1.5748427118621375,
+            "median_m": 1.3346442005418941,
+            "p95_m": 2.628816704464593,
+            "p99_m": 2.7786722840060034,
+            "max_m": 2.8015975556242534,
+            "final_m": 2.7903329790501314
+          },
+          "global": {
+            "rmse_m": 0.8312121380014587,
+            "median_m": 0.7556996740710268,
+            "p95_m": 1.3571403586865818,
+            "p99_m": 1.414068701501547,
+            "max_m": 1.4338624814731613,
+            "final_m": 1.3543262024432388
+          }
+        },
+        "maximum_board_to_native_position_difference_m": {
+          "dr": 1.4668024446854625e-07,
+          "local": 0.003449568049202137,
+          "global": 0.15810258071084213
+        },
+        "RMSE_P95_relative_changes": {
+          "dr": {
+            "rmse_m": 1.3907253126888008e-10,
+            "p95_m": 7.485499109449734e-09
+          },
+          "local": {
+            "rmse_m": -0.0014047518056988784,
+            "p95_m": -0.000958794192290835
+          },
+          "global": {
+            "rmse_m": 0.04117112999450945,
+            "p95_m": 0.10922208320116922
+          }
+        },
+        "full_route_acceptance": false,
+        "interpretation": "aligned cross-architecture measurements only; confirm mission completion and resource/latency evidence separately"
+      },
+      "board_unit": "oceansim-hil-sea-lockstep-20261021-172346-431096.service",
+      "host_unit": "oceansim-hil-sea-lockstep-20261021-172346-431096-sender.service"
+    }
+  ],
+  "full_route_HIL_complete": false,
+  "live_Isaac_HIL_complete": false,
+  "implementation_commit": "4cd84e7db551ebb77707756fa8f61224a2e36a6f",
+  "updated_at": "2026-10-21T17:35:52.022238+08:00",
+  "build_unit_terminal_state": {
+    "Result": "exit-code",
+    "ExecMainStatus": "1",
+    "ActiveState": "failed"
+  },
+  "installed_native_preflight": "native fixed-lag and CUDA ready",
+  "original_GTSAM_tests_passed": 11,
+  "regression_requires_review": [
+    [
+      "global",
+      "p95_m",
+      0.10922208320116922
+    ]
+  ],
+  "error": "RuntimeError: cross-architecture RMSE/P95 regression exceeds the proposed 10% allowance; inspect, do not tune silently"
+}

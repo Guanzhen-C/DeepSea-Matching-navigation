@@ -1,0 +1,123 @@
+{
+  "status": "needs_review",
+  "original_10_percent_gate_changed": false,
+  "sea_lockstep_metrics": {
+    "samples": 2001,
+    "end_timestamp_s": 400.0,
+    "board": {
+      "dr": {
+        "rmse_m": 2.645514588953045,
+        "median_m": 2.3528591771440737,
+        "p95_m": 4.278677750895596,
+        "p99_m": 4.429341921049348,
+        "max_m": 4.477136028693297,
+        "final_m": 4.477136028693297
+      },
+      "local": {
+        "rmse_m": 1.5726304487189575,
+        "median_m": 1.3319142048485944,
+        "p95_m": 2.626296210275755,
+        "p99_m": 2.7762217796317414,
+        "max_m": 2.7991596507805445,
+        "final_m": 2.7879088562843743
+      },
+      "global": {
+        "rmse_m": 0.8654340809881309,
+        "median_m": 0.7416831972427866,
+        "p95_m": 1.5053700558587122,
+        "p99_m": 1.568556853407464,
+        "max_m": 1.5881961201157915,
+        "final_m": 1.4886777371478896
+      }
+    },
+    "native": {
+      "dr": {
+        "rmse_m": 2.645514588585127,
+        "median_m": 2.352859179209066,
+        "p95_m": 4.278677718867558,
+        "p99_m": 4.429341914192267,
+        "max_m": 4.477135997238271,
+        "final_m": 4.477135997238271
+      },
+      "local": {
+        "rmse_m": 1.5748427118621375,
+        "median_m": 1.3346442005418941,
+        "p95_m": 2.628816704464593,
+        "p99_m": 2.7786722840060034,
+        "max_m": 2.8015975556242534,
+        "final_m": 2.7903329790501314
+      },
+      "global": {
+        "rmse_m": 0.8312121380014587,
+        "median_m": 0.7556996740710268,
+        "p95_m": 1.3571403586865818,
+        "p99_m": 1.414068701501547,
+        "max_m": 1.4338624814731613,
+        "final_m": 1.3543262024432388
+      }
+    },
+    "maximum_board_to_native_position_difference_m": {
+      "dr": 1.4668024446854625e-07,
+      "local": 0.003449568049202137,
+      "global": 0.15810258071084213
+    },
+    "RMSE_P95_relative_changes": {
+      "dr": {
+        "rmse_m": 1.3907253126888008e-10,
+        "p95_m": 7.485499109449734e-09
+      },
+      "local": {
+        "rmse_m": -0.0014047518056988784,
+        "p95_m": -0.000958794192290835
+      },
+      "global": {
+        "rmse_m": 0.04117112999450945,
+        "p95_m": 0.10922208320116922
+      }
+    },
+    "full_route_acceptance": false,
+    "interpretation": "aligned cross-architecture measurements only; confirm mission completion and resource/latency evidence separately"
+  },
+  "sampler_original_maximum_difference": 7.105427357601002e-15,
+  "identical_factor_stream_input_hash_matches": true,
+  "identical_factors_board_original_max_xy_difference_m": 3.5192457953972068e-12,
+  "pc_numpy126_control_maximum_differences": {
+    "dr": 0.0,
+    "local": 0.0,
+    "global": 0.0
+  },
+  "pc_numpy126_label_note": "The score tool generic board field in numpy126_to_original_metrics.json actually denotes the isolated PC dependency control, NOT a Jetson run.",
+  "pc_sea_packing_candidate": {
+    "native_parity_passed": true,
+    "samples": 2001,
+    "first_mismatch": null,
+    "maximum_component_differences": {
+      "dr_position": 0.0,
+      "local_position": 0.0,
+      "global_position": 0.0,
+      "dr_rotation": 0.0,
+      "local_rotation": 0.0,
+      "global_rotation": 0.0
+    },
+    "tolerances": {
+      "position_m": 1e-07,
+      "rotation_matrix": 1e-09
+    },
+    "rmse_3d_m": {
+      "dr": 2.6455145885851277,
+      "local": 1.574842711862138,
+      "global": 0.8312121380014583
+    }
+  },
+  "candidate_installed_in_ROS_receiver": false,
+  "live_Isaac_HIL_complete": false,
+  "full_route_HIL_complete": false,
+  "specific_frontend_numerical_root_cause_proven": false,
+  "active_performance_diagnostic_manifest": "demo/hil/jetson_20261021/sea_portability_audit/sea_600m_realtime_diagnostic/launch_manifest.json",
+  "task_source_sha256": {
+    "standalone/audit_hil_graph.py": "cea3563733ac1adafc9c4d3f1e09db2cccf005ba431368807dc5acd1bea8c437",
+    "standalone/audit_hil_sampling.py": "3691015d24f27baaa24c9fed5d34bd4b0fe24b304acae4945a7154e138f048ea",
+    "standalone/profile_hil_engine.py": "46a774c9a702fdbc22631298ab913ebfe60cb362517eca80fbf4ee98212102e1",
+    "standalone/hil_intensity_packing.py": "fce1499decba02424c71f0ef42587bacdccea3e804592e03851fb4fd45631b29"
+  }
+}

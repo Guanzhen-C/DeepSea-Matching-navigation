@@ -1,0 +1,73 @@
+         21303674 function calls (21273471 primitive calls) in 44.081 seconds
+
+   Ordered by: cumulative time
+   List reduced from 738 to 65 due to restriction <65>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     2101    0.008    0.000   42.238    0.020 {method 'send' of 'generator' objects}
+     2101    0.045    0.000   42.230    0.020 large_scale_slam_isaac_demo.py::hil-extracted:2(create_engine)
+      151    0.010    0.000   37.438    0.248 fast_sonar_slam.py:446(process_integrated_ping)
+      151    0.005    0.000   23.260    0.154 fast_sonar_slam.py:524(process_bathymetric_sidescan)
+      151    0.021    0.000   23.009    0.152 fast_sonar_slam.py:596(process_mbes)
+      151    0.063    0.000   21.402    0.142 fast_sonar_slam.py:870(_process_sidescan_intensity)
+      133    0.135    0.001   20.749    0.156 esikf.py:1852(update_intensity)
+      489    2.466    0.005   19.913    0.041 esikf.py:1537(_intensity_linearization)
+      485    9.584    0.020   14.319    0.030 intensity_map.py:666(query_fixed_anchor_batch)
+      151    0.045    0.000   14.046    0.093 feature_sonar_odometry.py:2033(process)
+      151    1.712    0.011    7.631    0.051 feature_sonar_odometry.py:1223(_canonical_frame)
+      150    0.024    0.000    6.276    0.042 feature_sonar_odometry.py:1678(_estimate_pair)
+      133    0.908    0.007    6.084    0.046 intensity_map.py:549(query_batch)
+      150    0.049    0.000    4.418    0.029 feature_sonar_odometry.py:784(_estimate_prediction_centered_ransac)
+    54362    0.102    0.000    2.871    0.000 fromnumeric.py:3513(std)
+    54362    0.207    0.000    2.769    0.000 _methods.py:204(_std)
+      150    1.129    0.008    2.762    0.018 feature_sonar_odometry.py:589(_prediction_centered_consensus_cuda)
+    54362    1.408    0.000    2.539    0.000 _methods.py:135(_var)
+     2102    0.017    0.000    2.070    0.001 recording.py:16(read_packets)
+   312818    2.008    0.000    2.008    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    73628    0.159    0.000    1.755    0.000 fromnumeric.py:3385(mean)
+      150    0.701    0.005    1.717    0.011 feature_sonar_odometry.py:1532(_klt_pairs)
+    74587    1.287    0.000    1.620    0.000 intensity_map.py:482(_candidate_entries)
+    73628    0.705    0.000    1.596    0.000 _methods.py:101(_mean)
+      151    0.003    0.000    1.524    0.010 fast_sonar_slam.py:1165(_commit_local_geometry)
+      151    0.305    0.002    1.519    0.010 surfel_map.py:415(add_points)
+     3000    0.356    0.000    1.265    0.000 esikf.py:491(propagate)
+     4203    0.007    0.000    1.242    0.000 gzip.py:296(read)
+9610/4203    0.058    0.000    1.230    0.000 {method 'read' of '_io.BufferedReader' objects}
+     5406    0.051    0.000    1.219    0.000 _compression.py:66(readinto)
+        1    0.001    0.001    1.197    1.197 large_scale_slam_isaac_demo.py::hil-extracted:3133(refine_terrain_fix_with_backscatter)
+        1    0.023    0.023    1.193    1.193 terrain_matching.py:1995(match)
+   107935    0.599    0.000    1.183    0.000 linalg.py:2383(norm)
+     5406    0.021    0.000    1.162    0.000 gzip.py:463(read)
+     1431    0.166    0.000    1.153    0.001 terrain_matching.py:1812(_score)
+  2066125    0.688    0.000    1.130    0.000 intensity_map.py:153(variance)
+    68440    0.176    0.000    1.071    0.000 fromnumeric.py:71(_wrapreduction)
+  2066125    0.655    0.000    1.054    0.000 intensity_map.py:157(z_variance)
+  4642185    1.030    0.000    1.030    0.000 {built-in method builtins.max}
+      485    0.098    0.000    0.985    0.002 intensity_map.py:726(<listcomp>)
+      150    0.008    0.000    0.907    0.006 feature_sonar_odometry.py:513(_draw_two_point_ransac_samples)
+      150    0.026    0.000    0.826    0.006 feature_sonar_odometry.py:520(<listcomp>)
+     2101    0.090    0.000    0.808    0.000 protocol.py:97(unpack)
+    38400    0.282    0.000    0.799    0.000 {method 'choice' of 'numpy.random._generator.Generator' objects}
+   110314    0.434    0.000    0.791    0.000 math3d.py:10(skew)
+      133    0.031    0.000    0.765    0.006 intensity_map.py:588(<listcomp>)
+     1500    0.006    0.000    0.664    0.000 fast_sonar_slam.py:384(process_imu)
+     1515    0.322    0.000    0.631    0.000 real_bathymetry.py:520(_sample)
+     1461    0.008    0.000    0.602    0.000 real_bathymetry.py:636(measured_reflectivity)
+      514    0.115    0.000    0.601    0.001 feature_sonar_odometry.py:438(_fit_prediction_centered_correction)
+    10471    0.203    0.000    0.596    0.000 surfel_map.py:112(merge)
+     5405    0.008    0.000    0.560    0.000 gzip.py:514(_add_read_data)
+      151    0.030    0.000    0.556    0.004 protocol.py:159(restore_acoustic)
+     5406    0.551    0.000    0.551    0.000 {built-in method zlib.crc32}
+     5405    0.526    0.000    0.526    0.000 {method 'decompress' of 'zlib.Decompress' objects}
+   346070    0.524    0.000    0.524    0.000 {built-in method numpy.array}
+     1821    0.026    0.000    0.522    0.000 arraysetops.py:138(unique)
+      151    0.003    0.000    0.520    0.003 fast_sonar_slam.py:1190(_promote_intensity_references)
+      147    0.180    0.001    0.516    0.004 intensity_map.py:247(add_points)
+   127990    0.457    0.000    0.506    0.000 _methods.py:67(_count_reduce_items)
+        1    0.000    0.000    0.491    0.491 terrain_matching.py:2892(match)
+        1    0.001    0.001    0.488    0.488 terrain_matching.py:2627(_solve)
+     5325    0.394    0.000    0.486    0.000 linalg.py:2191(lstsq)
+    54659    0.481    0.000    0.481    0.000 {resize}
+      151    0.011    0.000    0.470    0.003 <string>:2(__init__)
+
+
