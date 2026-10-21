@@ -1,0 +1,175 @@
+{
+  "kind": "completed_same_variant_graph_observations_not_causal_proof",
+  "roles": {
+    "PC_canonical": {
+      "keyframes": 122,
+      "intensity_edges": 10,
+      "intensity_rejection_reasons": {
+        "invalid_or_weak_information": 2
+      },
+      "terrain_priors": 103,
+      "auxiliary_non_loop_nodes": [
+        [
+          1,
+          6.4
+        ],
+        [
+          17,
+          474.40000000000003
+        ],
+        [
+          30,
+          818.8000000000001
+        ],
+        [
+          41,
+          1120.4
+        ],
+        [
+          54,
+          1479.4
+        ],
+        [
+          67,
+          1835.6000000000001
+        ],
+        [
+          80,
+          2202.2000000000003
+        ],
+        [
+          92,
+          2549.4
+        ],
+        [
+          107,
+          2944.6
+        ],
+        [
+          118,
+          3256.8
+        ]
+      ],
+      "objective_configuration": {
+        "terrain_prior_robust_kernel": "huber",
+        "robust_terrain_prior_delta": 2.5,
+        "relocalization_prior_robust_kernel": "cauchy",
+        "robust_relocalization_prior_delta": 2.5,
+        "robust_loop_delta": 3,
+        "robust_intensity_delta": 2.5,
+        "fixed_lag_seconds": 180,
+        "isam_relinearize_threshold": 0.01,
+        "isam_relinearize_skip": 1
+      },
+      "publication_policy_counts": {
+        "policy": "confirmed-particle-or-graph",
+        "particle_map_updates": 1800,
+        "ordinary_particle_map_updates": 1800,
+        "global_particle_map_updates": 0,
+        "pose_graph_fallback_updates": 14867,
+        "global_null_fallback_updates": 0,
+        "global_unconfirmed_shadow_updates": 0,
+        "ordinary_null_fallback_updates": 0,
+        "ordinary_unconfirmed_shadow_updates": 300,
+        "ordinary_fallback_after_global_null_updates": 0,
+        "ordinary_fallback_after_global_shadow_updates": 0,
+        "last_source": "pose_graph",
+        "last_particle_map_pose2": [
+          -12102.541088978793,
+          8274.885143823933,
+          2.4396419055872904
+        ],
+        "last_global_provisional_map_available": false,
+        "last_global_particle_map_available": false,
+        "last_ordinary_provisional_map_available": false,
+        "last_ordinary_particle_map_available": false
+      }
+    },
+    "ARM_canonical": {
+      "keyframes": 121,
+      "intensity_edges": 9,
+      "intensity_rejection_reasons": {
+        "invalid_or_weak_information": 7
+      },
+      "terrain_priors": 103,
+      "auxiliary_non_loop_nodes": [
+        [
+          1,
+          6.4
+        ],
+        [
+          15,
+          396.6
+        ],
+        [
+          30,
+          818.6
+        ],
+        [
+          44,
+          1208
+        ],
+        [
+          61,
+          1707.2
+        ],
+        [
+          78,
+          2184.2
+        ],
+        [
+          93,
+          2580.6
+        ],
+        [
+          107,
+          2974.6
+        ],
+        [
+          118,
+          3276.6
+        ]
+      ],
+      "objective_configuration": {
+        "terrain_prior_robust_kernel": "huber",
+        "robust_terrain_prior_delta": 2.5,
+        "relocalization_prior_robust_kernel": "cauchy",
+        "robust_relocalization_prior_delta": 2.5,
+        "robust_loop_delta": 3,
+        "robust_intensity_delta": 2.5,
+        "fixed_lag_seconds": 180,
+        "isam_relinearize_threshold": 0.01,
+        "isam_relinearize_skip": 1
+      },
+      "publication_policy_counts": {
+        "policy": "confirmed-particle-or-graph",
+        "particle_map_updates": 1800,
+        "ordinary_particle_map_updates": 1800,
+        "global_particle_map_updates": 0,
+        "pose_graph_fallback_updates": 14867,
+        "global_null_fallback_updates": 0,
+        "global_unconfirmed_shadow_updates": 0,
+        "ordinary_null_fallback_updates": 0,
+        "ordinary_unconfirmed_shadow_updates": 300,
+        "ordinary_fallback_after_global_null_updates": 0,
+        "ordinary_fallback_after_global_shadow_updates": 0,
+        "last_source": "pose_graph",
+        "last_particle_map_pose2": [
+          -12101.696267366387,
+          8271.895909190564,
+          2.4401847531129404
+        ],
+        "last_global_provisional_map_available": false,
+        "last_global_particle_map_available": false,
+        "last_ordinary_provisional_map_available": false,
+        "last_ordinary_particle_map_available": false
+      }
+    }
+  },
+  "pure_sorting_cause_not_yet_isolated": true,
+  "original_order_PC_acceleration_parity_pending": true,
+  "auxiliary_non_loop_nodes_not_evidence_of_regular_keyframe_cadence_change": true,
+  "gtsam_solver_bug_proven": false,
+  "original_failed_review_unchanged": true,
+  "full_route_acceptance": false
+}

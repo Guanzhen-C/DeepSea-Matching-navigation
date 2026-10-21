@@ -1,0 +1,9 @@
+{
+  "kind": "actual_PC_original_order_acceleration_control_launch_not_completion",
+  "recorded_utc": "2026-10-21 14:10:42 UTC",
+  "properties": "MainPID=2295866\nExecMainStartTimestamp=Wed 2026-10-21 22:00:03 CST\nExecStart={ path=/usr/bin/flock ; argv[]=/usr/bin/flock --nonblock /run/user/1000/oceansim-chelan-slam.lock /usr/bin/env OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 PYTHONPATH=/home/cgz/OceanSim OCEANSIM_BBS3D_LIBRARY=/home/cgz/OceanSim/native/bbs3d_bridge/build/liboceansim_bbs3d.so /home/cgz/.conda/envs/isaacsim-6.0/bin/python -m standalone.hil_intensity_linearization replay --profile lake --bundle /home/cgz/OceanSim/downloads/hil_bundles/lake-v2 --events /home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_20261021_canonical_v3/lake_5km_live_pilot/native_reference/sensor_events.osh.gz --output /home/cgz/OceanSim/demo/hil/jetson_20261021/lake_5km_portability_audit_20261021/pc_original_order_accelerated_5km ; ignore_errors=no ; start_time=[Wed 2026-10-21 22:00:03 CST] ; stop_time=[n/a] ; pid=2295866 ; code=(null) ; status=0/0 }\nCPUQuotaPerSecUSec=2s\nMemoryMax=7516192768\nMemorySwapMax=0\nId=oceansim-hil-lake-pc-original-order5km-20261021.service\nActiveState=active\n",
+  "canonical_correspondences": false,
+  "purpose": "Check original PC extraction/equivalent accelerations over the complete same 5 km before assigning the failed P95 entirely to sorting or ARM.",
+  "raw_input_sha256": "e10a1144ea53f64d2ad6abc8e02d093fd3b573ccdba90cba07cf4d54597a8c48",
+  "full_route_acceptance": false
+}
