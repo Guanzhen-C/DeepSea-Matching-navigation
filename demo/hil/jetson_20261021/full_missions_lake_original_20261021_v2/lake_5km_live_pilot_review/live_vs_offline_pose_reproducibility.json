@@ -1,0 +1,31 @@
+{
+  "kind": "completed_ARM_original_order_live_vs_offline_pose_reproducibility",
+  "samples": 16667,
+  "maximum_component_differences": {
+    "dr_position": 0,
+    "dr_rotation": 0,
+    "local_position": 0,
+    "local_rotation": 0,
+    "global_position": 0,
+    "global_rotation": 0
+  },
+  "first_nonzero_difference": null,
+  "all_six_pose_channels_exactly_equal": true,
+  "inputs": {
+    "offline_control_C": {
+      "path": "demo/hil/jetson_20261021/lake_5km_portability_audit_20261021/board_original_order_5km/estimator_outputs.osh.gz",
+      "sha256": "b3130ae505f0de9ea15349d9f87a30d3c060365d5a07713615af222fd850b743",
+      "size_bytes": 4025577
+    },
+    "new_live_board": {
+      "path": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_5km_live_pilot/board_artifacts/estimator_outputs.osh.gz",
+      "sha256": "f92d0e9b2e3149475f368ae6e8eadcfec494d61f59a92a494b80d44732610da6",
+      "size_bytes": 4032516
+    }
+  },
+  "raw_sensor_bytes_equal_claimed": false,
+  "cross_architecture_bitwise_equality_claimed": false,
+  "full_route_acceptance": false,
+  "method": "zip_longest complete ordered packet streams; require 16667 equal sensor timestamps, finite absolute differences; compute maxima independently for all six pose channels; no trajectory fitting",
+  "qualification": "reproducibility check only, not an additional full-route, cross-architecture or hard-realtime acceptance"
+}
