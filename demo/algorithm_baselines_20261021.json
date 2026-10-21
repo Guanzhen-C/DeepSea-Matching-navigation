@@ -1,0 +1,35 @@
+{
+  "purpose": "分别保留面向湖试和海试研发的算法基线。已有证据均为真实地形上的传感器仿真，不冒称实船湖试或实海试。",
+  "lake": {
+    "git_tag": "lake-sim-baseline-20261021",
+    "git_branch": "baselines/lake-chelan",
+    "algorithm_commit": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "terrain": "Lake Chelan USGS measured lakebed, prepared 6 m grid",
+    "configuration": "raw-recovery profile: confirmed-particle-or-graph, converged-cohort merging, raw-sonar recovery proposals",
+    "launch": "python3 standalone/run_chelan_guarded.py --profile raw-recovery --full-route --output <NEW_OUTPUT_DIRECTORY>",
+    "launch_precondition": "运行前需在上述湖底基线标签/分支的检出版本中执行，不能把后续开发分支的运行当成冻结基线复现；实际源码哈希由run_manifest.json记录。",
+    "completed_run": "demo/generalization/chelan_raw_recovery_20261020/full_route_raw_recovery_seed31",
+    "distance_m": 47116.48901858927,
+    "samples": 157056,
+    "online_global_rmse_m": 7.1204203906569745,
+    "online_global_p95_m": 13.323067983834225,
+    "online_global_max_m": 46.69117574727368,
+    "online_global_final_m": 36.39810572390677,
+    "error_curve_png": "demo/generalization/chelan_raw_recovery_20261020/lake_chelan_47km_full_route_error_curves.png",
+    "error_curve_pdf": "demo/generalization/chelan_raw_recovery_20261020/lake_chelan_47km_full_route_error_curves.pdf",
+    "plot_input_audit": "demo/generalization/chelan_raw_recovery_20261020/lake_chelan_47km_full_route_error_curves.json",
+    "known_limit": "末段转弯附近的共享DR/Local运动异常及Global峰值尚未消除；此标签用于后续湖试迭代，不代表该问题已解决。"
+  },
+  "sea": {
+    "git_tag": "sea-sim-baseline-20261021",
+    "git_branch": "baselines/sea-monterey",
+    "algorithm_commit": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "original_git_tag": "improved-long-range-slam-20260918",
+    "terrain": "Monterey Canyon measured seafloor, 5 m grid",
+    "configuration": "original multimodal-map policy; no lake-specific new cohort merging or raw recovery proposal feature",
+    "frozen_worktree": "/home/cgz/OceanSim_worktrees/monterey-72km-stable-20260918",
+    "launch": "bash /home/cgz/OceanSim/standalone/run_monterey_72km_stable.sh",
+    "completed_run_metrics": "demo/large_scale_slam/p0_shadow_confirm_full_route_headless_20260917.json",
+    "note": "保留原72km级完整改进版及既有试验数据，不用湖底版本覆盖。"
+  }
+}
