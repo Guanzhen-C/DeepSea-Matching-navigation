@@ -23,7 +23,7 @@ from standalone.hil.score_board_results import stats
 from standalone.terrain_plot_mesh import measured_surface
 
 
-def load_run(directory, *, require_full_route=False):
+def load_run(directory, *, require_full_route=False, include_rotations=False):
     manifest = json.loads((directory / "launch_manifest.json").read_text())
     source = Path(manifest["recording"]) if manifest.get("recording") else directory / "native_reference"
     recorded = json.loads((source / "recording_summary.json").read_text())
@@ -54,6 +54,7 @@ def load_run(directory, *, require_full_route=False):
             or sender.get("input_source") != "live_Isaac_sensor_stream"):
         raise ValueError("live-source claim lacks actual live delivery evidence")
     positions = np.empty((count, 4, 3))  # truth, DR, Local, online Global
+    rotations = np.empty((count, 4, 3, 3)) if include_rotations else None
     native = np.empty((count, 3, 3))
     timestamps = np.empty(count)
     roundtrip = np.empty(count)
@@ -66,14 +67,32 @@ def load_run(directory, *, require_full_route=False):
             raise ValueError("missing, excess, or misaligned board output")
         timestamps[index] = board["timestamp"]
         positions[index, 0] = truth["truth_position"]
+        if rotations is not None:
+            rotation = np.asarray(truth["truth_rotation"], dtype=np.float64)
+            if rotation.shape != (3, 3):
+                raise ValueError("invalid recorded rotation matrix shape")
+            rotations[index, 0] = rotation
         for channel, name in enumerate(("dr", "local", "global")):
             positions[index, channel + 1] = board[name + "_position"]
             native[index, channel] = truth[name + "_position"]
+            if rotations is not None:
+                rotation = np.asarray(board[name + "_rotation"], dtype=np.float64)
+                if rotation.shape != (3, 3):
+                    raise ValueError("invalid recorded rotation matrix shape")
+                rotations[index, channel + 1] = rotation
         roundtrip[index] = board["transport_and_processing_roundtrip_s"]
         lateness[index] = board.get("arrival_lateness_s", np.nan)
         used += 1
     if used != count or not np.isfinite(positions).all() or not np.isfinite(native).all():
         raise ValueError("incomplete or nonfinite recorded trajectory")
+    if rotations is not None:
+        # Input integrity, not a navigation acceptance threshold. Never repair
+        # or project an invalid orientation onto SO(3) in the scoring path.
+        for chunk in np.array_split(rotations, max(1, int(np.ceil(count / 10000)))):
+            if (not np.isfinite(chunk).all()
+                    or not np.allclose(np.swapaxes(chunk, -1, -2) @ chunk, np.eye(3), rtol=0., atol=1e-6)
+                    or not np.allclose(np.linalg.det(chunk), 1., rtol=0., atol=1e-6)):
+                raise ValueError("invalid recorded rotation matrix")
     if not np.allclose(np.diff(timestamps), 1. / metrics["ping_rate_hz"], rtol=0., atol=1e-8):
         raise ValueError("output stream contains a sensor-clock gap")
     distance = np.r_[0., np.cumsum(np.linalg.norm(np.diff(positions[:, 0], axis=0), axis=1))]
@@ -84,7 +103,7 @@ def load_run(directory, *, require_full_route=False):
     return dict(manifest=manifest, source=source, full_route=full, timestamps=timestamps,
                 distance=distance, positions=positions, errors=errors, native_errors=native_errors,
                 roundtrip=roundtrip, lateness=lateness, diagnostics=diagnostics, sender=sender,
-                reference=reference, outputs=outputs)
+                reference=reference, outputs=outputs, rotations=rotations)
 
 
 def set_font():

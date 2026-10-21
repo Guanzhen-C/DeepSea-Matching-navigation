@@ -81,3 +81,28 @@ def test_plot_loader_rejects_mislabeled_live_delivery(tmp_path):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="live delivery"):
         load_run(root)
+
+
+@pytest.mark.parametrize("invalid", [None, "reflection", "not_orthogonal", "broadcast_shape", "nonfinite"])
+def test_plot_loader_optionally_loads_and_validates_rotations(tmp_path, invalid):
+    root = fixture_run(tmp_path)
+    for relative in ("native_reference/host_reference.osh.gz", "sender/returned_estimator_outputs.osh.gz"):
+        from standalone.hil.recording import read_packets
+        path = root / relative
+        records = list(read_packets(path))
+        for record in records:
+            names = ("truth",) if "truth_position" in record else ("dr", "local", "global")
+            for name in names:
+                record[name + "_rotation"] = np.eye(3)
+        if invalid and "sender" in relative:
+            if invalid == "broadcast_shape":
+                records[1]["local_rotation"] = np.eye(3)[None]
+            else:
+                records[1]["local_rotation"][0, 0] = dict(reflection=-1., not_orthogonal=2., nonfinite=np.nan)[invalid]
+        write_packets(path, records)
+    if invalid:
+        with pytest.raises(ValueError, match="rotation matrix"):
+            load_run(root, include_rotations=True)
+    else:
+        run = load_run(root, include_rotations=True)
+        np.testing.assert_array_equal(run["rotations"], np.broadcast_to(np.eye(3), (3, 4, 3, 3)))
