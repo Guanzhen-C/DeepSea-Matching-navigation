@@ -1,0 +1,56 @@
+{
+  "kind": "partial_return_stream_latency_not_full_route_or_hard_realtime_acceptance",
+  "samples": 77100,
+  "cutoff_s": 15419.8,
+  "entire_prefix": {
+    "arrival_lateness": {
+      "maximum_s": 218.01971333500114,
+      "p95_s": 178.50004883430114,
+      "mean_s": 67.79187608324747,
+      "last_s": 178.47544085201116
+    },
+    "transport_and_processing_roundtrip": {
+      "maximum_s": 110.52441004601133,
+      "p95_s": 3.0550990667506994,
+      "mean_s": 1.6163742395860072,
+      "last_s": 2.4266711279924493
+    },
+    "processing_wall": {
+      "maximum_s": 109.09935655300069,
+      "p95_s": 0.18347674510077924,
+      "mean_s": 0.16615277821866956,
+      "last_s": 0.15631765000580344
+    }
+  },
+  "last_600_sensor_seconds": {
+    "arrival_lateness": {
+      "maximum_s": 181.9615051990204,
+      "p95_s": 180.8292521560088,
+      "mean_s": 144.65280997000448,
+      "last_s": 178.47544085201116
+    },
+    "transport_and_processing_roundtrip": {
+      "maximum_s": 6.805719844007399,
+      "p95_s": 3.876153875986347,
+      "mean_s": 2.215630446479828,
+      "last_s": 2.4266711279924493
+    },
+    "processing_wall": {
+      "maximum_s": 4.850372607004829,
+      "p95_s": 0.19711227899824735,
+      "mean_s": 0.19541845739350713,
+      "last_s": 0.15631765000580344
+    }
+  },
+  "source_and_result_clock": "same PC monotonic clock; arrival lateness measured relative to nominal 1x sensor epoch",
+  "full_route_acceptance": false,
+  "inputs_still_growing": true,
+  "input": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/sender/returned_estimator_outputs.osh.gz",
+  "warmup_handling": "Sender source clock starts after boot acknowledgement; boot warmup is not charged to sensor-period timing.",
+  "limits": [
+    "Partial returned-stream audit, not full-route or complete actual-board-file collection.",
+    "Arrival lateness includes source pacing and backpressure; it is not network latency alone.",
+    "Board processing_wall_s covers the entire sonar-event consumer; stage-level profiling is absent.",
+    "Position errors were scored at matching sensor epochs, not current wall time. Good same-epoch accuracy does not establish timely control/navigation output."
+  ]
+}
