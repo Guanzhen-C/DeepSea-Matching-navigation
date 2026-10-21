@@ -83,7 +83,7 @@ def main():
         "print(json.dumps({n:hashlib.sha256((r/n).read_bytes()).hexdigest() for n in names}))"])
     if json.loads(code_check) != code_sha256:
         p.error("board HIL interface code differs from this committed implementation; synchronize before testing")
-    preflight = remote([REMOTE + "/venv/bin/python", "-c",
+    preflight = remote(["env", "LD_LIBRARY_PATH=" + REMOTE + "/gtsam/lib", REMOTE + "/venv/bin/python", "-c",
         "import gtsam,gtsam_unstable,torch; "
         "assert hasattr(gtsam,'IncrementalFixedLagSmoother') or hasattr(gtsam_unstable,'IncrementalFixedLagSmoother'); "
         "assert torch.cuda.is_available(); "
