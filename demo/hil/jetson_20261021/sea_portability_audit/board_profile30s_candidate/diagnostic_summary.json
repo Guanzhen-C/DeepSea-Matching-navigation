@@ -1,0 +1,44 @@
+{
+  "kind": "finite_raw_prefix_profiling_NOT_HIL_acceptance",
+  "event_counts": {
+    "sonar": 151,
+    "imu": 1500,
+    "depth": 300,
+    "dvl": 150
+  },
+  "extraction": {
+    "profile": "sea",
+    "baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "source_sha256": "a11700c8c71aef21881f57f11d5ba322cc82400d16a6cc9b23e5c559c50064cc",
+    "initialization_lines": [
+      2403,
+      5268
+    ],
+    "sonar_lines": [
+      5708,
+      7999
+    ],
+    "diagnostic_truth_replacements": [
+      3035,
+      3323,
+      6606
+    ],
+    "native_parity_validated": false,
+    "deployment_candidate": {
+      "name": "layout_only_intensity_packing",
+      "frozen_method_sha256": "324a8f2c942152e562db815c2a0dcf557cb2d919aad1a6cf1c5b274e1e4d35b4",
+      "altered_plane_fit_or_thresholds": false,
+      "paired_full_engine_validation_required": true
+    }
+  },
+  "last_sensor_timestamp_s": 30.0,
+  "wall_duration_s": 37.404040101000646,
+  "sonar_processing_p50_p95_max_s": [
+    0.2238573720005661,
+    0.2962450754994279,
+    2.4530452050003078
+  ],
+  "completed_navigation_run": false,
+  "algorithm_parameters_modified": false,
+  "no_truth_after_initial_seed": true
+}

@@ -89,6 +89,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
     parser.add_argument("action", choices=("replay", "profile"))
+    parser.add_argument("--batch-feature-descriptors", action="store_true",
+                        help="additional explicit candidate: batch patch mean/std, preserve decisions")
     args, remaining = parser.parse_known_args()
     if args.action == "replay":
         from standalone.hil import replay as runner
@@ -104,6 +106,13 @@ def main():
         audit["deployment_candidate"] = dict(name="layout_only_intensity_packing",
             frozen_method_sha256=candidate.frozen_method_sha256,
             altered_plane_fit_or_thresholds=False, paired_full_engine_validation_required=True)
+        if args.batch_feature_descriptors:
+            from standalone.hil_feature_batching import build_batched_canonical
+            from oceansim.slam.feature_sonar_odometry import FeatureSonarOdometry
+            canonical = build_batched_canonical(FeatureSonarOdometry._canonical_frame)
+            FeatureSonarOdometry._canonical_frame = canonical
+            audit["deployment_candidate"].update(name="layout_packing_and_descriptor_reductions",
+                descriptor_method_sha256=canonical.frozen_method_sha256)
         return engine, audit
 
     runner.initialize = experimental_initialize
