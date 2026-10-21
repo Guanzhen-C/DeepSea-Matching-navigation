@@ -141,6 +141,13 @@ def main():
         producer += ["--full-route"] if args.full_route else ["--distance-m", str(args.distance_m)]
     else:
         host += ["--events", str(args.recording / "sensor_events.osh.gz")]
+    observer_source = ROOT / "standalone/observe_hil_host_resources.py"
+    observer = ["systemd-run", "--user", "--unit=" + unit + "-resources", "--working-directory=" + str(ROOT),
+        "--property=MemoryHigh=256M", "--property=MemoryMax=256M", "--property=MemorySwapMax=0",
+        "--property=CPUQuota=25%", "--property=Nice=15",
+        "--property=StandardOutput=append:" + str(args.output / "host_resource_observer.log"),
+        "--property=StandardError=append:" + str(args.output / "host_resource_observer.log"),
+        "/usr/bin/python3", "-m", "standalone.observe_hil_host_resources", "--run", str(args.output)]
     manifest = dict(profile=args.profile, mode=args.mode, deployment_layout=args.deployment_layout,
                     batch_intensity_jacobians=args.batch_intensity_jacobians,
                     canonical_correspondences=args.canonical_correspondences,
@@ -148,10 +155,12 @@ def main():
                     host_unit=unit + "-sender.service", board_output=board_output,
                     recording=str(args.recording) if args.recording else None, host_output=str(args.output),
                     live_Isaac=bool(args.live_bundle), producer_unit=unit + "-producer.service" if producer else None,
+                    host_resource_unit=unit + "-resources.service",
+                    host_observer_source_sha256=hashlib.sha256(observer_source.read_bytes()).hexdigest(),
                     implementation_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                     board_preflight=preflight.strip(), source_truth_is_host_only=True,
                     code_sha256=code_sha256,
-                    board_argv=board, host_argv=host, producer_argv=producer)
+                    board_argv=board, host_argv=host, producer_argv=producer, resource_argv=observer)
     if not args.dry_run:
         args.output.mkdir(parents=True)
         (args.output / "launch_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -165,6 +174,7 @@ def main():
                     raise TimeoutError("ROS peer/IPC not ready; producer was not launched; inspect existing units")
                 time.sleep(.1)
             subprocess.run(producer, check=True)
+        subprocess.run(observer, check=True)
     print(json.dumps(manifest, indent=2))
 
 
