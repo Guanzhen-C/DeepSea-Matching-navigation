@@ -1,0 +1,261 @@
+{
+  "status": "needs_review_existing_tasks_untouched",
+  "pilot": "/home/cgz/OceanSim/demo/hil/jetson_20261021/sea_live_5km_canonical_v3",
+  "stages": [
+    {
+      "name": "sea_5km_live_pilot",
+      "evidence": {
+        "status": "completed_integrity_and_accuracy_review_passed",
+        "profile": "sea",
+        "full_route": false,
+        "live_Isaac": true,
+        "distance_m": 4999.796967483578,
+        "samples": 16667,
+        "original_PC_reference_retained": true,
+        "returned_board_equality": {
+          "samples": 16667,
+          "six_pose_channels_exactly_equal": true,
+          "comparison_to_PC_estimator": false
+        },
+        "input_counts": {
+          "boot": 1,
+          "sonar": 16667,
+          "imu": 166666,
+          "depth": 33333,
+          "dvl": 16666,
+          "finish": 1
+        },
+        "latency_and_duration": {
+          "status": "completed",
+          "mode": "realtime",
+          "simulated_duration_s": 3333.32,
+          "wall_sensor_duration_s": 3336.1395191000047,
+          "maximum_source_lateness_s": 1.9301724420074606,
+          "maximum_in_flight_events": 128,
+          "samples": 16667,
+          "events": {
+            "boot": 1,
+            "sonar": 16667,
+            "imu": 166666,
+            "depth": 33333,
+            "dvl": 16666,
+            "finish": 1
+          },
+          "last_consumed_sequence": 233333,
+          "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+          "input_source": "live_Isaac_sensor_stream",
+          "skipped_events": 0,
+          "full_route_test": false,
+          "result_arrival_lateness_s": {
+            "maximum": 3.7700780190032503,
+            "p95": 2.6178526952054195,
+            "mean": 0.8260632842810777
+          }
+        },
+        "host_resources": {
+          "kind": "read_only_resource_observation_not_navigation_acceptance",
+          "samples": 672,
+          "stop_reason": "host_participants_terminal_no_task_was_stopped",
+          "units": {
+            "source": "oceansim-hil-sea-realtime-20261021-193738-480134-producer.service",
+            "sender": "oceansim-hil-sea-realtime-20261021-193738-480134-sender.service"
+          },
+          "memory": {
+            "source": {
+              "maximum_observed_current_bytes": 7516180480,
+              "maximum_kernel_lifetime_peak_bytes": 7516192768,
+              "maximum_observed_oom_kills": 0
+            },
+            "sender": {
+              "maximum_observed_current_bytes": 575586304,
+              "maximum_kernel_lifetime_peak_bytes": 576925696,
+              "maximum_observed_oom_kills": 0
+            }
+          },
+          "minimum_observed_host_available_bytes": 11569459200,
+          "earlier_GPU_timeline_not_reconstructed": true,
+          "task_state_modified": false
+        },
+        "terminal_state_snapshot": {
+          "board": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          },
+          "sender": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          },
+          "source": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          },
+          "resources": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          }
+        },
+        "terminal_snapshot_alone_does_not_prove_collected_transient_unit_exit_code": true,
+        "accuracy_review_limit_relative_change": 0.1,
+        "accuracy_regressions": [],
+        "truth_after_initial_seed_sent_to_board": false,
+        "physical_sensor_trial": false,
+        "controller_closed_loop": false,
+        "hard_realtime": false,
+        "final_acceptance": false
+      }
+    },
+    {
+      "name": "lake_600m_live_pilot",
+      "evidence": {
+        "status": "completed_integrity_and_accuracy_review_passed",
+        "profile": "lake",
+        "full_route": false,
+        "live_Isaac": true,
+        "distance_m": 599.9968893961066,
+        "samples": 2001,
+        "original_PC_reference_retained": true,
+        "returned_board_equality": {
+          "samples": 2001,
+          "six_pose_channels_exactly_equal": true,
+          "comparison_to_PC_estimator": false
+        },
+        "input_counts": {
+          "boot": 1,
+          "sonar": 2001,
+          "imu": 20000,
+          "depth": 4000,
+          "dvl": 2000,
+          "finish": 1
+        },
+        "latency_and_duration": {
+          "status": "completed",
+          "mode": "realtime",
+          "simulated_duration_s": 400.0,
+          "wall_sensor_duration_s": 402.19166230900737,
+          "maximum_source_lateness_s": 2.609907395002665,
+          "maximum_in_flight_events": 128,
+          "samples": 2001,
+          "events": {
+            "boot": 1,
+            "sonar": 2001,
+            "imu": 20000,
+            "depth": 4000,
+            "dvl": 2000,
+            "finish": 1
+          },
+          "last_consumed_sequence": 28002,
+          "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+          "input_source": "live_Isaac_sensor_stream",
+          "skipped_events": 0,
+          "full_route_test": false,
+          "result_arrival_lateness_s": {
+            "maximum": 4.449806146006438,
+            "p95": 3.1215541279962054,
+            "mean": 1.1477835674408523
+          }
+        },
+        "host_resources": {
+          "kind": "read_only_resource_observation_not_navigation_acceptance",
+          "samples": 12,
+          "stop_reason": "host_participants_terminal_no_task_was_stopped",
+          "units": {
+            "source": "oceansim-hil-lake-realtime-20261021-191738-291334-producer.service",
+            "sender": "oceansim-hil-lake-realtime-20261021-191738-291334-sender.service"
+          },
+          "memory": {
+            "source": {
+              "maximum_observed_current_bytes": 7515648000,
+              "maximum_kernel_lifetime_peak_bytes": 7516192768,
+              "maximum_observed_oom_kills": 0
+            },
+            "sender": {
+              "maximum_observed_current_bytes": 509194240,
+              "maximum_kernel_lifetime_peak_bytes": 510513152,
+              "maximum_observed_oom_kills": 0
+            }
+          },
+          "minimum_observed_host_available_bytes": 16190291968,
+          "earlier_GPU_timeline_not_reconstructed": true,
+          "task_state_modified": false
+        },
+        "terminal_state_snapshot": {
+          "board": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          },
+          "sender": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          },
+          "source": {
+            "Result": "success",
+            "ExecMainStatus": "0",
+            "ActiveState": "inactive"
+          }
+        },
+        "terminal_snapshot_alone_does_not_prove_collected_transient_unit_exit_code": true,
+        "accuracy_review_limit_relative_change": 0.1,
+        "accuracy_regressions": [],
+        "truth_after_initial_seed_sent_to_board": false,
+        "physical_sensor_trial": false,
+        "controller_closed_loop": false,
+        "hard_realtime": false,
+        "final_acceptance": false
+      }
+    }
+  ],
+  "full_missions_explicitly_requested": true,
+  "implementation_commit": "ec9b6d817e74f3219752612cfe08ca69f916a793",
+  "coordinator_source_sha256": "3dcdd90b327d70ddffdd0dc399d7ceac302a1fd14608e49abbae9c1ba2a9a866",
+  "final_acceptance": false,
+  "updated_utc": "2026-10-21T13:31:00.444080+00:00",
+  "observed_participant_states": {
+    "board": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "sender": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "source": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "resources": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    }
+  },
+  "next_launch_argv": [
+    "/home/cgz/.conda/envs/isaacsim-6.0/bin/python",
+    "-m",
+    "standalone.hil.launch_validation",
+    "--profile",
+    "lake",
+    "--mode",
+    "realtime",
+    "--live-bundle",
+    "/home/cgz/OceanSim/downloads/hil_bundles/lake-v2",
+    "--distance-m",
+    "5000.0",
+    "--deployment-layout",
+    "packed-and-feature-batch",
+    "--batch-intensity-jacobians",
+    "--canonical-correspondences",
+    "--output",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_20261021_canonical_v3/lake_5km_live_pilot"
+  ],
+  "active_run": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_20261021_canonical_v3/lake_5km_live_pilot",
+  "error": "RuntimeError: original RMSE/P95 review limit exceeded; see completion_evidence.json; no threshold was changed"
+}

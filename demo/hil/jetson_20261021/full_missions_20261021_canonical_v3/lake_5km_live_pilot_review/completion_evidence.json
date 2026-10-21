@@ -1,0 +1,109 @@
+{
+  "status": "needs_review",
+  "profile": "lake",
+  "full_route": false,
+  "live_Isaac": true,
+  "distance_m": 4999.795933131373,
+  "samples": 16667,
+  "original_PC_reference_retained": true,
+  "returned_board_equality": {
+    "samples": 16667,
+    "six_pose_channels_exactly_equal": true,
+    "comparison_to_PC_estimator": false
+  },
+  "input_counts": {
+    "boot": 1,
+    "sonar": 16667,
+    "imu": 166666,
+    "depth": 33333,
+    "dvl": 16666,
+    "finish": 1
+  },
+  "latency_and_duration": {
+    "status": "completed",
+    "mode": "realtime",
+    "simulated_duration_s": 3333.32,
+    "wall_sensor_duration_s": 3337.0810774400015,
+    "maximum_source_lateness_s": 3.888562242005719,
+    "maximum_in_flight_events": 128,
+    "samples": 16667,
+    "events": {
+      "boot": 1,
+      "sonar": 16667,
+      "imu": 166666,
+      "depth": 33333,
+      "dvl": 16666,
+      "finish": 1
+    },
+    "last_consumed_sequence": 233333,
+    "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+    "input_source": "live_Isaac_sensor_stream",
+    "skipped_events": 0,
+    "full_route_test": false,
+    "result_arrival_lateness_s": {
+      "maximum": 5.7284051820024615,
+      "p95": 3.3695945854941085,
+      "mean": 1.0664155221588243
+    }
+  },
+  "host_resources": {
+    "kind": "read_only_resource_observation_not_navigation_acceptance",
+    "samples": 667,
+    "stop_reason": "host_participants_terminal_no_task_was_stopped",
+    "units": {
+      "source": "oceansim-hil-lake-realtime-20261021-203434-978521-producer.service",
+      "sender": "oceansim-hil-lake-realtime-20261021-203434-978521-sender.service"
+    },
+    "memory": {
+      "source": {
+        "maximum_observed_current_bytes": 7516192768,
+        "maximum_kernel_lifetime_peak_bytes": 7516192768,
+        "maximum_observed_oom_kills": 0
+      },
+      "sender": {
+        "maximum_observed_current_bytes": 548413440,
+        "maximum_kernel_lifetime_peak_bytes": 549982208,
+        "maximum_observed_oom_kills": 0
+      }
+    },
+    "minimum_observed_host_available_bytes": 10528546816,
+    "earlier_GPU_timeline_not_reconstructed": true,
+    "task_state_modified": false
+  },
+  "terminal_state_snapshot": {
+    "board": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "sender": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "source": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "resources": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    }
+  },
+  "terminal_snapshot_alone_does_not_prove_collected_transient_unit_exit_code": true,
+  "accuracy_review_limit_relative_change": 0.1,
+  "accuracy_regressions": [
+    {
+      "channel": "global",
+      "metric": "p95_m",
+      "relative_change": 0.2776183151290461
+    }
+  ],
+  "truth_after_initial_seed_sent_to_board": false,
+  "physical_sensor_trial": false,
+  "controller_closed_loop": false,
+  "hard_realtime": false,
+  "final_acceptance": false
+}
