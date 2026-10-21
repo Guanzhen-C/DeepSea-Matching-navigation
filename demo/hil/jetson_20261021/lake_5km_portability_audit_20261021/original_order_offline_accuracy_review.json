@@ -1,0 +1,82 @@
+{
+  "kind": "original_order_offline_accuracy_review_not_live_qualification",
+  "role": "ARM_original_order_accelerated",
+  "original_PC_reference_retained": true,
+  "samples": 16667,
+  "board_metrics": {
+    "dr": {
+      "rmse_m": 17.688876603527184,
+      "median_m": 10.52929646797944,
+      "p95_m": 39.045666075515754,
+      "p99_m": 43.91053095280712,
+      "max_m": 45.294439106705916,
+      "final_m": 45.294439106705916
+    },
+    "local": {
+      "rmse_m": 15.551431118257264,
+      "median_m": 11.297175078564125,
+      "p95_m": 35.35217774388952,
+      "p99_m": 40.58813036263803,
+      "max_m": 42.66934540645808,
+      "final_m": 42.63403446109827
+    },
+    "global": {
+      "rmse_m": 4.03939071857646,
+      "median_m": 3.1397706804302823,
+      "p95_m": 7.699713303354926,
+      "p99_m": 8.857703327406393,
+      "max_m": 10.021089596255518,
+      "final_m": 1.305387065982667
+    }
+  },
+  "original_PC_metrics": {
+    "dr": {
+      "rmse_m": 17.690297425184554,
+      "median_m": 10.529136801304675,
+      "p95_m": 39.048784759679094,
+      "p99_m": 43.91474202155846,
+      "max_m": 45.29988823904559,
+      "final_m": 45.29988823904559
+    },
+    "local": {
+      "rmse_m": 15.560192880690533,
+      "median_m": 11.3244505506859,
+      "p95_m": 35.37255604941083,
+      "p99_m": 40.61119095302115,
+      "max_m": 42.68541077561837,
+      "final_m": 42.65040239219785
+    },
+    "global": {
+      "rmse_m": 4.199341675652875,
+      "median_m": 3.3358211639922555,
+      "p95_m": 7.244835171227194,
+      "p99_m": 9.466810473861916,
+      "max_m": 10.263018770134767,
+      "final_m": 1.2135929327092647
+    }
+  },
+  "relative_changes": {
+    "dr": {
+      "rmse_m": -0.00008031643692696377,
+      "p95_m": -0.00007986635647005969
+    },
+    "local": {
+      "rmse_m": -0.0005630882920572011,
+      "p95_m": -0.0005761049750786507
+    },
+    "global": {
+      "rmse_m": -0.03808953151009031,
+      "p95_m": 0.06278653984210392
+    }
+  },
+  "preexisting_review_limit": 0.1,
+  "regressions": [],
+  "offline_accuracy_passed": true,
+  "raw_input_sha256": "e10a1144ea53f64d2ad6abc8e02d093fd3b573ccdba90cba07cf4d54597a8c48",
+  "PC_original_order_six_pose_channels_zero_difference_proof": "PC_original_order_acceleration_parity_5km.json",
+  "decision": "Restore original KLT order for lake deployment, retain equivalent accelerations; reuse the unchanged previously qualified spatial-order mode for sea.",
+  "new_original_order_live_600m_and_5km_still_required": true,
+  "navigation_thresholds_or_sensor_rates_changed": false,
+  "prior_failed_spatial_order_review_preserved": true,
+  "full_route_acceptance": false
+}
