@@ -1,0 +1,32 @@
+{
+  "kind": "same_input_portability_diagnostic_controls_not_full_route_qualification",
+  "source_commit_at_start": "577692b0482b3d1eceab5a148a6e82fefed81094",
+  "frozen_lake_commit": "204d3e24048a8b515616d9305b7516221bcf8fed",
+  "recording": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_20261021_canonical_v3/lake_5km_live_pilot/native_reference",
+  "samples": 16667,
+  "expected_sensor_events_including_boot_and_finish": 233334,
+  "original_PC_control": "host_reference.osh.gz remains PC-only and is never replaced",
+  "existing_ARM_control": "completed lake_5km_live_pilot/board_artifacts/estimator_outputs.osh.gz; accelerated layout with spatially canonical order",
+  "new_PC_control": {
+    "unit": "oceansim-hil-lake-pc-canonical5km-20261021.service",
+    "profile": "lake",
+    "deployment_layout": "packed-and-feature-batch",
+    "batch_intensity_jacobians": true,
+    "canonical_correspondences": true,
+    "output": "pc_same_variant_5km",
+    "purpose": "Separate the canonical-order numerical variant itself from residual ARM differences on exactly the completed raw input."
+  },
+  "planned_ARM_control": {
+    "unit": "oceansim-hil-lake-original-order5km-20261021.service",
+    "profile": "lake",
+    "deployment_layout": "packed-and-feature-batch",
+    "batch_intensity_jacobians": true,
+    "canonical_correspondences": false,
+    "purpose": "Preserve original completed KLT order while retaining only the explicit equivalent accelerations; do not tune navigation."
+  },
+  "board_transfer_policy": "Only sensor_events.osh.gz may be copied. No host_reference, live truth, PC estimator positions or fitted trajectories may enter the board control.",
+  "replays_are_not_live_Isaac_or_ROS_realtime_qualification": true,
+  "prior_failed_P95_evidence_retained": true,
+  "navigation_gates_or_sensor_rates_modified": false,
+  "full_route_acceptance": false
+}
