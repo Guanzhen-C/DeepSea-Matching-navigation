@@ -1,0 +1,66 @@
+{
+  "kind": "two_selected_epochs_near_18km_not_full_route_statistics",
+  "samples_scanned": 61700,
+  "epochs": [
+    {
+      "sensor_timestamp_s": 12149.800000000001,
+      "truth_arc_m": 18224.69498992034,
+      "instantaneous_errors_3d_m": {
+        "original_PC": {
+          "dr": 268.7728741807172,
+          "local": 275.32829128658454,
+          "global": 10.948345300837754
+        },
+        "returned_Jetson": {
+          "dr": 240.35347091668075,
+          "local": 242.79951881831565,
+          "global": 10.904223319287933
+        }
+      },
+      "PC_vs_returned_Jetson_position_difference_3d_m": {
+        "dr": 38.25229025224883,
+        "local": 37.803453593807276,
+        "global": 17.37481454525237
+      }
+    },
+    {
+      "sensor_timestamp_s": 12339.800000000001,
+      "truth_arc_m": 18509.6951909573,
+      "instantaneous_errors_3d_m": {
+        "original_PC": {
+          "dr": 282.67504560821806,
+          "local": 291.10518139703356,
+          "global": 6.81593055739858
+        },
+        "returned_Jetson": {
+          "dr": 253.3596775430893,
+          "local": 259.6004313100494,
+          "global": 1.1755156616346836
+        }
+      },
+      "PC_vs_returned_Jetson_position_difference_3d_m": {
+        "dr": 34.44426993486852,
+        "local": 33.83549322893861,
+        "global": 5.645318443019961
+      }
+    }
+  ],
+  "original_PC_reference_retained": true,
+  "truth_sent_to_board": false,
+  "trajectory_alignment": false,
+  "actual_complete_board_log_audit_pending": true,
+  "full_route_acceptance": false,
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/sender/returned_estimator_outputs.osh.gz",
+    "inputs_still_growing": true
+  },
+  "method": "Verify aligned timestamps and uniform 5 Hz throughout the scanned prefix; compute unaligned 3D Euclidean truth errors and inter-estimator position differences at only the two selected epochs. Does not audit the whole source sensor stream or establish full-route statistics.",
+  "conclusions": [
+    "At 18.2247 km the two Global error magnitudes are similar (10.9483/10.9042 m), but the Global positions differ by 17.3748 m. Similar scalar error does not establish trajectory agreement.",
+    "At 18.5097 km the returned Jetson Global error is 1.1755 m versus original PC 6.8159 m; neither this improvement nor recovery erases the earlier discrepancy or proves full-route acceptance.",
+    "DR and Local positions still differ by tens of metres; this read-only observation does not isolate a unique cause or implement a fix."
+  ],
+  "navigation_changed": false,
+  "original_accuracy_review_limit_relative_change": 0.1
+}
