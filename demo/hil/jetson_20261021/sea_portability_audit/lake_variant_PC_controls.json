@@ -1,0 +1,166 @@
+{
+  "kind": "PC_common_truth_position_metrics_only",
+  "samples": 2001,
+  "end_timestamp_s": 400.0,
+  "original_baseline_sha": "204d3e24048a8b515616d9305b7516221bcf8fed",
+  "control_role": "canonical_refined_PC",
+  "metrics": {
+    "original_PC": {
+      "dr": {
+        "rmse_m": 2.772599809972755,
+        "median_m": 2.4951231617794067,
+        "p95_m": 4.548635811980067,
+        "p99_m": 4.678586003059616,
+        "max_m": 4.749393401604814,
+        "final_m": 4.745556500089776
+      },
+      "local": {
+        "rmse_m": 1.4910382495071992,
+        "median_m": 1.6114146968931495,
+        "p95_m": 1.8352210658487265,
+        "p99_m": 1.8739602905558777,
+        "max_m": 1.8875641728561623,
+        "final_m": 1.6065834249595885
+      },
+      "global": {
+        "rmse_m": 1.3655379932367981,
+        "median_m": 1.4067289169098165,
+        "p95_m": 1.7378764431511093,
+        "p99_m": 1.9074229277866386,
+        "max_m": 1.9789372129657528,
+        "final_m": 1.7378764431511093
+      }
+    },
+    "original_ARM": {
+      "dr": {
+        "rmse_m": 2.772599822380028,
+        "median_m": 2.4951231625327837,
+        "p95_m": 4.548635933873591,
+        "p99_m": 4.678586068991626,
+        "max_m": 4.749393456448813,
+        "final_m": 4.745556555304784
+      },
+      "local": {
+        "rmse_m": 1.4935174875598203,
+        "median_m": 1.6188860877448166,
+        "p95_m": 1.8365713618817474,
+        "p99_m": 1.8751314478393786,
+        "max_m": 1.8875400925928827,
+        "final_m": 1.6210676802548014
+      },
+      "global": {
+        "rmse_m": 1.3609765644411804,
+        "median_m": 1.3963657895887114,
+        "p95_m": 1.7331896352705636,
+        "p99_m": 1.8979082663189104,
+        "max_m": 1.968482195065018,
+        "final_m": 1.711109744952559
+      }
+    },
+    "canonical_refined_PC": {
+      "dr": {
+        "rmse_m": 2.772599809972755,
+        "median_m": 2.4951231617794067,
+        "p95_m": 4.548635811980067,
+        "p99_m": 4.678586003059616,
+        "max_m": 4.749393401604814,
+        "final_m": 4.745556500089776
+      },
+      "local": {
+        "rmse_m": 1.4831413764130725,
+        "median_m": 1.5713069178491064,
+        "p95_m": 1.8938676549136215,
+        "p99_m": 1.936792247637546,
+        "max_m": 1.9502244860966802,
+        "final_m": 1.5448565064997495
+      },
+      "global": {
+        "rmse_m": 1.3586280953840302,
+        "median_m": 1.43395617130621,
+        "p95_m": 1.7190168314713075,
+        "p99_m": 1.8581137620481147,
+        "max_m": 1.925367981233402,
+        "final_m": 1.7652108406051923
+      }
+    }
+  },
+  "maximum_position_difference_from_control_m": {
+    "original_PC": {
+      "dr": 0.0,
+      "local": 0.10667259322244153,
+      "global": 0.12488087274897809
+    },
+    "original_ARM": {
+      "dr": 1.9708373307394648e-07,
+      "local": 0.11496973195422344,
+      "global": 0.14066282865685795
+    },
+    "canonical_refined_PC": {
+      "dr": 0.0,
+      "local": 0.0,
+      "global": 0.0
+    }
+  },
+  "relative_RMSE_P95_changes_from_original_PC": {
+    "original_PC": {
+      "dr": {
+        "rmse_m": 0.0,
+        "p95_m": 0.0
+      },
+      "local": {
+        "rmse_m": 0.0,
+        "p95_m": 0.0
+      },
+      "global": {
+        "rmse_m": 0.0,
+        "p95_m": 0.0
+      }
+    },
+    "original_ARM": {
+      "dr": {
+        "rmse_m": 4.474959958145064e-09,
+        "p95_m": 2.679781996306474e-08
+      },
+      "local": {
+        "rmse_m": 0.001662759525746793,
+        "p95_m": 0.0007357675095105431
+      },
+      "global": {
+        "rmse_m": -0.003340389515494535,
+        "p95_m": -0.002696859088582637
+      }
+    },
+    "canonical_refined_PC": {
+      "dr": {
+        "rmse_m": 0.0,
+        "p95_m": 0.0
+      },
+      "local": {
+        "rmse_m": -0.005296224356911461,
+        "p95_m": 0.03195614422493187
+      },
+      "global": {
+        "rmse_m": -0.005060201830334399,
+        "p95_m": -0.010852101571505068
+      }
+    }
+  },
+  "input_files": {
+    "original_PC": {
+      "path": "demo/hil/jetson_20261021/lake_native_600m_v3/host_reference.osh.gz",
+      "sha256": "8162899e8cbec51dc182261fc3af546cd9f22b04a65cd88812560c0276749a76"
+    },
+    "original_ARM": {
+      "path": "demo/hil/jetson_20261021/after_build_qualification_v2/lake_600m_lockstep/board_artifacts/estimator_outputs.osh.gz",
+      "sha256": "046ad7abb92375e87bf9ed8a288a27a47cc3075bbe850be84c097f895115e5be"
+    },
+    "canonical_refined_PC": {
+      "path": "demo/hil/jetson_20261021/sea_portability_audit/lake_pc_canonical_v3_refined/estimator_outputs.osh.gz",
+      "sha256": "d12a8216b283d74a90e935f690c9f9c35e6f4102d288b298ba8ddc0d13caaff5"
+    }
+  },
+  "trajectory_alignment_applied": false,
+  "original_PC_reference_always_retained": true,
+  "candidate_lifecycle_or_realtime_acceptance": false,
+  "full_route_acceptance": false
+}

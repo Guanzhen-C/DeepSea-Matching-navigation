@@ -10,6 +10,7 @@ import argparse
 import ast
 import copy
 import json
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -113,7 +114,10 @@ def main():
     argv = launcher_argv(args.bundle, args.profile, args.output, args.distance_m or 0.)
     (args.output / "capture_manifest.json").write_text(json.dumps(dict(
         source_sha256=digest, profile=args.profile, hooks=transform.hooks, argv=argv,
-        purpose="native sensor capture and parity reference, not network HIL"), indent=2) + "\n")
+        live_Isaac_sensor_delivery=bool(os.environ.get("OCEANSIM_HIL_SOCKET")),
+        purpose=("live Isaac simulated raw-sensor producer with independent frozen PC control; processor-in-loop, not physical sensors"
+                 if os.environ.get("OCEANSIM_HIL_SOCKET") else
+                 "native sensor capture and parity reference, not network HIL")), indent=2) + "\n")
     namespace = dict(__name__="__main__", __file__=str(source), hil_capture=recorder)
     sys.argv = [str(source), *argv]
     try:
