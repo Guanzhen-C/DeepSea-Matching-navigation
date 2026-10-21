@@ -1,0 +1,82 @@
+{
+  "status": "completed_integrity_and_accuracy_review_passed",
+  "profile": "lake",
+  "full_route": false,
+  "live_Isaac": true,
+  "distance_m": 599.9968893961066,
+  "samples": 2001,
+  "original_PC_reference_retained": true,
+  "returned_board_equality": {
+    "samples": 2001,
+    "six_pose_channels_exactly_equal": true,
+    "comparison_to_PC_estimator": false
+  },
+  "input_counts": {
+    "boot": 1,
+    "sonar": 2001,
+    "imu": 20000,
+    "depth": 4000,
+    "dvl": 2000,
+    "finish": 1
+  },
+  "latency_and_duration": {
+    "status": "completed",
+    "mode": "realtime",
+    "simulated_duration_s": 400.0,
+    "wall_sensor_duration_s": 402.19166230900737,
+    "maximum_source_lateness_s": 2.609907395002665,
+    "maximum_in_flight_events": 128,
+    "samples": 2001,
+    "events": {
+      "boot": 1,
+      "sonar": 2001,
+      "imu": 20000,
+      "depth": 4000,
+      "dvl": 2000,
+      "finish": 1
+    },
+    "last_consumed_sequence": 28002,
+    "transport": "ROS2 Humble reliable UDP direct-NIC whitelist",
+    "input_source": "live_Isaac_sensor_stream",
+    "skipped_events": 0,
+    "full_route_test": false,
+    "result_arrival_lateness_s": {
+      "maximum": 4.449806146006438,
+      "p95": 3.1215541279962054,
+      "mean": 1.1477835674408523
+    }
+  },
+  "host_resources": {
+    "kind": "read_only_resource_observation_not_navigation_acceptance",
+    "samples": 12,
+    "stop_reason": "host_participants_terminal_no_task_was_stopped",
+    "units": {
+      "source": "oceansim-hil-lake-realtime-20261021-191738-291334-producer.service",
+      "sender": "oceansim-hil-lake-realtime-20261021-191738-291334-sender.service"
+    },
+    "memory": {
+      "source": {
+        "maximum_observed_current_bytes": 7515648000,
+        "maximum_kernel_lifetime_peak_bytes": 7516192768,
+        "maximum_observed_oom_kills": 0
+      },
+      "sender": {
+        "maximum_observed_current_bytes": 509194240,
+        "maximum_kernel_lifetime_peak_bytes": 510513152,
+        "maximum_observed_oom_kills": 0
+      }
+    },
+    "minimum_observed_host_available_bytes": 16190291968,
+    "earlier_GPU_timeline_not_reconstructed": true,
+    "task_state_modified": false
+  },
+  "terminal_state_snapshot": null,
+  "terminal_snapshot_alone_does_not_prove_collected_transient_unit_exit_code": true,
+  "accuracy_review_limit_relative_change": 0.1,
+  "accuracy_regressions": [],
+  "truth_after_initial_seed_sent_to_board": false,
+  "physical_sensor_trial": false,
+  "controller_closed_loop": false,
+  "hard_realtime": false,
+  "final_acceptance": false
+}
