@@ -145,7 +145,8 @@ def create_filter(bundle, profile, boot):
     return namespace["dead_reckoning"], digest
 
 
-def replay(cache_directory, bundle, output, profile, filter_factory=create_filter):
+def replay(cache_directory, bundle, output, profile, filter_factory=create_filter,
+           experiment_metadata=None):
     cache_directory, output = Path(cache_directory), Path(output)
     manifest = json.loads((cache_directory / "cache_manifest.json").read_text())
     cache = cache_directory / "inertial_events.navdiag.gz"
@@ -224,8 +225,57 @@ def replay(cache_directory, bundle, output, profile, filter_factory=create_filte
                    outputs_sha256=sha256(outputs), elapsed_wall_s=time.monotonic() - started,
                    truth_after_seed_consumed=False, navigation_parameters_changed=False,
                    native_PC_parity_must_be_verified_before_alternate_version=True, full_route_acceptance=False)
+    if experiment_metadata is not None:
+        summary["counterfactual_initialization"] = dict(experiment_metadata)
     write_json(output / "replay_summary.json", summary)
     return summary
+
+
+def initial_rotation_control(cache_directory, bundle, output, profile, pair_path, role):
+    """Diagnostic-only post-initialization rotation replacement, never a fix.
+
+    Both the placebo and ARM-rotation case load the identical bit-preserving
+    pair. No re-projection is performed: it would erase the perturbation being
+    studied. Every other nominal state and covariance is retained verbatim.
+    """
+    if role not in ("pc", "arm"):
+        raise ValueError("unknown rotation control role")
+    pair = json.loads(Path(pair_path).read_text())
+    if pair["source_epoch_s"] != 0.0 or pair["dtype"] != "<f8" or pair["shape"] != [3, 3]:
+        raise ValueError("only controlled epoch-zero float64 rotations are allowed")
+    rotations = {}
+    for name in ("pc", "arm"):
+        raw = bytes.fromhex(pair["matrix_hex"][name])
+        if len(raw) != 72 or hashlib.sha256(raw).hexdigest() != pair["matrix_sha256"][name]:
+            raise ValueError("rotation pair checksum/extent mismatch")
+        rotation = np.frombuffer(raw, dtype="<f8").reshape(3, 3).copy()
+        if (not np.isfinite(rotation).all()
+                or np.linalg.norm(rotation.T @ rotation - np.eye(3)) > 1e-12
+                or abs(np.linalg.det(rotation) - 1.0) > 1e-12):
+            raise ValueError("invalid diagnostic rotation")
+        rotations[name] = rotation
+    pair_delta = float(np.max(np.abs(rotations["pc"] - rotations["arm"])))
+    if pair_delta > 1e-12:
+        raise ValueError("this control is restricted to numerical initial-rotation microdifferences")
+    metadata = dict(role=role, source_epoch_s=0.0, pair_sha256=sha256(pair_path),
+                    pair_maximum_component_difference=pair_delta,
+                    diagnostic_only_not_a_production_candidate=True,
+                    formal_initialization_unchanged=True)
+
+    def factory(bundle_arg, profile_arg, boot):
+        dr, digest = create_filter(bundle_arg, profile_arg, boot)
+        keys = ("position", "velocity", "gyro_bias", "accel_bias", "covariance")
+        before = {key: getattr(dr.state, key).copy() for key in keys}
+        metadata["actual_rotation_delta_from_original_PC_initialization"] = float(
+            np.max(np.abs(dr.state.rotation - rotations[role])))
+        dr.state.rotation = rotations[role].copy()
+        if not all(np.array_equal(before[key], getattr(dr.state, key)) for key in keys):
+            raise AssertionError("non-rotation state changed")
+        metadata["other_nominal_states_and_covariance_unchanged"] = True
+        return dr, digest
+
+    return replay(cache_directory, bundle, output, profile, filter_factory=factory,
+                  experiment_metadata=metadata)
 
 
 def compare(reference, outputs, cutoff_s):
@@ -269,6 +319,13 @@ def main():
     replay_parser.add_argument("--bundle", type=Path, required=True)
     replay_parser.add_argument("--output", type=Path, required=True)
     replay_parser.add_argument("--profile", choices=BASELINES, required=True)
+    rotation_parser = commands.add_parser("initial-rotation-control")
+    rotation_parser.add_argument("--cache", type=Path, required=True)
+    rotation_parser.add_argument("--bundle", type=Path, required=True)
+    rotation_parser.add_argument("--output", type=Path, required=True)
+    rotation_parser.add_argument("--profile", choices=BASELINES, required=True)
+    rotation_parser.add_argument("--rotation-pair", type=Path, required=True)
+    rotation_parser.add_argument("--role", choices=("pc", "arm"), required=True)
     compare_parser = commands.add_parser("compare")
     compare_parser.add_argument("--reference", type=Path, required=True)
     compare_parser.add_argument("--outputs", type=Path, required=True)
@@ -280,6 +337,9 @@ def main():
         result = prepare(args.events, args.output, args.profile, args.cutoff_s)
     elif args.command == "replay":
         result = replay(args.cache, args.bundle, args.output, args.profile)
+    elif args.command == "initial-rotation-control":
+        result = initial_rotation_control(args.cache, args.bundle, args.output, args.profile,
+                                          args.rotation_pair, args.role)
     else:
         result = compare(args.reference, args.outputs, args.cutoff_s)
         write_json(args.report, result)

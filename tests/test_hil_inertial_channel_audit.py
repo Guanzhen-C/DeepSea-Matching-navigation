@@ -1,5 +1,6 @@
 import ast
 import gzip
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -8,7 +9,7 @@ import pytest
 
 from standalone.audit_hil_inertial_channel import (
     BOOT, BASELINES, compare, create_filter, initialization_nodes,
-    prepare, read_packets, replay, write_record,
+    initial_rotation_control, prepare, read_packets, replay, write_record,
 )
 from standalone.hil.protocol import EventOrder, PAYLOAD_KEYS
 
@@ -145,3 +146,43 @@ def test_unknown_frozen_source_is_rejected_before_import(tmp_path):
         profile="lake", source_commit=BASELINES["lake"][0], files={})))
     with pytest.raises(ValueError, match="unrecognized baseline"):
         create_filter(tmp_path, "lake", {})
+
+
+def rotation_pair(tmp_path):
+    matrices = {"pc": np.eye(3), "arm": np.eye(3)}
+    matrices["arm"][2, 1] = 1e-19
+    value = dict(source_epoch_s=0., dtype="<f8", shape=[3, 3],
+                 matrix_hex={k: r.astype("<f8").tobytes().hex() for k, r in matrices.items()},
+                 matrix_sha256={k: hashlib.sha256(r.astype("<f8").tobytes()).hexdigest()
+                                for k, r in matrices.items()})
+    path = tmp_path / "rotation_pair.json"
+    path.write_text(json.dumps(value))
+    return path
+
+
+def test_counterfactual_is_explicit_and_retains_other_initial_state(tmp_path, monkeypatch):
+    cache, _ = cached(tmp_path)
+    monkeypatch.setattr("standalone.audit_hil_inertial_channel.create_filter",
+                        lambda b, p, boot: (FakeDR(boot["payload"]["initial"]), "test"))
+    result = initial_rotation_control(cache, tmp_path, tmp_path / "out", "lake",
+                                      rotation_pair(tmp_path), "arm")
+    assert result["counterfactual_initialization"]["role"] == "arm"
+    assert result["counterfactual_initialization"]["other_nominal_states_and_covariance_unchanged"]
+    assert result["counterfactual_initialization"]["actual_rotation_delta_from_original_PC_initialization"] == 1e-19
+    first = next(read_packets(tmp_path / "out/dr_outputs.osh.gz"))
+    assert first["dr_rotation"][2, 1] == 1e-19
+    assert not result["full_route_acceptance"]
+
+
+def test_counterfactual_rejects_nonzero_epoch_and_corrupt_pair(tmp_path):
+    pair = rotation_pair(tmp_path)
+    value = json.loads(pair.read_text())
+    value["source_epoch_s"] = 1.
+    pair.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="epoch-zero"):
+        initial_rotation_control(tmp_path, tmp_path, tmp_path / "out", "lake", pair, "pc")
+    value["source_epoch_s"] = 0.
+    value["matrix_sha256"]["arm"] = "bad"
+    pair.write_text(json.dumps(value))
+    with pytest.raises(ValueError, match="checksum"):
+        initial_rotation_control(tmp_path, tmp_path, tmp_path / "out", "lake", pair, "pc")

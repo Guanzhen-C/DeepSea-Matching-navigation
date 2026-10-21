@@ -1,0 +1,28 @@
+{
+  "kind": "host_only_initial_rotation_sensitivity_not_navigation_fix",
+  "cache": "demo/hil/jetson_20261021/inertial_channel_control_20261022/cache",
+  "cutoff_s": 6666.6,
+  "expected_samples": 33334,
+  "rotation_pair": "initial_rotation_pair.json",
+  "only_counterfactual_state_field": "post-initialization rotation matrix",
+  "other_nominal_states_covariance_and_filter_configuration": "unchanged",
+  "phases": [
+    "PC post-projection rotation replacement placebo",
+    "require 33334-sample position/rotation exact-zero parity with original native PC before proceeding",
+    "ARM network-returned epoch-zero rotation replacement, using the identical bit-preserving pair",
+    "compare against qualified placebo and network-returned ARM DR; report sensitivity, not a proven unique root"
+  ],
+  "formal_initialization_changed": false,
+  "formal_navigation_changed": false,
+  "additional_Jetson_tasks": false,
+  "GPU_visible_to_diagnostic": false,
+  "resource_policy": {
+    "memory_max_bytes": 1073741824,
+    "Nice": 19,
+    "single_thread_environment": true,
+    "CPUQuota_request": "50%",
+    "CPU_quota_effective": false
+  },
+  "status_at_creation": "planned_not_launched",
+  "full_route_acceptance": false
+}
