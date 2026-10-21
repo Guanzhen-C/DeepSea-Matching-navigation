@@ -1,0 +1,40 @@
+{
+  "kind": "read_only_point_in_time_background_runtime_check",
+  "observation_local_date": "2026-10-21",
+  "timezone": "Asia/Shanghai",
+  "host": {
+    "loginctl_user_state": "active",
+    "loginctl_linger": "yes",
+    "gnome_sleep_inactive_ac_type": "nothing",
+    "gnome_sleep_inactive_ac_timeout_s": 3600
+  },
+  "jetson": {
+    "loginctl_user_state": "active",
+    "loginctl_linger": "yes",
+    "gnome_sleep_inactive_ac_type": "nothing",
+    "gnome_sleep_inactive_ac_timeout_s": 3600,
+    "task_storage_directory": "/media/cgz/data/oceansim_hil_20261021",
+    "task_filesystem": "/dev/nvme0n1p1",
+    "df_h_available_literal_rounded": "25G",
+    "tegrastats_sample_local_time": "2026-10-21 21:13:00",
+    "tegrastats_RAM_used_MB": 4827,
+    "tegrastats_RAM_total_MB": 30697,
+    "tegrastats_SWAP_used_MB": 0,
+    "tegrastats_cpu_temperature_C": 53.656
+  },
+  "coordinator_unit": "oceansim-hil-full-missions-sequence-20261021.service",
+  "active_estimator_at_observation": "oceansim-hil-lake-realtime-20261021-203434-978521.service",
+  "commands_used": [
+    "loginctl show-user cgz -p Linger -p State",
+    "gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type",
+    "gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout",
+    "systemd-inhibit --list --no-pager (host only)",
+    "df -h /media/cgz/data/oceansim_hil_20261021 (Jetson)",
+    "tail -1 existing receiver tegrastats.log (Jetson)"
+  ],
+  "interpretation": "Existing user-service persistence and GNOME AC idle-action settings did not require a change. The timeout does not imply suspension when the configured action is nothing. This snapshot does not guarantee power, networking or future configuration stability.",
+  "settings_modified": false,
+  "processes_stopped_or_restarted": false,
+  "navigation_or_sensor_parameters_modified": false,
+  "full_route_acceptance": false
+}
