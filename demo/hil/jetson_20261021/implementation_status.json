@@ -1,0 +1,64 @@
+{
+  "updated_at": "2026-10-21T16:26:00+08:00",
+  "scope": "湖底和海底冻结算法的完整前后端 Jetson AGX Orin 传感器注入硬件在环，非实船试验、非控制器闭环",
+  "complete": false,
+  "network": {
+    "host_direct_address": "192.168.77.1/24",
+    "jetson_direct_address": "192.168.77.2/24",
+    "existing_internet_routes_preserved": true,
+    "ROS_DOMAIN_ID": 177,
+    "direct_interface_whitelist": true,
+    "host_firewall": "仅允许来自 192.168.77.2、到新网卡 192.168.77.1 的 UDP 51650:51699；未关闭防火墙",
+    "verified_ros_packets": 30,
+    "payload_bytes_per_packet": 1500000,
+    "mean_round_trip_s": 0.03027198716881685,
+    "evidence": "dds_link_pc_v3.json"
+  },
+  "board_environment": {
+    "architecture": "aarch64",
+    "L4T": "36.4.7",
+    "python": "3.10.12",
+    "CUDA": "12.6",
+    "workspace": "/media/cgz/data/oceansim_hil_20261021",
+    "existing_system_python_unmodified": true,
+    "torch": "2.5.0a0+872d972e41.nv24.08",
+    "cuda_float64_solve_and_svd": "passed",
+    "feature_CPU_CUDA_consensus_parity": "1 passed on the Jetson",
+    "original_native_BBS3D": "8 tests passed on the Jetson; native synthetic recovery test executed, not skipped",
+    "GTSAM": "4.3a2 C++ and unstable libraries compiled; Python bindings still compiling at this checkpoint",
+    "GTSAM_build_user_unit": "oceansim-hil-build-gtsam-20261021.service",
+    "GTSAM_memory_max_GiB": 12,
+    "GTSAM_swap_max_bytes": 0
+  },
+  "lake": {
+    "frozen_algorithm_commit": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "native_reference_capture": "lake_native_600m_v3",
+    "distance_m": 600,
+    "sonar_samples": 2001,
+    "imu_samples": 20000,
+    "dvl_samples": 2000,
+    "depth_samples": 4000,
+    "same_PC_full_engine_native_parity": "passed; all 2001 DR/Local/Global position and rotation samples identical",
+    "parity_report": "lake_pc_parity_600m/native_parity_report.json",
+    "board_full_estimator_validation": "pending GTSAM Python bindings",
+    "full_route_HIL": "not started"
+  },
+  "sea": {
+    "frozen_algorithm_commit": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "native_reference_capture": "sea_native_600m",
+    "capture_status": "running at this checkpoint; inspect unit and final recording_summary.json before any restart",
+    "native_capture_unit": "oceansim-hil-native-sea-600m-20261021.service",
+    "start_distance_m": 30000,
+    "board_full_estimator_validation": "not started",
+    "full_route_HIL": "not started"
+  },
+  "remaining": [
+    "完成并测试 GTSAM 固定滞后原生 Python 接口",
+    "海底原生参考采集及同机逐样本一致性核对",
+    "Jetson 完整前后端 600 米锁步与 1 倍速传感器注入",
+    "5 公里和关键转弯段检查，评估精度及事件积压",
+    "完成实时主机传感器生成与板端输出接入，不能只以窗口 PF 回放冒充完整迁移",
+    "湖底 47.116 公里和海底 73.070 公里完整测试，记录全部数据并绘图、出具报告"
+  ],
+  "known_limit": "原湖底末段的共享 DR/Local 运动异常尚未修复；此次部署不修改冻结算法或掩盖旧问题。"
+}

@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 import numpy as np
 import pytest
@@ -154,6 +155,9 @@ def test_pinned_native_bbs3d_recovers_a_synthetic_planar_candidate_when_built():
         / "build"
         / "liboceansim_bbs3d.so"
     )
+    if os.environ.get("OCEANSIM_BBS3D_LIBRARY"):
+        library = Path(os.environ["OCEANSIM_BBS3D_LIBRARY"])
+        assert library.is_file(), "explicit native 3D-BBS library is missing"
     if not library.is_file():
         pytest.skip("optional 3D-BBS bridge has not been built")
 
