@@ -64,11 +64,13 @@ def accuracy_regressions(measured):
             for metric, change in values.items() if not np.isfinite(change) or change > .10]
 
 
-def verify_declaration(manifest, receiver, extraction, *, full, native):
+def verify_declaration(manifest, receiver, extraction, *, full, native, canonical=True):
     profile = manifest["profile"]
     if (not manifest["live_Isaac"] or not manifest["source_truth_is_host_only"]
             or manifest["deployment_layout"] != "packed-and-feature-batch"
-            or not manifest["batch_intensity_jacobians"] or not manifest["canonical_correspondences"]):
+            or not manifest["batch_intensity_jacobians"]
+            or type(manifest["canonical_correspondences"]) is not bool
+            or manifest["canonical_correspondences"] != canonical):
         raise ValueError("not the explicitly qualified live deployment variant")
     if receiver["input_truth_after_seed"]:
         raise ValueError("ongoing truth must not enter board navigation")
@@ -77,16 +79,22 @@ def verify_declaration(manifest, receiver, extraction, *, full, native):
             raise ValueError("board declaration differs from launch manifest")
     if extraction["profile"] != profile or extraction["baseline_sha"] != BASELINES[profile][0]:
         raise ValueError("wrong board frozen baseline")
+    installed = extraction.get("numerical_portability_variant")
+    if canonical:
+        if not isinstance(installed, dict) or installed.get("name") != "spatially_canonical_completed_KLT_correspondence_order":
+            raise ValueError("canonical-order declaration lacks actual extraction evidence")
+    elif installed is not None:
+        raise ValueError("original-order declaration conflicts with an installed numerical variant")
     if full and (not native["full_map_completed"] or native["requested_survey_segment_distance_m"] != 0.):
         raise ValueError("segment completion cannot replace a full requested route")
 
 
-def launch_command(profile, bundle, output, *, distance_m=None):
+def launch_command(profile, bundle, output, *, distance_m=None, canonical=True):
     return [sys.executable, "-m", "standalone.hil.launch_validation", "--profile", profile,
             "--mode", "realtime", "--live-bundle", str(bundle),
             *(["--full-route"] if distance_m is None else ["--distance-m", str(distance_m)]),
             "--deployment-layout", "packed-and-feature-batch", "--batch-intensity-jacobians",
-            "--canonical-correspondences", "--output", str(output)]
+            *(["--canonical-correspondences"] if canonical else []), "--output", str(output)]
 
 
 def verify_qualified_implementation(manifest, root=ROOT):
@@ -133,7 +141,7 @@ def wait_existing(directory, timeout_s, save):
         time.sleep(10.)
 
 
-def finalize(directory, output, terrain, *, full=False, terminal_states=None):
+def finalize(directory, output, terrain, *, full=False, terminal_states=None, canonical=True):
     """Only completed files; no process state changes or navigation changes."""
     output.mkdir()
     manifest = json.loads((directory / "launch_manifest.json").read_text())
@@ -148,7 +156,7 @@ def finalize(directory, output, terrain, *, full=False, terminal_states=None):
     native = json.loads((run["source"] / "native_metrics.json").read_text())
     receiver = json.loads((artifacts / "receiver_summary.json").read_text())
     extraction = json.loads((artifacts / "extraction_audit.json").read_text())
-    verify_declaration(manifest, receiver, extraction, full=full, native=native)
+    verify_declaration(manifest, receiver, extraction, full=full, native=native, canonical=canonical)
     returned = check_returned_poses(artifacts / "estimator_outputs.osh.gz", run["outputs"])
     if returned["samples"] != len(run["timestamps"]):
         raise ValueError("board output count differs from completed input trajectory")
@@ -168,6 +176,7 @@ def finalize(directory, output, terrain, *, full=False, terminal_states=None):
         profile=manifest["profile"], full_route=run["full_route"],
         live_Isaac=True, distance_m=float(run["distance"][-1]), samples=len(run["timestamps"]),
         original_PC_reference_retained=True, returned_board_equality=returned,
+        canonical_correspondences=canonical,
         input_counts=receiver["events"], latency_and_duration=run["sender"],
         host_resources=resource, terminal_state_snapshot=terminal_states,
         terminal_snapshot_alone_does_not_prove_collected_transient_unit_exit_code=True,
@@ -191,6 +200,10 @@ def main():
     p.add_argument("--lake-bundle", type=Path, default=ROOT / "downloads/hil_bundles/lake-v2")
     p.add_argument("--sea-bundle", type=Path, default=ROOT / "downloads/hil_bundles/sea-v2")
     p.add_argument("--output", type=Path, required=True, help="fresh pipeline directory")
+    p.add_argument("--lake-correspondence-order", choices=("original", "spatial-canonical"),
+                   default="spatial-canonical", help="explicit mode; matching live short/5km evidence remains required")
+    p.add_argument("--sea-correspondence-order", choices=("original", "spatial-canonical"),
+                   default="spatial-canonical")
     p.add_argument("--run-full-missions", action="store_true", help="explicitly authorize the two sequential full runs")
     args = p.parse_args()
     for name in ("pilot", "lake_short", "lake_bundle", "sea_bundle", "output"):
@@ -201,11 +214,14 @@ def main():
     if pilot_manifest["profile"] != "sea" or not pilot_manifest["live_Isaac"]:
         p.error("existing sea live pilot required")
     verify_qualified_implementation(pilot_manifest)
+    canonical_by_profile = {profile: getattr(args, profile + "_correspondence_order") == "spatial-canonical"
+                            for profile in ("lake", "sea")}
     args.output.mkdir(parents=True)
     status = dict(status="observing_existing_sea_pilot", pilot=str(args.pilot), stages=[],
         full_missions_explicitly_requested=args.run_full_missions,
         implementation_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         coordinator_source_sha256=file_sha256(Path(__file__).resolve()), final_acceptance=False)
+    status["canonical_correspondences_by_profile"] = canonical_by_profile
 
     def save(states=None):
         status["updated_utc"] = datetime.now(timezone.utc).isoformat()
@@ -220,7 +236,8 @@ def main():
         states = wait_existing(args.pilot, 3.*3600., save)
         status["status"] = "reviewing_completed_sea_pilot"
         save()
-        evidence = finalize(args.pilot, args.output / "pilot_review", args.sea_bundle / "map", terminal_states=states)
+        evidence = finalize(args.pilot, args.output / "pilot_review", args.sea_bundle / "map", terminal_states=states,
+                            canonical=canonical_by_profile["sea"])
         if not 4990. <= evidence["distance_m"] <= 5010. or evidence["full_route"]:
             raise ValueError("the pilot must be a completed 5 km segment, not a different scope")
         status["stages"].append(dict(name="sea_5km_live_pilot", evidence=evidence))
@@ -228,7 +245,8 @@ def main():
         save()
         # Reuse completed short evidence; this never launches a second pilot.
         lake_states = wait_existing(args.lake_short, 60., save)
-        evidence = finalize(args.lake_short, args.output / "lake_short_review", args.lake_bundle / "map", terminal_states=lake_states)
+        evidence = finalize(args.lake_short, args.output / "lake_short_review", args.lake_bundle / "map", terminal_states=lake_states,
+                            canonical=canonical_by_profile["lake"])
         status["stages"].append(dict(name="lake_600m_live_pilot", evidence=evidence))
         save()
         if args.run_full_missions:
@@ -242,7 +260,8 @@ def main():
                 name = profile + ("_full_route_live" if full else "_5km_live_pilot")
                 directory = args.output / name
                 status["status"] = "admitting_" + name
-                command = launch_command(profile, bundle, directory, distance_m=distance_m)
+                command = launch_command(profile, bundle, directory, distance_m=distance_m,
+                                         canonical=canonical_by_profile[profile])
                 status["next_launch_argv"] = command
                 save()
                 verify_qualified_implementation(pilot_manifest)
@@ -255,7 +274,8 @@ def main():
                 states = wait_existing(directory, (24. if full else 3.)*3600., save)
                 status["status"] = "reviewing_" + name
                 save()
-                evidence = finalize(directory, args.output / (name + "_review"), bundle / "map", full=full, terminal_states=states)
+                evidence = finalize(directory, args.output / (name + "_review"), bundle / "map", full=full, terminal_states=states,
+                                    canonical=canonical_by_profile[profile])
                 if not full and not 4990. <= evidence["distance_m"] <= 5010.:
                     raise ValueError("lake pilot did not complete its requested 5 km")
                 status["stages"].append(dict(name=name, evidence=evidence))

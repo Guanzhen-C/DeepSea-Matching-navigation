@@ -58,7 +58,8 @@ def declarations():
         canonical_correspondences=True)
     receiver = dict(input_truth_after_seed=False, deployment_layout="packed-and-feature-batch",
         batch_intensity_jacobians=True, canonical_correspondences=True)
-    extraction = dict(profile="sea", baseline_sha=BASELINES["sea"][0])
+    extraction = dict(profile="sea", baseline_sha=BASELINES["sea"][0], numerical_portability_variant=dict(
+        name="spatially_canonical_completed_KLT_correspondence_order"))
     native = dict(full_map_completed=True, requested_survey_segment_distance_m=0.)
     return manifest, receiver, extraction, native
 
@@ -104,6 +105,32 @@ def test_lake_pilot_remains_explicitly_separate_from_full_mission():
     assert command[command.index("--distance-m") + 1] == "5000.0"
 
 
+def test_original_order_requires_explicit_plan_and_actual_matching_audit():
+    manifest, receiver, extraction, native = declarations()
+    manifest["canonical_correspondences"] = False
+    receiver["canonical_correspondences"] = False
+    extraction.pop("numerical_portability_variant")
+    with pytest.raises(ValueError, match="qualified"):
+        pipeline.verify_declaration(manifest, receiver, extraction, full=True, native=native)
+    pipeline.verify_declaration(manifest, receiver, extraction, full=True, native=native, canonical=False)
+    extraction["numerical_portability_variant"] = dict(name="unexpected_patch")
+    with pytest.raises(ValueError, match="conflicts"):
+        pipeline.verify_declaration(manifest, receiver, extraction, full=True, native=native, canonical=False)
+
+
+def test_canonical_manifest_cannot_replace_actual_installation_evidence():
+    manifest, receiver, extraction, native = declarations()
+    extraction.pop("numerical_portability_variant")
+    with pytest.raises(ValueError, match="extraction evidence"):
+        pipeline.verify_declaration(manifest, receiver, extraction, full=True, native=native)
+
+
+def test_original_order_launch_does_not_change_other_sensor_or_navigation_flags():
+    default = pipeline.launch_command("lake", Path("bundle"), Path("output"))
+    original = pipeline.launch_command("lake", Path("bundle"), Path("output"), canonical=False)
+    assert original == [arg for arg in default if arg != "--canonical-correspondences"]
+
+
 def test_qualified_code_cannot_be_changed_between_pilot_and_full_mission(tmp_path):
     source = tmp_path / "qualified.py"
     source.write_text("qualified implementation\n")
@@ -147,7 +174,8 @@ def test_failed_participant_stops_queue_not_existing_jobs(tmp_path, monkeypatch)
 
 
 @pytest.mark.parametrize("failure", [None, "pilot", "lake_full"])
-def test_finite_pipeline_orders_stages_and_never_launches_after_failure(tmp_path, monkeypatch, failure):
+@pytest.mark.parametrize("lake_order", ["original", "spatial-canonical"])
+def test_finite_pipeline_orders_stages_and_never_launches_after_failure(tmp_path, monkeypatch, failure, lake_order):
     pilot, output = tmp_path / "existing_pilot", tmp_path / "pipeline"
     pilot.mkdir()
     (pilot / "launch_manifest.json").write_text(json.dumps(dict(profile="sea", live_Isaac=True)))
@@ -157,7 +185,11 @@ def test_finite_pipeline_orders_stages_and_never_launches_after_failure(tmp_path
     monkeypatch.setattr(pipeline.subprocess, "check_output", lambda *args, **kwargs: "synthetic-unit-test-commit\n")
     monkeypatch.setattr(pipeline.subprocess, "run", lambda command, **kwargs: launched.append(command))
 
-    def finish(directory, review, terrain, *, full=False, terminal_states=None):
+    def finish(directory, review, terrain, *, full=False, terminal_states=None, canonical=True):
+        if directory == pilot:
+            assert canonical is True
+        else:
+            assert canonical == (lake_order == "spatial-canonical" or directory.name == "sea_full_route_live")
         if ((failure == "pilot" and directory == pilot)
                 or (failure == "lake_full" and directory.name == "lake_full_route_live")):
             raise RuntimeError("synthetic review failure; never modify navigation thresholds")
@@ -165,7 +197,8 @@ def test_finite_pipeline_orders_stages_and_never_launches_after_failure(tmp_path
 
     monkeypatch.setattr(pipeline, "finalize", finish)
     monkeypatch.setattr(pipeline.sys, "argv", ["pipeline", "--pilot", str(pilot),
-        "--output", str(output), "--lake-short", str(tmp_path / "existing_lake_short"), "--run-full-missions"])
+        "--output", str(output), "--lake-short", str(tmp_path / "existing_lake_short"),
+        "--lake-correspondence-order", lake_order, "--run-full-missions"])
     if failure:
         with pytest.raises(RuntimeError, match="synthetic review failure"):
             pipeline.main()
@@ -177,6 +210,9 @@ def test_finite_pipeline_orders_stages_and_never_launches_after_failure(tmp_path
     if not failure:
         assert "--distance-m" in launched[0]
         assert "--full-route" in launched[1] and "--full-route" in launched[2]
+        assert ("--canonical-correspondences" in launched[0]) == (lake_order == "spatial-canonical")
+        assert ("--canonical-correspondences" in launched[1]) == (lake_order == "spatial-canonical")
+        assert "--canonical-correspondences" in launched[2]
         assert report["status"] == "both_full_missions_completed_pending_final_review"
         assert not report["final_acceptance"]
     else:
