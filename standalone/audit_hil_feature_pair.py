@@ -85,6 +85,8 @@ def main():
     p.add_argument("--events", type=Path)
     p.add_argument("--timestamp", type=float, default=3.6)
     p.add_argument("--pair-directory", type=Path)
+    p.add_argument("--forced-order-result", type=Path,
+                   help="isolated diagnostic only: reuse KLT ordering from an evaluated identical pair")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     if args.output.exists():
@@ -129,10 +131,21 @@ def main():
         metadata, (previous, current), prediction, body = load_pair(args.pair_directory, _FeatureFrame)
         feature = FeatureSonarOdometry(FeatureSonarOdometryConfig(**metadata["config"]),
                                       sensor_rotation_body=body[:3, :3], sensor_translation_body=body[:3, 3])
+        forced = None
+        if args.forced_order_result:
+            saved = json.loads(args.forced_order_result.read_text())
+            if saved["input_sha256"] != metadata["input_sha256"]:
+                raise ValueError("forced order belongs to another pair")
+            forced = [tuple(int(i) for i in pair) for pair in saved["klt_pairs"]]
+            natural = feature._klt_pairs(previous, current, prediction)
+            if len(forced) != len(natural) or set(forced) != set(natural):
+                raise ValueError("forced order may only permute the SAME correspondence set")
+            feature._klt_pairs = lambda *values: list(forced)
         result = feature._estimate_pair(previous, current, prediction)
         pairs = feature._klt_pairs(previous, current, prediction) if prediction is not None else []
         write_result(args.output / "evaluated_result.json", result, feature,
                      input_sha256=metadata["input_sha256"], klt_pairs=pairs,
+                     forced_correspondence_order_diagnostic=forced is not None,
                      kind="identical_pair_portability_diagnostic")
 
 

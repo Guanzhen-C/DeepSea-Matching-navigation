@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from oceansim.slam.intensity_map import AcousticIntensityMap
-from standalone.hil_intensity_packing import build_packed_query
+from standalone.hil_intensity_packing import build_packed_query, install_layout
 
 
 @pytest.mark.parametrize("heading", [None, 0., .4])
@@ -50,3 +50,29 @@ def test_layout_candidate_refuses_unknown_algorithm_source():
         return points
     with pytest.raises(ValueError, match="unrecognized"):
         build_packed_query(different_method)
+
+
+def test_original_layout_never_changes_algorithm_methods():
+    original = AcousticIntensityMap.query_fixed_anchor_batch
+    audit = {}
+    install_layout(audit, "original")
+    assert AcousticIntensityMap.query_fixed_anchor_batch is original
+    assert audit == {}
+    with pytest.raises(ValueError, match="unknown"):
+        install_layout(audit, "silent-best")
+    assert AcousticIntensityMap.query_fixed_anchor_batch is original
+
+
+def test_explicit_combined_layout_is_audited_and_validates_both_sources(monkeypatch):
+    from oceansim.slam.feature_sonar_odometry import FeatureSonarOdometry
+    original_query = AcousticIntensityMap.query_fixed_anchor_batch
+    original_frame = FeatureSonarOdometry._canonical_frame
+    # Register restoration even though the installer, not monkeypatch, assigns.
+    monkeypatch.setattr(AcousticIntensityMap, "query_fixed_anchor_batch", original_query)
+    monkeypatch.setattr(FeatureSonarOdometry, "_canonical_frame", original_frame)
+    audit = {}
+    install_layout(audit, "packed-and-feature-batch")
+    assert AcousticIntensityMap.query_fixed_anchor_batch is not original_query
+    assert FeatureSonarOdometry._canonical_frame is not original_frame
+    assert audit["deployment_candidate"]["layout"] == "packed-and-feature-batch"
+    assert not audit["deployment_candidate"]["altered_plane_fit_or_thresholds"]

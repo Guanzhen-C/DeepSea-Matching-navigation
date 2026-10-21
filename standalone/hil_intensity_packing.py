@@ -17,6 +17,7 @@ import textwrap
 import numpy as np
 
 EXPECTED_METHOD_SHA256 = "324a8f2c942152e562db815c2a0dcf557cb2d919aad1a6cf1c5b274e1e4d35b4"
+DEPLOYMENT_LAYOUTS = ("original", "packed", "packed-and-feature-batch")
 
 
 def _pack_fixed_anchor(points, finite_indices, entries_by_base, base_inverse,
@@ -84,8 +85,33 @@ _hil_pack_fixed_anchor(points, finite_indices, entries_by_base, base_inverse,
     return candidate
 
 
+def install_layout(audit, layout):
+    """Install only when explicitly requested, AFTER frozen initialization."""
+    if layout not in DEPLOYMENT_LAYOUTS:
+        raise ValueError("unknown deployment layout")
+    if layout == "original":
+        return
+    from oceansim.slam.intensity_map import AcousticIntensityMap
+    original = AcousticIntensityMap.query_fixed_anchor_batch
+    candidate = build_packed_query(original)
+    canonical = None
+    if layout == "packed-and-feature-batch":
+        from standalone.hil_feature_batching import build_batched_canonical
+        from oceansim.slam.feature_sonar_odometry import FeatureSonarOdometry
+        # Validate BOTH sources before changing either class method.
+        canonical = build_batched_canonical(FeatureSonarOdometry._canonical_frame)
+    AcousticIntensityMap.query_fixed_anchor_batch = candidate
+    audit["deployment_candidate"] = dict(name="layout_only_intensity_packing", layout=layout,
+        frozen_method_sha256=candidate.frozen_method_sha256,
+        altered_plane_fit_or_thresholds=False, paired_full_engine_validation_required=True)
+    if canonical is not None:
+        FeatureSonarOdometry._canonical_frame = canonical
+        audit["deployment_candidate"].update(name="layout_packing_and_descriptor_reductions",
+            descriptor_method_sha256=canonical.frozen_method_sha256)
+
+
 def main():
-    """Explicitly labelled experimental replay/profile, never the ROS receiver."""
+    """Explicitly labelled experimental replay/profile entry point."""
     import argparse
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
     parser.add_argument("action", choices=("replay", "profile"))
@@ -100,19 +126,7 @@ def main():
 
     def experimental_initialize(*values, **kwargs):
         engine, audit = original_initialize(*values, **kwargs)
-        from oceansim.slam.intensity_map import AcousticIntensityMap
-        candidate = build_packed_query(AcousticIntensityMap.query_fixed_anchor_batch)
-        AcousticIntensityMap.query_fixed_anchor_batch = candidate
-        audit["deployment_candidate"] = dict(name="layout_only_intensity_packing",
-            frozen_method_sha256=candidate.frozen_method_sha256,
-            altered_plane_fit_or_thresholds=False, paired_full_engine_validation_required=True)
-        if args.batch_feature_descriptors:
-            from standalone.hil_feature_batching import build_batched_canonical
-            from oceansim.slam.feature_sonar_odometry import FeatureSonarOdometry
-            canonical = build_batched_canonical(FeatureSonarOdometry._canonical_frame)
-            FeatureSonarOdometry._canonical_frame = canonical
-            audit["deployment_candidate"].update(name="layout_packing_and_descriptor_reductions",
-                descriptor_method_sha256=canonical.frozen_method_sha256)
+        install_layout(audit, "packed-and-feature-batch" if args.batch_feature_descriptors else "packed")
         return engine, audit
 
     runner.initialize = experimental_initialize
