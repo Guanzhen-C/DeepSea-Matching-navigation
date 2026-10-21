@@ -33,6 +33,8 @@ def main():
     p.add_argument("--mode", choices=("lockstep", "realtime"), required=True)
     p.add_argument("--deployment-layout", choices=("original", "packed", "packed-and-feature-batch"),
                    default="original")
+    p.add_argument("--batch-intensity-jacobians", action="store_true")
+    p.add_argument("--canonical-correspondences", action="store_true")
     input_mode = p.add_mutually_exclusive_group(required=True)
     input_mode.add_argument("--recording", type=Path, help="completed native capture directory")
     input_mode.add_argument("--live-bundle", type=Path, help="live Isaac source, original frozen bundle on the PC")
@@ -78,7 +80,9 @@ def main():
         p.error("another board HIL/build unit is running; it was not stopped:\n" + running)
     # Verify the exact Python environment and real native backends before launch.
     code_files = [f for f in (ROOT / "standalone/hil").glob("*") if f.is_file()]
-    code_files += [ROOT / "standalone/hil_intensity_packing.py", ROOT / "standalone/hil_feature_batching.py"]
+    code_files += [ROOT / ("standalone/" + name) for name in (
+        "hil_intensity_packing.py", "hil_feature_batching.py",
+        "hil_intensity_linearization.py", "hil_stable_correspondences.py")]
     code_sha256 = {str(f.relative_to(ROOT)): hashlib.sha256(f.read_bytes()).hexdigest()
                   for f in sorted(code_files)}
     code_check = remote([REMOTE + "/venv/bin/python", "-c",
@@ -104,6 +108,10 @@ def main():
              REMOTE + "/code/standalone/hil/run_ros.sh", "--side", "jetson", "--role", "receiver",
              "--profile", args.profile, "--bundle", REMOTE + "/bundles/" + args.profile,
              "--output", board_output, "--deployment-layout", args.deployment_layout]
+    if args.batch_intensity_jacobians:
+        board += ["--batch-intensity-jacobians"]
+    if args.canonical_correspondences:
+        board += ["--canonical-correspondences"]
     host = ["systemd-run", "--user", "--unit=" + unit + "-sender", "--working-directory=" + str(ROOT),
             "--property=MemoryHigh=3G", "--property=MemoryMax=3G", "--property=MemorySwapMax=0",
             "--property=CPUQuota=200%", "--property=Nice=5",
@@ -134,6 +142,8 @@ def main():
     else:
         host += ["--events", str(args.recording / "sensor_events.osh.gz")]
     manifest = dict(profile=args.profile, mode=args.mode, deployment_layout=args.deployment_layout,
+                    batch_intensity_jacobians=args.batch_intensity_jacobians,
+                    canonical_correspondences=args.canonical_correspondences,
                     board_unit=unit + ".service",
                     host_unit=unit + "-sender.service", board_output=board_output,
                     recording=str(args.recording) if args.recording else None, host_output=str(args.output),

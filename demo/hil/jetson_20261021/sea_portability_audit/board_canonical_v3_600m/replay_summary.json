@@ -1,0 +1,59 @@
+{
+  "status": "completed",
+  "mode": "raw_sensor_replay_not_network_realtime_HIL",
+  "extraction": {
+    "profile": "sea",
+    "baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "source_sha256": "a11700c8c71aef21881f57f11d5ba322cc82400d16a6cc9b23e5c559c50064cc",
+    "initialization_lines": [
+      2403,
+      5268
+    ],
+    "sonar_lines": [
+      5708,
+      7999
+    ],
+    "diagnostic_truth_replacements": [
+      3035,
+      3323,
+      6606
+    ],
+    "native_parity_validated": false,
+    "deployment_candidate": {
+      "name": "layout_packing_and_descriptor_reductions",
+      "layout": "packed-and-feature-batch",
+      "frozen_method_sha256": "324a8f2c942152e562db815c2a0dcf557cb2d919aad1a6cf1c5b274e1e4d35b4",
+      "altered_plane_fit_or_thresholds": false,
+      "paired_full_engine_validation_required": true,
+      "descriptor_method_sha256": "31f951d2537acbda871e47ad891b7c6573a46b1ed9d7c3cba85a198bd6a39486"
+    },
+    "intensity_linearization_candidate": {
+      "frozen_method_sha256": "736a42e9e8e173109fb4335baca99bfae9185eb53946e1a8dd553b7b1c463780",
+      "per_row_yaw_reduction_and_variance_equations_retained": true,
+      "paired_full_engine_bitwise_validation_required": true
+    },
+    "numerical_portability_variant": {
+      "name": "spatially_canonical_completed_KLT_correspondence_order",
+      "original_klt_method_sha256": "2a14b8902b37f883204517859e7e5b4bbdc28c650c29547bdf08a86982f66911",
+      "original_correspondence_set_and_quality_decisions_retained": true,
+      "uniform_RANSAC_sampling_distribution_retained": true,
+      "fixed_seed_sample_realization_changes": true,
+      "bitwise_equality_to_original_trajectory_expected": false,
+      "separate_PC_ARM_and_original_accuracy_comparisons_required": true
+    }
+  },
+  "profile": "sea",
+  "event_counts": {
+    "sonar": 2001,
+    "imu": 20000,
+    "depth": 4000,
+    "dvl": 2000
+  },
+  "simulated_duration_s": 400.0,
+  "wall_duration_s": 371.2974081399989,
+  "achieved_time_scale": 1.0773035071905988,
+  "output_samples": 2001,
+  "maximum_sonar_processing_s": 3.297494603000814,
+  "p95_sonar_processing_s": 0.1687307749998581,
+  "no_truth_input_after_initial_seed": true
+}

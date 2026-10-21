@@ -94,6 +94,12 @@ class Receiver(Node):
                 self.engine, audit = initialize(self.args.bundle.resolve(), self.args.profile, event)
                 from standalone.hil_intensity_packing import install_layout
                 install_layout(audit, self.args.deployment_layout)
+                if self.args.batch_intensity_jacobians:
+                    from standalone.hil_intensity_linearization import install_batched_linearization
+                    install_batched_linearization(audit)
+                if self.args.canonical_correspondences:
+                    from standalone.hil_stable_correspondences import install_canonical_order
+                    install_canonical_order(audit)
                 (self.args.output / "extraction_audit.json").write_text(json.dumps(audit, indent=2) + "\n")
             elif event["kind"] == "finish":
                 try:
@@ -129,6 +135,8 @@ class Receiver(Node):
                 (self.args.output / "receiver_summary.json").write_text(json.dumps(dict(
                     status="completed", profile=self.args.profile, events=self.counts,
                     deployment_layout=self.args.deployment_layout,
+                    batch_intensity_jacobians=self.args.batch_intensity_jacobians,
+                    canonical_correspondences=self.args.canonical_correspondences,
                     wall_duration_s=time.monotonic() - self.started, input_truth_after_seed=False,
                     mode="full_estimator_ROS2_raw_replay_not_controller_HIL"), indent=2) + "\n")
         except Exception as exc:
@@ -279,6 +287,10 @@ def main():
     p.add_argument("--mode", choices=("lockstep", "realtime"), default="lockstep")
     p.add_argument("--deployment-layout", choices=("original", "packed", "packed-and-feature-batch"),
                    default="original", help="explicit execution-layout candidate; default preserves frozen execution")
+    p.add_argument("--batch-intensity-jacobians", action="store_true",
+                   help="explicit equivalent Jacobian batching candidate")
+    p.add_argument("--canonical-correspondences", action="store_true",
+                   help="explicit numerical variant; changes fixed-seed RANSAC sample realization")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args()
     if os.environ.get("ROS_DOMAIN_ID") != "177" or not os.environ.get("FASTRTPS_DEFAULT_PROFILES_FILE"):
