@@ -1,0 +1,48 @@
+{
+  "kind": "immutable_coordinator_launch_provenance_not_test_completion",
+  "launched_local_date": "2026-10-21",
+  "service": "oceansim-hil-full-missions-sequence-20261021.service",
+  "implementation_commit": "ec9b6d817e74f3219752612cfe08ca69f916a793",
+  "coordinator_source_sha256": "3dcdd90b327d70ddffdd0dc399d7ceac302a1fd14608e49abbae9c1ba2a9a866",
+  "working_directory": "/home/cgz/OceanSim",
+  "lock": "/run/user/1000/oceansim-hil-full-missions.lock",
+  "coordinator_limits": {
+    "MemoryHigh": "3G",
+    "MemoryMax": "3G",
+    "MemorySwapMax": "0",
+    "CPUQuota": "100%",
+    "Nice": "15"
+  },
+  "environment": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "PYTHONPATH": "/home/cgz/OceanSim:/home/cgz/OceanSim/isaacsim"
+  },
+  "python_argv": [
+    "/home/cgz/.conda/envs/isaacsim-6.0/bin/python",
+    "-m",
+    "standalone.run_hil_full_missions",
+    "--pilot",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/sea_live_5km_canonical_v3",
+    "--output",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_20261021_canonical_v3",
+    "--run-full-missions"
+  ],
+  "ordered_stages": [
+    "observe and review existing sea live 5 km without restarting it",
+    "review existing completed lake live 600 m without restarting it",
+    "new lake live 5 km pilot, only after prior reviews pass",
+    "new lake live approximately 47.116 km full route, only after lake pilot passes",
+    "new sea live approximately 73.070 km full route, only after lake full review passes"
+  ],
+  "frozen_baselines": {
+    "lake": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "sea": "8b5df53cb57f9de2506d78d90b16e33bf5e96510"
+  },
+  "retries_or_navigation_threshold_changes_authorized": false,
+  "world_truth_after_initial_seed_sent_to_board": false,
+  "physical_sensor_trial": false,
+  "controller_closed_loop": false,
+  "hard_realtime_qualification": false,
+  "full_route_completion_claim": false
+}
