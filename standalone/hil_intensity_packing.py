@@ -31,18 +31,36 @@ def _pack_fixed_anchor(points, finite_indices, entries_by_base, base_inverse,
     base_values = np.zeros((len(entries_by_base), width, 5), dtype=np.float64)
     base_ids = np.zeros((len(entries_by_base), width), dtype=np.int64)
     occupied = np.zeros((len(entries_by_base), width), dtype=bool)
+    # Neighbouring broad-phase bases share most of their immutable cells.
+    # Read statistics once per object within THIS call, never cache across map
+    # mutations, and fill all repeated slots with one indexed array operation.
+    cell_indices = {}
+    unique_xy, unique_values, unique_ids = [], [], []
+    base_rows, base_columns, lookup = [], [], []
     for base, entries in enumerate(entries_by_base):
         if len(entries) > width:
             raise ValueError("unexpected fixed-anchor neighbourhood width")
         for slot, (_anchor_id, cell) in enumerate(entries):
-            base_xy[base, slot] = cell.mean_xy
-            base_values[base, slot] = (cell.mean_intensity, cell.variance, cell.mean_z,
-                                      cell.z_variance, cell.count)
-            base_ids[base, slot] = cell.last_observation_id
-            occupied[base, slot] = True
+            index = cell_indices.get(id(cell))
+            if index is None:
+                index = len(unique_xy)
+                cell_indices[id(cell)] = index
+                unique_xy.append(cell.mean_xy)
+                unique_values.append((cell.mean_intensity, cell.variance, cell.mean_z,
+                                      cell.z_variance, cell.count))
+                unique_ids.append(cell.last_observation_id)
+            base_rows.append(base)
+            base_columns.append(slot)
+            lookup.append(index)
+    if not lookup:
+        return
+    base_xy[base_rows, base_columns] = np.asarray(unique_xy, dtype=np.float64)[lookup]
+    base_values[base_rows, base_columns] = np.asarray(unique_values, dtype=np.float64)[lookup]
+    base_ids[base_rows, base_columns] = np.asarray(unique_ids, dtype=np.int64)[lookup]
+    occupied[base_rows, base_columns] = True
     dx = base_xy[base_inverse, :, 0] - points[finite_indices, 0, None]
     dy = base_xy[base_inverse, :, 1] - points[finite_indices, 1, None]
-    retained = occupied[base_inverse] & (dx * dx + dy * dy <= radius_squared)
+    retained = occupied[base_inverse] & ~(dx * dx + dy * dy > radius_squared)
     rows, columns = np.nonzero(retained)
     if not rows.size:
         return
