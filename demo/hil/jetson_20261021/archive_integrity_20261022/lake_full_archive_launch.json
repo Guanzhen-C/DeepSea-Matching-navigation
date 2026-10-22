@@ -1,0 +1,46 @@
+{
+  "kind": "host_only_completed_archive_check_not_new_navigation_or_sensor_run",
+  "implementation_commit": "68d6192",
+  "started_utc": "2026-10-22T01:37:36Z",
+  "unit": "oceansim-hil-lake-archive-full-20261022.service",
+  "observed_main_PID": 3146966,
+  "recording_directory": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference",
+  "output": "/home/cgz/OceanSim/demo/hil/jetson_20261021/archive_integrity_20261022/lake_completed_full_archive.json",
+  "preceding_smoke_report": "demo/hil/jetson_20261021/archive_integrity_20261022/lake_completed_600m_smoke.json",
+  "initial_observed_resources": {
+    "observed_utc": "2026-10-22T01:38:22Z",
+    "nice": 19,
+    "threads": 1,
+    "process_RSS_KiB": 51544,
+    "kernel_memory_max_bytes": 402653184,
+    "kernel_swap_max_bytes": 0,
+    "memory_events": {
+      "max": 1982,
+      "oom": 0,
+      "oom_kill": 0
+    },
+    "IO_priority_class": "idle",
+    "CPU_hard_quota_enforced": false,
+    "IO_bandwidth_hard_limit_enforced": false
+  },
+  "environment": {
+    "CUDA_VISIBLE_DEVICES": "",
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1"
+  },
+  "overlapping_formal_run": {
+    "profile": "sea",
+    "board_unit": "oceansim-hil-sea-realtime-20261022-091638-697918.service",
+    "board_PID": 197416,
+    "host_source_PID": 3118281,
+    "host_sender_PID": 3118261
+  },
+  "scientific_limits": [
+    "The host CPU and I/O audit overlaps the formal sea trial; that interval is not an exclusive performance benchmark.",
+    "Memory.max and swap.max were read from the kernel; Nice and thread count were observed, but there is no CPU hard quota.",
+    "Idle I/O priority is a scheduling class, not a verified bandwidth limit.",
+    "No new board workload, sensor replay, navigation estimator, or GPU tests were started.",
+    "This is only the launch/initial-resource observation, not proof that the full archive audit has completed."
+  ]
+}
