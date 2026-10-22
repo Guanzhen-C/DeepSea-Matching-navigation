@@ -1,0 +1,43 @@
+{
+  "kind": "one_selected_sea_epoch_readonly_PC_reference_comparison_not_full_acceptance",
+  "recorded_utc": "2026-10-22T04:57:14.773797+00:00",
+  "run": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live",
+  "board_unit": "oceansim-hil-sea-realtime-20261022-091638-697918.service",
+  "sensor_time_s": 11529.800000000001,
+  "truth_arc_m": 17294.694671715424,
+  "awaiting_exact_truth_timestamp": false,
+  "truth_evaluated_only_on_PC": true,
+  "spatial_alignment": false,
+  "interpolation": false,
+  "new_board_or_GPU_job": false,
+  "saved_record_verification": {
+    "reference": "native_reference/host_reference.osh.gz",
+    "returned_board_outputs": "sender/returned_estimator_outputs.osh.gz",
+    "selected_timestamps_exactly_equal": true,
+    "all_nine_position_metrics_reproduced_exactly": true,
+    "complete_actual_board_log_audit_still_pending": true
+  },
+  "dr": {
+    "original_PC_error_m": 269.39552981751376,
+    "Jetson_error_m": 188.37262116004555,
+    "inter_estimator_position_difference_m": 81.86518222280588
+  },
+  "local": {
+    "original_PC_error_m": 257.49945266389693,
+    "Jetson_error_m": 176.24671799582018,
+    "inter_estimator_position_difference_m": 81.31202767228109
+  },
+  "global": {
+    "original_PC_error_m": 3.0719613493348352,
+    "Jetson_error_m": 16.714200237116216,
+    "inter_estimator_position_difference_m": 15.914498076619921
+  },
+  "limitations": [
+    "A selected diagnostic epoch, not random sampling, cumulative RMSE/P95, or full-route acceptance.",
+    "The source reference and the actual board progress were compared at the same sensor epoch without spatial fitting or interpolation.",
+    "This demonstrates a deployment-specific difference at this epoch; it does not identify a unique numerical, frontend, or backend root cause.",
+    "The full sea mission and complete board-log recovery remain pending; no parameters or acceptance rules were changed."
+  ],
+  "full_route_acceptance": false,
+  "final_acceptance": false
+}
