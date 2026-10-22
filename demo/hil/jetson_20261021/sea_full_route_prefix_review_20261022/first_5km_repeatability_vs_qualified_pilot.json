@@ -1,0 +1,233 @@
+{
+  "kind": "first_5km_same_platform_repeatability_vs_qualified_pilot_not_full_route_or_raw_sensor_equivalence",
+  "recorded_utc": "2026-10-22T02:14:55.201053+00:00",
+  "samples": 16667,
+  "end_sensor_time_s": 3333.2000000000003,
+  "truth_arc_m": 4999.796967483578,
+  "timestamps_numerically_exact_across_four_pose_streams": true,
+  "same_platform_numeric_pose_equality": {
+    "PC_native_repeat": true,
+    "Jetson_returned_repeat": true
+  },
+  "same_platform_array_dtype_and_bytes_equality": {
+    "PC_native_repeat": true,
+    "Jetson_returned_repeat": true
+  },
+  "maximum_component_differences": {
+    "PC_native_repeat": {
+      "dr_position": 0,
+      "dr_rotation": 0,
+      "local_position": 0,
+      "local_rotation": 0,
+      "global_position": 0,
+      "global_rotation": 0,
+      "truth_position": 0,
+      "truth_rotation": 0
+    },
+    "Jetson_returned_repeat": {
+      "dr_position": 0,
+      "dr_rotation": 0,
+      "local_position": 0,
+      "local_rotation": 0,
+      "global_position": 0,
+      "global_rotation": 0
+    }
+  },
+  "first_numeric_mismatch": {
+    "PC_native_repeat": null,
+    "Jetson_returned_repeat": null
+  },
+  "returned_diagnostic_counters_equal": {
+    "terrain_match_attempts": true,
+    "terrain_prior_accepts": true,
+    "keyframes": true,
+    "output_policy": true,
+    "feature_backend": true,
+    "feature_cuda_calls": true,
+    "input_sequence": true
+  },
+  "qualified_static_metrics_reproduced": true,
+  "metrics": {
+    "qualified_PC": {
+      "dr": {
+        "rmse_m": 45.645877521468755,
+        "median_m": 29.641835325555178,
+        "p95_m": 83.33904658252092,
+        "p99_m": 88.21054831252205,
+        "max_m": 90.53658818055398,
+        "final_m": 90.39550332060833
+      },
+      "local": {
+        "rmse_m": 39.11421475841095,
+        "median_m": 26.330134674032752,
+        "p95_m": 72.00023238516023,
+        "p99_m": 76.63113862303898,
+        "max_m": 79.04856746512424,
+        "final_m": 78.90024587093359
+      },
+      "global": {
+        "rmse_m": 4.632827510389141,
+        "median_m": 2.170788177768652,
+        "p95_m": 11.079869816691154,
+        "p99_m": 14.679181784378416,
+        "max_m": 19.347865124918027,
+        "final_m": 2.687421718757539
+      }
+    },
+    "current_PC": {
+      "dr": {
+        "rmse_m": 45.645877521468755,
+        "median_m": 29.641835325555178,
+        "p95_m": 83.33904658252092,
+        "p99_m": 88.21054831252205,
+        "max_m": 90.53658818055398,
+        "final_m": 90.39550332060833
+      },
+      "local": {
+        "rmse_m": 39.11421475841095,
+        "median_m": 26.330134674032752,
+        "p95_m": 72.00023238516023,
+        "p99_m": 76.63113862303898,
+        "max_m": 79.04856746512424,
+        "final_m": 78.90024587093359
+      },
+      "global": {
+        "rmse_m": 4.632827510389141,
+        "median_m": 2.170788177768652,
+        "p95_m": 11.079869816691154,
+        "p99_m": 14.679181784378416,
+        "max_m": 19.347865124918027,
+        "final_m": 2.687421718757539
+      }
+    },
+    "qualified_returned_Jetson": {
+      "dr": {
+        "rmse_m": 45.63577029285016,
+        "median_m": 29.64080727927116,
+        "p95_m": 83.1771563062027,
+        "p99_m": 88.32182057239326,
+        "max_m": 90.64297341806292,
+        "final_m": 90.5030482488764
+      },
+      "local": {
+        "rmse_m": 39.07183421094393,
+        "median_m": 26.319744764300545,
+        "p95_m": 71.7551006567743,
+        "p99_m": 76.65415046433249,
+        "max_m": 79.06911507186348,
+        "final_m": 78.92173067598523
+      },
+      "global": {
+        "rmse_m": 3.9098736362119673,
+        "median_m": 1.860131096308533,
+        "p95_m": 9.987873501901612,
+        "p99_m": 14.080448322614236,
+        "max_m": 19.62094734119507,
+        "final_m": 3.896804466753727
+      }
+    },
+    "current_returned_Jetson": {
+      "dr": {
+        "rmse_m": 45.63577029285016,
+        "median_m": 29.64080727927116,
+        "p95_m": 83.1771563062027,
+        "p99_m": 88.32182057239326,
+        "max_m": 90.64297341806292,
+        "final_m": 90.5030482488764
+      },
+      "local": {
+        "rmse_m": 39.07183421094393,
+        "median_m": 26.319744764300545,
+        "p95_m": 71.7551006567743,
+        "p99_m": 76.65415046433249,
+        "max_m": 79.06911507186348,
+        "final_m": 78.92173067598523
+      },
+      "global": {
+        "rmse_m": 3.9098736362119673,
+        "median_m": 1.860131096308533,
+        "p95_m": 9.987873501901612,
+        "p99_m": 14.080448322614236,
+        "max_m": 19.62094734119507,
+        "final_m": 3.896804466753727
+      }
+    }
+  },
+  "current_prefix_timing": {
+    "arrival_lateness_s": {
+      "finite_samples": 16667,
+      "missing_or_nonfinite_samples": 0,
+      "maximum_s": 5.857775869022589,
+      "p95_s": 3.3366219702182485,
+      "mean_s": 1.1196087633529324,
+      "last_s": 2.5171811660225103
+    },
+    "transport_and_processing_roundtrip_s": {
+      "finite_samples": 16667,
+      "missing_or_nonfinite_samples": 0,
+      "maximum_s": 4.824910840019584,
+      "p95_s": 2.05904807341285,
+      "mean_s": 0.8783245802340465,
+      "last_s": 1.584008053992875
+    },
+    "processing_wall_s": {
+      "finite_samples": 16667,
+      "missing_or_nonfinite_samples": 0,
+      "maximum_s": 3.3320308689944795,
+      "p95_s": 0.17246950449989526,
+      "mean_s": 0.15027742013717724,
+      "last_s": 0.11354551299882587
+    }
+  },
+  "initial_seed_numeric_equality": {
+    "rotation": true,
+    "position": true,
+    "velocity": true
+  },
+  "boot_configuration_differences": {
+    "metrics": {
+      "qualified": {
+        "path": "/home/cgz/OceanSim/demo/hil/jetson_20261021/sea_live_5km_canonical_v3/native_reference/native_metrics.json"
+      },
+      "current": {
+        "path": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json"
+      }
+    },
+    "survey_segment_distance_m": {
+      "qualified": 5000,
+      "current": 0
+    }
+  },
+  "qualified_implementation_hashes_equal": true,
+  "source_files": {
+    "qualified_PC": "demo/hil/jetson_20261021/sea_live_5km_canonical_v3/native_reference/host_reference.osh.gz",
+    "current_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/host_reference.osh.gz",
+    "qualified_returned_Jetson": "demo/hil/jetson_20261021/sea_live_5km_canonical_v3/sender/returned_estimator_outputs.osh.gz",
+    "current_returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/sender/returned_estimator_outputs.osh.gz"
+  },
+  "current_inputs_still_growing": true,
+  "current_actual_board_complete_file_collection_pending": true,
+  "raw_sensor_payload_equality_checked": false,
+  "cross_architecture_PC_vs_Jetson_exactness_claimed": false,
+  "trajectory_alignment": false,
+  "truth_sent_back_to_board": false,
+  "new_navigation_or_sensor_run": false,
+  "navigation_changed": false,
+  "full_route_acceptance": false,
+  "execution": {
+    "compute": "host-only streaming read of four existing pose recordings plus initial boot packets",
+    "nice": 19,
+    "CUDA_VISIBLE_DEVICES": "",
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "new_board_or_GPU_workload": false
+  },
+  "conclusions": [
+    "Across all 16,667 epochs (0–3333.2 s, 4,999.79697 m truth arc), current full-route PC native poses/truth repeat the qualified PC pilot exactly, and current full-route returned Jetson poses repeat the qualified returned Jetson pilot exactly. Numeric values, array dtypes, and array bytes are equal within each same-platform pair, not across PC and Jetson.",
+    "Initial seeded position, rotation and velocity are numerically equal; the 26 qualified implementation hashes and selected returned diagnostic counters match. Boot configurations differ only in the intended survey segment limit (5,000 m vs full route) and output metrics path.",
+    "The current returned Jetson first-5km Global RMSE/P95/max/final are 3.90987/9.98787/19.62095/3.89680 m, exactly reproducing the earlier pilot metrics. Local RMSE 39.07183 m versus DR 45.63577 m is only this prefix, not evidence that long-range front-end drift is fixed.",
+    "Arrival lateness maximum 5.85778 s includes source pacing/backpressure; it is not pure network latency. Whole sonar-event mean 0.15028 s excludes other sensor events, transport, and response overhead; maximum 3.33203 s exceeds a 5 Hz period. Neither the average nor repeated navigation outputs proves hard-real-time operation.",
+    "Raw non-boot sensor payload equality was not compared. The current full route is still running, its actual complete board log is not yet collected, and the older 31.77 km and 59.8 km cumulative-distance risk intervals are outside this prefix. No scope or threshold was relaxed and no source/estimator run was restarted."
+  ]
+}
