@@ -1,0 +1,47 @@
+{
+  "kind": "completed_lake_receiver_owned_board_system_telemetry_not_process_RSS_or_realtime_acceptance",
+  "input": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/board_artifacts/tegrastats.log",
+  "input_sha256": "a4060a164daef5605a83a2287b1b1fd1de4894a2c14e2dc24ca15c47d4caa0a1",
+  "parsed_samples": 34185,
+  "unparsed_lines": 0,
+  "first_board_local_timestamp": "10-21-2026 23:42:11",
+  "last_board_local_timestamp": "10-22-2026 09:15:34",
+  "maximum_observed_sample_gap_s": 2,
+  "maximum_observed_system_RAM_MB_tegrastats": 6262,
+  "maximum_observed_system_SWAP_MB_tegrastats": 0,
+  "GPU_utilization_samples": 34185,
+  "GPU_utilization_mean_percent": 8.404709667983033,
+  "GPU_utilization_max_percent": 98,
+  "maximum_observed_temperature_C": {
+    "cpu": 57.093,
+    "soc2": 50.281,
+    "soc0": 50.5,
+    "gpu": 49.562,
+    "tj": 57.093,
+    "soc1": 50.625
+  },
+  "limits": [
+    "System RAM includes the operating system and other board processes; this is not estimator peak RSS.",
+    "Sampling cannot prove all between-sample peaks or absence of throttling.",
+    "Dynamic CPU frequencies and temperature samples do not prove a fixed power profile or no thermal/power throttling.",
+    "The trial overlapped explicitly recorded host-only diagnostic jobs; it is not an exclusive clean-room performance benchmark."
+  ],
+  "navigation_changed": false,
+  "full_route_hard_realtime_acceptance": false,
+  "coordinator_lifetime_memory_snapshot_after_lake_review": {
+    "recorded_utc": "2026-10-22T01:21:26Z",
+    "current_bytes": 549797888,
+    "peak_bytes": 1093238784,
+    "max_bytes": 3221225472,
+    "swap_current_bytes": 0,
+    "memory_events": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "scope": "Whole coordinator cgroup lifetime includes earlier pilot reviews and full-lake analysis/CPU plotting, not an isolated per-stage RSS benchmark."
+  }
+}
