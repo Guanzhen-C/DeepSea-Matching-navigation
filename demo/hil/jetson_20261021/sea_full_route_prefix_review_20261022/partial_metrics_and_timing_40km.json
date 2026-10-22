@@ -1,0 +1,610 @@
+{
+  "kind": "sea_first_40km_partial_accuracy_timing_and_predeclared_risk_review_not_full_route_acceptance",
+  "recorded_utc": "2026-10-22T11:05:19.392185+00:00",
+  "samples": 133334,
+  "prefix_end_sensor_timestamp_s": 26666.600000000002,
+  "truth_arc_m": 39999.871639972,
+  "board": {
+    "dr": {
+      "rmse_m": 373.7093567523515,
+      "median_m": 220.54498693684621,
+      "p95_m": 713.7529182256457,
+      "p99_m": 723.6072724189709,
+      "max_m": 727.9856261524665,
+      "final_m": 718.8233210203477
+    },
+    "local": {
+      "rmse_m": 351.3372851345806,
+      "median_m": 199.5684008443929,
+      "p95_m": 679.2331695759519,
+      "p99_m": 688.9216926589216,
+      "max_m": 693.4366067073216,
+      "final_m": 684.2721004209707
+    },
+    "global": {
+      "rmse_m": 6.590394595651256,
+      "median_m": 3.696601970925123,
+      "p95_m": 13.386638968453758,
+      "p99_m": 21.72359201179273,
+      "max_m": 41.45334039504116,
+      "final_m": 2.3616678278378886
+    }
+  },
+  "original_PC": {
+    "dr": {
+      "rmse_m": 237.7679067014213,
+      "median_m": 248.07254518779524,
+      "p95_m": 334.0151783497389,
+      "p99_m": 341.240848055864,
+      "max_m": 343.94731953176625,
+      "final_m": 242.17131780896696
+    },
+    "local": {
+      "rmse_m": 232.13503713415196,
+      "median_m": 236.87889807486852,
+      "p95_m": 336.68694798080963,
+      "p99_m": 343.21754484017174,
+      "max_m": 346.25216365470317,
+      "final_m": 229.88081667127292
+    },
+    "global": {
+      "rmse_m": 5.8467831747215495,
+      "median_m": 3.769855042258893,
+      "p95_m": 10.940788622065204,
+      "p99_m": 14.419283016915239,
+      "max_m": 53.84625800105146,
+      "final_m": 3.079264682784749
+    }
+  },
+  "relative_change_Jetson_vs_original_PC": {
+    "dr": {
+      "rmse_m": 0.5717401138650708,
+      "p95_m": 1.1368876760393594
+    },
+    "local": {
+      "rmse_m": 0.5135039047618697,
+      "p95_m": 1.0174027346455574
+    },
+    "global": {
+      "rmse_m": 0.12718299938754285,
+      "p95_m": 0.22355338640359101
+    }
+  },
+  "inter_estimator_position_difference_3d_m": {
+    "dr": {
+      "max_m": 909.184755019034,
+      "final_m": 846.9012115247433
+    },
+    "local": {
+      "max_m": 906.6566070823693,
+      "final_m": 845.009773735699
+    },
+    "global": {
+      "max_m": 49.89965188161301,
+      "final_m": 1.031286552368201
+    }
+  },
+  "checkpoint_first_30km": {
+    "samples": 100001,
+    "end_sensor_s": 20000.0,
+    "truth_arc_m": 29999.990742412454,
+    "board": {
+      "dr": {
+        "rmse_m": 205.46651556929368,
+        "median_m": 186.90246391779885,
+        "p95_m": 366.44384996023933,
+        "p99_m": 431.56775289314106,
+        "max_m": 448.68729973922206,
+        "final_m": 448.4260671617815
+      },
+      "local": {
+        "rmse_m": 187.0019438675297,
+        "median_m": 174.66520594550795,
+        "p95_m": 333.53413427881645,
+        "p99_m": 398.4003231722526,
+        "max_m": 415.1215942465342,
+        "final_m": 414.8440436206614
+      },
+      "global": {
+        "rmse_m": 6.53796117125591,
+        "median_m": 3.5624356664132604,
+        "p95_m": 13.292799768373111,
+        "p99_m": 21.789208686908438,
+        "max_m": 41.45334039504116,
+        "final_m": 0.6939204839560073
+      }
+    },
+    "original_PC": {
+      "dr": {
+        "rmse_m": 223.83398250896363,
+        "median_m": 237.2487511215829,
+        "p95_m": 324.9392290954214,
+        "p99_m": 334.98481531823626,
+        "max_m": 340.4683478098589,
+        "final_m": 340.4683478098589
+      },
+      "local": {
+        "rmse_m": 218.61074004283006,
+        "median_m": 229.54248139924135,
+        "p95_m": 329.3792596781871,
+        "p99_m": 337.64448131276635,
+        "max_m": 342.6113200835181,
+        "final_m": 342.6113200835181
+      },
+      "global": {
+        "rmse_m": 5.657863029908795,
+        "median_m": 3.7811487988794155,
+        "p95_m": 11.085988998137863,
+        "p99_m": 14.093300236850746,
+        "max_m": 19.347865124918027,
+        "final_m": 4.653977566751131
+      }
+    },
+    "relative_change_Jetson_vs_original_PC": {
+      "dr": {
+        "rmse_m": -0.0820584378376702,
+        "p95_m": 0.1277304097149492
+      },
+      "local": {
+        "rmse_m": -0.14458940200791415,
+        "p95_m": 0.01261425690460527
+      },
+      "global": {
+        "rmse_m": 0.15555310135553113,
+        "p95_m": 0.1990630489175058
+      }
+    },
+    "inter_estimator_position_difference_3d_m": {
+      "dr": {
+        "max_m": 663.9859116570276,
+        "final_m": 663.9859116570276
+      },
+      "local": {
+        "max_m": 662.2672500000347,
+        "final_m": 662.2672500000347
+      },
+      "global": {
+        "max_m": 40.54996289740358,
+        "final_m": 3.9643736284873805
+      }
+    },
+    "timing": {
+      "arrival_lateness": {
+        "maximum_s": 5838.977611802024,
+        "p95_s": 5205.730934913008,
+        "mean_s": 1746.1766980769883,
+        "last_s": 5838.977611802024
+      },
+      "transport_and_processing_roundtrip": {
+        "maximum_s": 74.41080930602038,
+        "p95_s": 3.983806303003803,
+        "mean_s": 2.352528007963319,
+        "last_s": 2.444882890005829
+      },
+      "whole_sonar_estimator_call": {
+        "maximum_s": 72.19382384800701,
+        "p95_s": 0.21833027098909952,
+        "mean_s": 0.22224150147317331,
+        "last_s": 0.2136638310039416
+      }
+    },
+    "full_route_acceptance": false
+  },
+  "descriptive_10km_segments_not_independent_repetitions": [
+    {
+      "start_index": 0,
+      "samples": 33334,
+      "start_sensor_s": 0.0,
+      "end_sensor_s": 6666.6,
+      "truth_arc_end_m": 9999.894812183136,
+      "board": {
+        "dr": {
+          "rmse_m": 82.9479090165683,
+          "median_m": 89.58248234897536,
+          "p95_m": 121.68655441910862,
+          "p99_m": 126.54091356686786,
+          "max_m": 130.44462871806152,
+          "final_m": 130.44462871806152
+        },
+        "local": {
+          "rmse_m": 72.7363413129604,
+          "median_m": 77.90793003636793,
+          "p95_m": 107.92054008028474,
+          "p99_m": 112.67410649696866,
+          "max_m": 116.53549181027574,
+          "final_m": 116.53549181027574
+        },
+        "global": {
+          "rmse_m": 3.9925918358970653,
+          "median_m": 2.4900884247537878,
+          "p95_m": 8.420361217523661,
+          "p99_m": 11.993109779377987,
+          "max_m": 19.62094734119507,
+          "final_m": 3.448969865627169
+        }
+      },
+      "original_PC": {
+        "dr": {
+          "rmse_m": 96.99765332585481,
+          "median_m": 89.46515176766161,
+          "p95_m": 156.1679287017332,
+          "p99_m": 159.4539096430792,
+          "max_m": 165.07411968744398,
+          "final_m": 165.07411968744398
+        },
+        "local": {
+          "rmse_m": 87.0936090598642,
+          "median_m": 77.8795867706522,
+          "p95_m": 142.686940058912,
+          "p99_m": 145.89839156406103,
+          "max_m": 151.51542329255344,
+          "final_m": 151.51542329255344
+        },
+        "global": {
+          "rmse_m": 4.434530211707403,
+          "median_m": 2.5622057456550342,
+          "p95_m": 9.94545169334829,
+          "p99_m": 13.662338306677693,
+          "max_m": 19.347865124918027,
+          "final_m": 2.5901876566225757
+        }
+      }
+    },
+    {
+      "start_index": 33334,
+      "samples": 33333,
+      "start_sensor_s": 6666.8,
+      "end_sensor_s": 13333.2,
+      "truth_arc_end_m": 19999.79469722858,
+      "board": {
+        "dr": {
+          "rmse_m": 188.76424890806882,
+          "median_m": 186.90246391779885,
+          "p95_m": 219.2173296922046,
+          "p99_m": 221.92268618607898,
+          "max_m": 222.8318352114177,
+          "final_m": 222.5515931590071
+        },
+        "local": {
+          "rmse_m": 175.4259995629493,
+          "median_m": 174.66520594550795,
+          "p95_m": 200.00749050537806,
+          "p99_m": 202.07723679252098,
+          "max_m": 203.7172166659286,
+          "final_m": 201.66657869984815
+        },
+        "global": {
+          "rmse_m": 8.144110184676258,
+          "median_m": 4.657985769152219,
+          "p95_m": 16.587251174064075,
+          "p99_m": 22.478618721591143,
+          "max_m": 23.66085738700199,
+          "final_m": 6.383944563449402
+        }
+      },
+      "original_PC": {
+        "dr": {
+          "rmse_m": 250.8897867377189,
+          "median_m": 261.0504569331443,
+          "p95_m": 271.2178075787949,
+          "p99_m": 272.8474206055799,
+          "max_m": 274.64483378871114,
+          "final_m": 248.34465140507987
+        },
+        "local": {
+          "rmse_m": 237.87752787223218,
+          "median_m": 249.30330813010616,
+          "p95_m": 259.0398865822156,
+          "p99_m": 259.98953083564083,
+          "max_m": 261.9390227225804,
+          "final_m": 236.67791811704967
+        },
+        "global": {
+          "rmse_m": 6.003403537259988,
+          "median_m": 4.752637190924631,
+          "p95_m": 11.240850151845933,
+          "p99_m": 15.176695569767949,
+          "max_m": 17.97667538236136,
+          "final_m": 6.076871331476663
+        }
+      }
+    },
+    {
+      "start_index": 66667,
+      "samples": 33334,
+      "start_sensor_s": 13333.4,
+      "end_sensor_s": 20000.0,
+      "truth_arc_end_m": 29999.990742412454,
+      "board": {
+        "dr": {
+          "rmse_m": 290.0637382577184,
+          "median_m": 257.77070662009606,
+          "p95_m": 420.2547504939302,
+          "p99_m": 443.9106131919305,
+          "max_m": 448.68729973922206,
+          "final_m": 448.4260671617815
+        },
+        "local": {
+          "rmse_m": 262.3817800450241,
+          "median_m": 230.47212917932447,
+          "p95_m": 387.0013621230503,
+          "p99_m": 410.4776609238279,
+          "max_m": 415.1215942465342,
+          "final_m": 414.8440436206614
+        },
+        "global": {
+          "rmse_m": 6.7799849554416,
+          "median_m": 3.6300295093552277,
+          "p95_m": 12.8149966472361,
+          "p99_m": 16.022854449512476,
+          "max_m": 41.45334039504116,
+          "final_m": 0.6939204839560073
+        }
+      },
+      "original_PC": {
+        "dr": {
+          "rmse_m": 279.19726118059066,
+          "median_m": 280.3551660399509,
+          "p95_m": 334.08290302030963,
+          "p99_m": 338.06692108453456,
+          "max_m": 340.4683478098589,
+          "final_m": 340.4683478098589
+        },
+        "local": {
+          "rmse_m": 281.4271057079357,
+          "median_m": 287.3936740984699,
+          "p95_m": 336.87444269516556,
+          "p99_m": 340.3267409199361,
+          "max_m": 342.6113200835181,
+          "final_m": 342.6113200835181
+        },
+        "global": {
+          "rmse_m": 6.35046855331763,
+          "median_m": 4.65799058099438,
+          "p95_m": 11.867057162920915,
+          "p99_m": 13.293460021355585,
+          "max_m": 14.225862154298785,
+          "final_m": 4.653977566751131
+        }
+      }
+    },
+    {
+      "start_index": 100001,
+      "samples": 33333,
+      "start_sensor_s": 20000.2,
+      "end_sensor_s": 26666.600000000002,
+      "truth_arc_end_m": 39999.871639972,
+      "board": {
+        "dr": {
+          "rmse_m": 657.2603082695538,
+          "median_m": 697.7505586037987,
+          "p95_m": 722.8789949491911,
+          "p99_m": 726.283901373742,
+          "max_m": 727.9856261524665,
+          "final_m": 718.8233210203477
+        },
+        "local": {
+          "rmse_m": 623.5765220203392,
+          "median_m": 663.3987782188894,
+          "p95_m": 688.2811443232641,
+          "p99_m": 691.7246945855965,
+          "max_m": 693.4366067073216,
+          "final_m": 684.2721004209707
+        },
+        "global": {
+          "rmse_m": 6.745252862369156,
+          "median_m": 4.17689546302071,
+          "p95_m": 14.964268327008016,
+          "p99_m": 21.466978533563353,
+          "max_m": 24.26994409033427,
+          "final_m": 2.3616678278378886
+        }
+      },
+      "original_PC": {
+        "dr": {
+          "rmse_m": 275.37200397033314,
+          "median_m": 267.5257134770892,
+          "p95_m": 340.8034624697119,
+          "p99_m": 342.0981533979724,
+          "max_m": 343.94731953176625,
+          "final_m": 242.17131780896696
+        },
+        "local": {
+          "rmse_m": 268.6542399436882,
+          "median_m": 259.80582870559715,
+          "p95_m": 342.8803284613655,
+          "p99_m": 344.3743909845748,
+          "max_m": 346.25216365470317,
+          "final_m": 229.88081667127292
+        },
+        "global": {
+          "rmse_m": 6.380076973052242,
+          "median_m": 3.724526177890612,
+          "p95_m": 10.368531211353886,
+          "p99_m": 18.074973965481902,
+          "max_m": 53.84625800105146,
+          "final_m": 3.079264682784749
+        }
+      }
+    }
+  ],
+  "known_previous_risk_near_31p77km": {
+    "window_selected_around_previously_reported_risk_not_new_discovery": true,
+    "requested_truth_arc_window_m": [
+      31270,
+      32270
+    ],
+    "samples": 3333,
+    "first_sensor_s": 20846.8,
+    "last_sensor_s": 21513.2,
+    "actual_truth_arc_bounds_m": [
+      31270.19069399644,
+      32269.790472782708
+    ],
+    "global_error_stats": {
+      "board": {
+        "rmse_m": 6.191950197343372,
+        "median_m": 5.382495100040554,
+        "p95_m": 10.649448760661603,
+        "p99_m": 11.107251263776883,
+        "max_m": 11.452055399999079,
+        "final_m": 6.339758717562117
+      },
+      "original_PC": {
+        "rmse_m": 13.493861139581847,
+        "median_m": 5.4422049427694414,
+        "p95_m": 26.530311284208317,
+        "p99_m": 53.00138405692697,
+        "max_m": 53.84625800105146,
+        "final_m": 1.6213284451261403
+      }
+    },
+    "peak_epochs": {
+      "board": {
+        "timestamp": 21029.8,
+        "truth_arc_m": 31544.69067802377,
+        "global_error_m": 11.452055399999079,
+        "paired_board_global_error_m": 11.452055399999079,
+        "paired_original_PC_global_error_m": 17.95126764979494,
+        "inter_estimator_global_position_difference_m": 6.618464701007623
+      },
+      "original_PC": {
+        "timestamp": 21179.8,
+        "truth_arc_m": 31769.690580917093,
+        "global_error_m": 53.84625800105146,
+        "paired_board_global_error_m": 3.949858031762302,
+        "paired_original_PC_global_error_m": 53.84625800105146,
+        "inter_estimator_global_position_difference_m": 49.89965188161301
+      }
+    },
+    "inter_estimator_global_position_difference_max_m": 49.89965188161301,
+    "interpretation": "descriptive fixed historical-risk window; no spatial fitting or truth feedback; not an independent repeat or unique causal diagnosis"
+  },
+  "timing": {
+    "entire_prefix": {
+      "arrival_lateness": {
+        "maximum_s": 7391.700169977008,
+        "p95_s": 7147.855523578258,
+        "mean_s": 2979.231787913208,
+        "last_s": 7391.700169977008
+      },
+      "transport_and_processing_roundtrip": {
+        "maximum_s": 74.41080930602038,
+        "p95_s": 4.116039711893245,
+        "mean_s": 2.374580293891346,
+        "last_s": 2.385055265011033
+      },
+      "whole_sonar_estimator_call": {
+        "maximum_s": 72.19382384800701,
+        "p95_s": 0.22236892245273338,
+        "mean_s": 0.22069198736737358,
+        "last_s": 0.22846074200060684
+      }
+    },
+    "last_3000_epochs_open_600_second_interval": {
+      "samples": 3000,
+      "open_start_sensor_s": 26066.600000000002,
+      "first_included_sensor_s": 26066.8,
+      "end_sensor_s": 26666.600000000002,
+      "values": {
+        "arrival_lateness": {
+          "maximum_s": 7391.700169977008,
+          "p95_s": 7381.590173024272,
+          "mean_s": 7326.422921179193,
+          "last_s": 7391.700169977008
+        },
+        "transport_and_processing_roundtrip": {
+          "maximum_s": 9.320571530988673,
+          "p95_s": 4.660978954713209,
+          "mean_s": 2.324804096005653,
+          "last_s": 2.385055265011033
+        },
+        "whole_sonar_estimator_call": {
+          "maximum_s": 4.817763430997729,
+          "p95_s": 0.22277542724987143,
+          "mean_s": 0.20647803713753335,
+          "last_s": 0.22846074200060684
+        }
+      }
+    },
+    "selected_8_slowest_estimator_calls": [
+      {
+        "timestamp": 19650.0,
+        "truth_arc_m": 29474.990803179524,
+        "processing_wall_s": 72.19382384800701,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 19740.0,
+        "truth_arc_m": 29609.990771328918,
+        "processing_wall_s": 65.80177399000968,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 10560.0,
+        "truth_arc_m": 15839.994689282417,
+        "processing_wall_s": 62.00789495999925,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 19950.0,
+        "truth_arc_m": 29924.990772907982,
+        "processing_wall_s": 55.58636564199696,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 19440.0,
+        "truth_arc_m": 29159.99078524746,
+        "processing_wall_s": 53.384129169004154,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 10470.0,
+        "truth_arc_m": 15704.994650516881,
+        "processing_wall_s": 48.781829312007176,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 19350.0,
+        "truth_arc_m": 29024.990823761254,
+        "processing_wall_s": 47.753837037002086,
+        "at_30s_boundary": true
+      },
+      {
+        "timestamp": 11460.0,
+        "truth_arc_m": 17189.994777120246,
+        "processing_wall_s": 46.0999180959916,
+        "at_30s_boundary": true
+      }
+    ],
+    "arrival_clock": "same PC monotonic nominal1x clock; excludes boot warmup; includes source pacing/backpressure",
+    "processing_scope": "Receiver.consume timer brackets engine.send for sonar: all estimator stages within that call, but excludes packet decoding/order checks and output serialization/disk/ack overhead, other sensor callbacks, and transport",
+    "pure_network_latency": false,
+    "hard_realtime_acceptance": false
+  },
+  "consistency_checks": {
+    "uniform_5Hz_tolerance_s": 1e-08,
+    "paired_timestamps_exactly_equal": true,
+    "finite_3D_positions_and_timing": true,
+    "previous_first_20km_accuracy_reproduced_exactly": true,
+    "previous_first_20km_timing_reproduced_within_1e_12": true,
+    "previous_accuracy_max_abs_metric_difference_m": 0.0
+  },
+  "original_full_run_accuracy_review_relative_limit": 0.1,
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/sender/returned_estimator_outputs.osh.gz",
+    "still_growing": true
+  },
+  "truth_evaluated_only_on_PC": true,
+  "spatial_alignment": false,
+  "interpolation": false,
+  "full_route_acceptance": false,
+  "final_acceptance": false,
+  "complete_actual_board_log_audit_still_pending": true,
+  "limitations": [
+    "Only a prefix of the ongoing sea mission; not full-route acceptance or a root-cause diagnosis.",
+    "No estimator rerun, new board job, GPU diagnostic, parameter change, slow-sample removal, or acceptance-rule relaxation.",
+    "Small absolute error or relative aggregate metrics do not prove cross-architecture trajectory reproduction or real-time throughput."
+  ]
+}
