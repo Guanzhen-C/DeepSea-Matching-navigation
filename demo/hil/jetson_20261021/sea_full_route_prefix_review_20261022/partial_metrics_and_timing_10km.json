@@ -1,0 +1,239 @@
+{
+  "kind": "sea_first_10km_partial_accuracy_and_timing_not_full_route_acceptance",
+  "recorded_utc": "2026-10-22T03:14:20.916925+00:00",
+  "samples": 33334,
+  "prefix_end_sensor_timestamp_s": 6666.6,
+  "truth_arc_m": 9999.894812183136,
+  "board": {
+    "dr": {
+      "rmse_m": 82.9479090165683,
+      "median_m": 89.58248234897536,
+      "p95_m": 121.68655441910862,
+      "p99_m": 126.54091356686786,
+      "max_m": 130.44462871806152,
+      "final_m": 130.44462871806152
+    },
+    "local": {
+      "rmse_m": 72.7363413129604,
+      "median_m": 77.90793003636793,
+      "p95_m": 107.92054008028474,
+      "p99_m": 112.67410649696866,
+      "max_m": 116.53549181027574,
+      "final_m": 116.53549181027574
+    },
+    "global": {
+      "rmse_m": 3.9925918358970653,
+      "median_m": 2.4900884247537878,
+      "p95_m": 8.420361217523661,
+      "p99_m": 11.993109779377987,
+      "max_m": 19.62094734119507,
+      "final_m": 3.448969865627169
+    }
+  },
+  "original_PC": {
+    "dr": {
+      "rmse_m": 96.99765332585481,
+      "median_m": 89.46515176766161,
+      "p95_m": 156.1679287017332,
+      "p99_m": 159.4539096430792,
+      "max_m": 165.07411968744398,
+      "final_m": 165.07411968744398
+    },
+    "local": {
+      "rmse_m": 87.0936090598642,
+      "median_m": 77.8795867706522,
+      "p95_m": 142.686940058912,
+      "p99_m": 145.89839156406103,
+      "max_m": 151.51542329255344,
+      "final_m": 151.51542329255344
+    },
+    "global": {
+      "rmse_m": 4.434530211707403,
+      "median_m": 2.5622057456550342,
+      "p95_m": 9.94545169334829,
+      "p99_m": 13.662338306677693,
+      "max_m": 19.347865124918027,
+      "final_m": 2.5901876566225757
+    }
+  },
+  "relative_change_Jetson_vs_original_PC": {
+    "dr": {
+      "rmse_m": -0.14484622903285782,
+      "p95_m": -0.22079677030538658
+    },
+    "local": {
+      "rmse_m": -0.16484869443216277,
+      "p95_m": -0.2436550953035579
+    },
+    "global": {
+      "rmse_m": -0.0996584428816375,
+      "p95_m": -0.1533455214351539
+    }
+  },
+  "inter_estimator_position_difference_3d_m": {
+    "dr": {
+      "max_m": 38.63568964707812,
+      "final_m": 35.22744924791158
+    },
+    "local": {
+      "max_m": 38.41014393684532,
+      "final_m": 35.03417569374008
+    },
+    "global": {
+      "max_m": 14.419585113854993,
+      "final_m": 2.909043425012935
+    }
+  },
+  "timing": {
+    "entire_prefix": {
+      "arrival_lateness": {
+        "maximum_s": 180.28239863901945,
+        "p95_s": 77.59301099530852,
+        "mean_s": 18.088485749708525,
+        "last_s": 180.28239863901945
+      },
+      "transport_and_processing_roundtrip": {
+        "maximum_s": 6.09049042899278,
+        "p95_s": 2.789561181950557,
+        "mean_s": 1.4149690818404446,
+        "last_s": 3.2214680330071133
+      },
+      "whole_sonar_event_processing": {
+        "maximum_s": 3.4317894840060035,
+        "p95_s": 0.1940954959980445,
+        "mean_s": 0.16411121892175504,
+        "last_s": 0.19207301900314633
+      }
+    },
+    "last_3000_epochs_open_600_second_interval": {
+      "samples": 3000,
+      "open_start_sensor_s": 6066.6,
+      "first_included_sensor_s": 6066.8,
+      "end_sensor_s": 6666.6,
+      "values": {
+        "arrival_lateness": {
+          "maximum_s": 180.28239863901945,
+          "p95_s": 160.94955181157297,
+          "mean_s": 87.77445509927485,
+          "last_s": 180.28239863901945
+        },
+        "transport_and_processing_roundtrip": {
+          "maximum_s": 6.09049042899278,
+          "p95_s": 4.11164696405176,
+          "mean_s": 2.446726969504244,
+          "last_s": 3.2214680330071133
+        },
+        "whole_sonar_event_processing": {
+          "maximum_s": 3.1867347079969477,
+          "p95_s": 0.2159043714964355,
+          "mean_s": 0.20925848550088993,
+          "last_s": 0.19207301900314633
+        }
+      }
+    },
+    "eight_selected_slowest_sonar_epochs": [
+      {
+        "timestamp": 4830,
+        "processing_wall_s": 3.4317894840060035,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 161,
+        "terrain_prior_accepts": 145,
+        "keyframes": 177
+      },
+      {
+        "timestamp": 5490,
+        "processing_wall_s": 3.38153306300228,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 183,
+        "terrain_prior_accepts": 162,
+        "keyframes": 202
+      },
+      {
+        "timestamp": 180,
+        "processing_wall_s": 3.3320308689944795,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 6,
+        "terrain_prior_accepts": 4,
+        "keyframes": 8
+      },
+      {
+        "timestamp": 5280,
+        "processing_wall_s": 3.2847808719961904,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 176,
+        "terrain_prior_accepts": 160,
+        "keyframes": 194
+      },
+      {
+        "timestamp": 3360,
+        "processing_wall_s": 3.2709252439963166,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 112,
+        "terrain_prior_accepts": 98,
+        "keyframes": 124
+      },
+      {
+        "timestamp": 5610,
+        "processing_wall_s": 3.245497971001896,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 187,
+        "terrain_prior_accepts": 166,
+        "keyframes": 206
+      },
+      {
+        "timestamp": 5460,
+        "processing_wall_s": 3.2410696339939022,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 182,
+        "terrain_prior_accepts": 161,
+        "keyframes": 200
+      },
+      {
+        "timestamp": 3420,
+        "processing_wall_s": 3.205671681993408,
+        "at_30s_boundary": true,
+        "terrain_match_attempts": 114,
+        "terrain_prior_accepts": 100,
+        "keyframes": 126
+      }
+    ],
+    "arrival_clock": "same PC monotonic nominal1x clock; excludes boot warmup; includes source pacing/backpressure",
+    "processing_scope": "whole board sonar-event consumer, not other sensor callbacks/transport/ack overhead",
+    "pure_network_latency": false,
+    "hard_realtime_acceptance": false
+  },
+  "consistency_checks": {
+    "uniform_5Hz_and_exact_paired_timestamps": true,
+    "finite_3D_positions_and_timing": true,
+    "previous_first_5km_metrics_reproduced": true
+  },
+  "original_full_run_accuracy_review_relative_limit": 0.1,
+  "inputs": {
+    "original_PC": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/host_reference.osh.gz",
+    "returned_Jetson": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/sender/returned_estimator_outputs.osh.gz",
+    "still_growing": true
+  },
+  "whole_raw_input_stream_integrity_audited": false,
+  "current_complete_actual_board_log_collected": false,
+  "truth_sent_back_to_board": false,
+  "trajectory_alignment": false,
+  "navigation_changed": false,
+  "new_estimator_sensor_or_board_workload": false,
+  "full_route_acceptance": false,
+  "execution": {
+    "compute": "host-only read of already recorded prefix, no estimator replay",
+    "CUDA_VISIBLE_DEVICES": "",
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "nice": 19
+  },
+  "conclusions": [
+    "These 33,334 aligned 5Hz pose samples cover only the first 9,999.89481 m, not the requested 73.070 km. Global board RMSE/P95 are 3.99259/8.42036 m versus original-PC 4.43453/9.94545 m. Better truth-error scalars do not prove cross-platform trajectory reproduction or full-route acceptance.",
+    "PC versus Jetson DR/Local/Global 3D position differences already reach 38.63569/38.41014/14.41959 m in this prefix; the exact SAME-platform first-5km repetition does not resolve CROSS-platform numerical sensitivity.",
+    "Compared with the first-5km nominal clock maximum lateness of 5.85778 s, the first-10km maximum/last lateness is now 180.28240 s. This contains source pacing and backpressure, not pure network delay and not an additional 180 s of physical-world motion.",
+    "Last 3,000 sonar epochs in (6066.6,6666.6] s have mean whole-sonar-event processing 0.20925849 s, excluding IMU/DVL/depth and response overhead; sustainable 5Hz wall-time processing is not achieved in this interval. A small sensor-epoch error does not make this timely control/navigation output.",
+    "The eight selected slowest whole-sonar callbacks coincide with 30s terrain-attempt boundaries; no per-stage board profiling was added to the formal trial, so this cannot isolate 3D-BBS, GTSAM, feature extraction, or another function as the unique cause.",
+    "Original 10% full-route review rule, navigation, sensors, rates and running jobs remain unchanged. Current actual-board-file collection, whole raw input archive audit and complete sea route are pending."
+  ]
+}

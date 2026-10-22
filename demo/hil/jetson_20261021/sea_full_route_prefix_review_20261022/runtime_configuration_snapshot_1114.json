@@ -1,0 +1,47 @@
+{
+  "kind": "read_only_runtime_configuration_snapshot_not_power_or_completion_guarantee",
+  "recorded_utc": "2026-10-22T03:14:20Z",
+  "units": [
+    {
+      "role": "coordinator",
+      "unit": "oceansim-hil-full-missions-original-lake-20261021-v2.service",
+      "MainPID": 2345655,
+      "ActiveState": "active",
+      "RuntimeMaxUSec": "infinity",
+      "Restart": "no",
+      "NRestarts": 0
+    },
+    {
+      "role": "PC_source",
+      "unit": "oceansim-hil-sea-realtime-20261022-091638-697918-producer.service",
+      "MainPID": 3118281,
+      "ActiveState": "active",
+      "RuntimeMaxUSec": "infinity",
+      "Restart": "no",
+      "NRestarts": 0
+    },
+    {
+      "role": "PC_sender",
+      "unit": "oceansim-hil-sea-realtime-20261022-091638-697918-sender.service",
+      "MainPID": 3118261,
+      "ActiveState": "active",
+      "RuntimeMaxUSec": "infinity",
+      "Restart": "no",
+      "NRestarts": 0
+    },
+    {
+      "role": "Jetson_estimator",
+      "unit": "oceansim-hil-sea-realtime-20261022-091638-697918.service",
+      "MainPID": 197416,
+      "ActiveState": "active",
+      "RuntimeMaxUSec": "infinity",
+      "Restart": "no",
+      "NRestarts": 0
+    }
+  ],
+  "system_or_job_configuration_changed": false,
+  "limits": [
+    "No fixed systemd runtime cutoff is configured for these four units; this does not guarantee power, network, OS health, or absence of external termination.",
+    "The coordinator has a separate finite observation budget; expiration is not proof that participant jobs are terminal and does not authorize a restart."
+  ]
+}
