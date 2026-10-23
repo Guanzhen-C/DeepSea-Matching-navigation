@@ -1,0 +1,55 @@
+{
+  "kind": "completed_sensor_archive_integrity_not_navigation_acceptance",
+  "status": "completed",
+  "profile": "sea",
+  "baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+  "input": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/sensor_events.osh.gz",
+  "input_bytes": 67769318915,
+  "input_sha256": "a2ac4081d4a26fd68a8339fe3174ba575141ceb30a159b60954cc16e59596b00",
+  "events": {
+    "boot": 1,
+    "sonar": 243569,
+    "imu": 2435683,
+    "depth": 487136,
+    "dvl": 243568,
+    "finish": 1
+  },
+  "samples": 243569,
+  "last_sequence": 3409957,
+  "expected_rates_hz": {
+    "imu": 50.0,
+    "dvl": 5.0,
+    "depth": 10.0,
+    "sonar": 5.0
+  },
+  "first_timestamps_s": {
+    "sonar": 0.0,
+    "imu": 0.02,
+    "depth": 0.1,
+    "dvl": 0.2
+  },
+  "last_timestamps_s": {
+    "sonar": 48713.6,
+    "imu": 48713.66,
+    "depth": 48713.6,
+    "dvl": 48713.6
+  },
+  "maximum_cadence_roundoff_s": {
+    "imu": 4.074535847609084e-12,
+    "dvl": 4.365563466279809e-12,
+    "depth": 5.820760540231618e-12,
+    "sonar": 4.365563466279809e-12
+  },
+  "nonfinite_inertial_measurement_counts": {},
+  "gzip_EOF_and_all_packet_checksums_verified": true,
+  "only_initial_seed_has_navigation_truth_fields": true,
+  "acoustic_field_whitelist_and_shared_return_declarations_checked": true,
+  "physical_echo_lineage_or_sensor_fidelity_validation": false,
+  "independent_board_input_byte_comparison": false,
+  "new_estimator_or_board_workload": false,
+  "navigation_changed": false,
+  "full_route_acceptance": false,
+  "elapsed_s": 1235.3774510389776,
+  "completed_utc": "2026-10-23T07:44:05.919562+00:00",
+  "host_process_peak_RSS_bytes_linux": 88068096
+}

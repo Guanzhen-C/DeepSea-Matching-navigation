@@ -1,0 +1,82 @@
+{
+  "kind": "ARM_CPU_only_inertial_control_of_already_PC_qualified_lake_prefix_not_new_simulation",
+  "created_utc": "2026-10-23T07:29:28.183177+00:00",
+  "board_unit": "oceansim-hil-inertial-lake-arm-20261023.service",
+  "board_directory": "/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023",
+  "cache_manifest": {
+    "format": "oceansim.inertial_channel_diagnostic.v1",
+    "profile": "lake",
+    "cutoff_s": 6666.6,
+    "baseline_sha": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "source_events": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference/sensor_events.osh.gz",
+    "source_counts": {
+      "boot": 1,
+      "sonar": 33334,
+      "imu": 333330,
+      "depth": 66666,
+      "dvl": 33333
+    },
+    "cache_sha256": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce",
+    "complete_requested_prefix": true,
+    "whole_source_stream_audited": false,
+    "acoustic_arrays_excluded": true,
+    "sonar_clocks_retained": true,
+    "full_route_acceptance": false,
+    "elapsed_wall_s": 185.85345470499306
+  },
+  "qualified_PC_parity": {
+    "samples": 33334,
+    "cutoff_s": 6666.6,
+    "maximum_component_differences": {
+      "position_m": 0.0,
+      "rotation_component": 0.0
+    },
+    "first_nonzero_difference": null,
+    "exactly_equal": true,
+    "native_parity_within_tolerance": true,
+    "truth_used": false,
+    "full_route_acceptance": false
+  },
+  "uploaded_sha256": {
+    "audit_hil_inertial_channel.py": "a5f20a7806ab63aef1b0ef03e4293cc79994c590405c9e2476a11a4839f6a7ee",
+    "cache/cache_manifest.json": "f2fac1406c9ff7431e69eb88e4c07530a3be11787e52e5685846b4306201c1f6",
+    "cache/inertial_events.navdiag.gz": "9bb030666dc804056c4e82069fa598b06a156054341dabcbac57942f71ef05ce"
+  },
+  "command": [
+    "systemd-run",
+    "--user",
+    "--unit=oceansim-hil-inertial-lake-arm-20261023",
+    "--working-directory=/media/cgz/data/oceansim_hil_20261021/code",
+    "--property=MemoryMax=1G",
+    "--property=MemorySwapMax=0",
+    "--property=Nice=19",
+    "--property=IOSchedulingClass=idle",
+    "--property=StandardOutput=append:/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023/replay.log",
+    "--property=StandardError=append:/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023/replay.log",
+    "/usr/bin/env",
+    "PYTHONPATH=/media/cgz/data/oceansim_hil_20261021/code",
+    "LD_LIBRARY_PATH=/media/cgz/data/oceansim_hil_20261021/gtsam/lib",
+    "CUDA_VISIBLE_DEVICES=",
+    "OPENBLAS_NUM_THREADS=1",
+    "OMP_NUM_THREADS=1",
+    "MKL_NUM_THREADS=1",
+    "/media/cgz/data/oceansim_hil_20261021/venv/bin/python",
+    "/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023/audit_hil_inertial_channel.py",
+    "replay",
+    "--cache",
+    "/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023/cache",
+    "--bundle",
+    "/media/cgz/data/oceansim_hil_20261021/bundles/lake",
+    "--output",
+    "/media/cgz/data/oceansim_hil_20261021/audits/inertial_control_20261023/arm_DR_only",
+    "--profile",
+    "lake"
+  ],
+  "expected_samples": 33334,
+  "source_native_recording": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/native_reference",
+  "board_HIL_reference": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/lake_full_route_live/board_artifacts/estimator_outputs.osh.gz",
+  "no_sonar_or_graph_updates": true,
+  "no_truth_after_initial_seed": true,
+  "no_formal_navigation_change": true,
+  "full_route_acceptance": false
+}

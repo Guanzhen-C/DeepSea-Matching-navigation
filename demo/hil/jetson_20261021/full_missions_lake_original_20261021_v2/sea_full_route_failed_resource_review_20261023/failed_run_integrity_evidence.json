@@ -1,0 +1,134 @@
+{
+  "kind": "completed_sensor_data_integrity_review_of_failed_HIL_run_not_acceptance",
+  "recorded_utc": "2026-10-23T07:19:31.053381+00:00",
+  "source_run": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live",
+  "full_route_data_complete": true,
+  "samples": 243569,
+  "distance_m": 73070.32881952196,
+  "rotations_validated_without_repair": true,
+  "sensor_epoch_gaps_found": false,
+  "qualified_implementation_hashes_checked": 26,
+  "original_baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+  "all_returned_poses_equal_actual_board_output": {
+    "samples": 243569,
+    "six_pose_channels_exactly_equal": true,
+    "comparison_to_PC_estimator": false,
+    "input_sequence_exactly_equal_checked": true
+  },
+  "declared_sensor_counts": {
+    "boot": 1,
+    "sonar": 243569,
+    "imu": 2435683,
+    "depth": 487136,
+    "dvl": 243568,
+    "finish": 1
+  },
+  "no_truth_after_initial_seed": true,
+  "CUDA_frontend": {
+    "frames": 243569,
+    "pair_attempts": 243568,
+    "accepted_pairs": 239254,
+    "rejected_pairs": 4314,
+    "completed_subframes": 78683,
+    "rejection_reasons": {
+      "insufficient_geometric_inliers": 3604,
+      "insufficient_mutual_matches": 710
+    },
+    "mean_pair_inlier_ratio": 0.44204695012858464,
+    "mean_pair_rmse_m": 0.24860542961821272,
+    "requested_compute_backend": "cuda",
+    "active_compute_backend": "cuda",
+    "compute_device": "Orin",
+    "cuda_ransac_calls": 242858,
+    "cpu_ransac_calls": 0,
+    "cuda_fallbacks": 0,
+    "mean_frame_build_ms": 13.880823577738783,
+    "mean_pair_estimation_ms": 36.09994886976809,
+    "mean_ransac_ms": 25.658079593973216
+  },
+  "native_GTSAM_backend": "gtsam_isam2_incremental_fixed_lag",
+  "original_accuracy_review_relative_limit": 0.1,
+  "accuracy_regressions": [
+    {
+      "channel": "dr",
+      "metric": "rmse_m",
+      "relative_change": 0.5032166935731979
+    },
+    {
+      "channel": "dr",
+      "metric": "p95_m",
+      "relative_change": 0.46806086909282474
+    },
+    {
+      "channel": "local",
+      "metric": "rmse_m",
+      "relative_change": 0.48731830321724123
+    },
+    {
+      "channel": "local",
+      "metric": "p95_m",
+      "relative_change": 0.46592891152144444
+    },
+    {
+      "channel": "global",
+      "metric": "p95_m",
+      "relative_change": 0.13334148859920947
+    }
+  ],
+  "terminal_states": {
+    "board": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "sender": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "source": {
+      "Result": "oom-kill",
+      "ExecMainStatus": "15",
+      "ActiveState": "failed"
+    }
+  },
+  "host_resource_summary": {
+    "kind": "read_only_resource_observation_not_navigation_acceptance",
+    "samples": 13159,
+    "stop_reason": "host_participants_terminal_no_task_was_stopped",
+    "units": {
+      "source": "oceansim-hil-sea-realtime-20261022-091638-697918-producer.service",
+      "sender": "oceansim-hil-sea-realtime-20261022-091638-697918-sender.service"
+    },
+    "memory": {
+      "source": {
+        "maximum_observed_current_bytes": 7516192768,
+        "maximum_kernel_lifetime_peak_bytes": 7516192768,
+        "maximum_observed_oom_kills": 1
+      },
+      "sender": {
+        "maximum_observed_current_bytes": 594849792,
+        "maximum_kernel_lifetime_peak_bytes": 595808256,
+        "maximum_observed_oom_kills": 0
+      }
+    },
+    "minimum_observed_host_available_bytes": 3886493696,
+    "earlier_GPU_timeline_not_reconstructed": true,
+    "task_state_modified": false
+  },
+  "resource_gate_passed": false,
+  "raw_sensor_archive_integrity_pending": true,
+  "full_route_acceptance": false,
+  "final_acceptance": false,
+  "input_sha256": {
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/launch_manifest.json": "f5a6bed03e5f8f3d404a1a6bd3626b7bc1d46d23644b49df8d542a0e40432421",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json": "586460990d478096c3ff2a2df4118713cfe55e564f955dab2d8cfaaf0e19140c",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/host_reference.osh.gz": "e4a526da2068126ca96be9c1907a3f3366175f7c403caffc288f50da89ef5028",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/sender/returned_estimator_outputs.osh.gz": "3f1e8de4e6cc59f11c1d347b7d3767c26def914303f7751b1e89568f4f2c9611",
+    "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/board_artifacts/estimator_outputs.osh.gz": "e0856b709bf0f42a1f36188ba5fb40d7dfaf611ea394b6ecb86e9923117a3ade"
+  },
+  "limitations": [
+    "Complete sensor data and exact returned-board equality do not erase the source OOM, accuracy regressions or real-time backlog.",
+    "No navigation/threshold changes, new simulation, trajectory fit or truth feedback; this is forensic postprocessing only."
+  ]
+}

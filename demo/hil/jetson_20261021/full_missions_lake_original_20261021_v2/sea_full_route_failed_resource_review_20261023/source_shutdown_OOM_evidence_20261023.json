@@ -1,0 +1,25 @@
+{
+  "kind": "shutdown_OOM_saved_evidence_and_static_localization_not_unique_runtime_stack",
+  "recorded_utc": "2026-10-23T07:49:40.226760+00:00",
+  "metrics_file": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json",
+  "metrics_file_bytes": 20012541,
+  "metrics_file_sha256": "586460990d478096c3ff2a2df4118713cfe55e564f955dab2d8cfaaf0e19140c",
+  "metrics_file_complete_JSON_verified": true,
+  "source_log": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference.log",
+  "source_log_bytes": 100829,
+  "full_metrics_log_marker_present": false,
+  "source_file": "downloads/hil_bundles/sea-v2/standalone/large_scale_slam_isaac_demo.py",
+  "source_sha256": "a11700c8c71aef21881f57f11d5ba322cc82400d16a6cc9b23e5c559c50064cc",
+  "source_order": [
+    "write complete native metrics JSON",
+    "construct and print another entire json.dumps(metrics) string",
+    "world/sonar/SimulationApp cleanup"
+  ],
+  "suspected_allocation_stage": "whole-metrics log serialization before cleanup",
+  "static_inference_not_runtime_stack_proof": true,
+  "source_memory_limit_bytes": 7516192768,
+  "source_oom_kills": 1,
+  "source_status_not_changed": true,
+  "algorithm_or_navigation_changed": false,
+  "final_acceptance": false
+}
