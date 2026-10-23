@@ -144,7 +144,7 @@ def test_native_hooks_do_not_record_startup_as_timed_imu_events():
     result = instrument.visit(copy.deepcopy(tree))
     ast.fix_missing_locations(result)
     compile(result, "instrumented", "exec")
-    assert sorted(instrument.hooks) == sorted(["boot", "imu", "dvl", "depth", "sonar", "reference", "finish"])
+    assert sorted(instrument.hooks) == sorted(["boot", "imu", "dvl", "depth", "sonar", "reference", "finish", "final_log"])
     main = next(n for n in result.body if isinstance(n, ast.FunctionDef) and n.name == "main")
     startup = next(n for n in main.body if isinstance(n, ast.For) and "range(32)" in ast.unparse(n.iter))
     assert "hil_capture" not in ast.unparse(startup)

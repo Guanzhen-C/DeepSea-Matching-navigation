@@ -21,6 +21,25 @@ from standalone.hil.recording import Recorder
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def log_metrics_summary(metrics, metrics_path):
+    """Log scalar completion metadata, not a second copy of the full report.
+
+    The frozen main has already streamed the complete JSON report to disk.
+    Re-encoding its potentially large cohort/history diagnostics for stdout
+    creates an avoidable allocation at the source's memory limit. This hook
+    changes only the final PC-reference log, never the saved report or engine.
+    """
+    keys = ("run_status", "termination_reason", "full_map_completed",
+            "survey_travelled_distance_m", "sim_time_s", "pings",
+            "local_error_m", "global_error_m")
+    summary = {key: metrics.get(key) for key in keys}
+    summary.update(full_metrics_file=str(metrics_path),
+                   PC_reference_not_board_output=True,
+                   complete_report_retained_on_disk=True)
+    print("[OceanSim HIL] PC reference summary: "
+          + json.dumps(summary, allow_nan=False), flush=True)
+
+
 def launcher_argv(bundle, profile, output, distance):
     text = (bundle / "standalone/run_v2_full_map_slam_isaac.sh").read_text()
     text = text[text.index('exec "${SCRIPT_DIR}/run_large_scale_slam_isaac.sh"'):]
@@ -76,6 +95,27 @@ class Instrument(ast.NodeTransformer):
             return ast.parse("hil_capture.reference_sample(sim_time, truth, slam, dead_reckoning, global_rotation, global_position)").body + [node]
         return self.generic_visit(node)
 
+    def visit_Expr(self, node):
+        call = node.value
+        if (self.in_main and isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name) and call.func.id == "print"
+                and call.args):
+            label = any(isinstance(part, ast.Constant)
+                        and isinstance(part.value, str)
+                        and part.value.startswith("[OceanSim] live metrics:")
+                        for part in ast.walk(call.args[0]))
+            full_dump = any(isinstance(part, ast.Call)
+                            and isinstance(part.func, ast.Attribute)
+                            and isinstance(part.func.value, ast.Name)
+                            and part.func.value.id == "json" and part.func.attr == "dumps"
+                            and part.args and isinstance(part.args[0], ast.Name)
+                            and part.args[0].id == "metrics" for part in ast.walk(call))
+            if label and full_dump:
+                self.hooks.append("final_log")
+                replacement = ast.parse("hil_capture_log_metrics(metrics)").body[0]
+                return ast.copy_location(replacement, node)
+        return self.generic_visit(node)
+
     def visit_Try(self, node):
         node = self.generic_visit(node)
         if self.in_main and any(isinstance(n, ast.Expr) and isinstance(n.value, ast.Call)
@@ -105,7 +145,7 @@ def main():
     tree, digest = source_tree(source, args.profile)
     transform = Instrument(args.bundle)
     tree = transform.visit(copy.deepcopy(tree))
-    expected = ["boot", "imu", "dvl", "depth", "sonar", "reference", "finish"]
+    expected = ["boot", "imu", "dvl", "depth", "sonar", "reference", "finish", "final_log"]
     if sorted(transform.hooks) != sorted(expected):
         raise ValueError(f"unexpected native instrumentation sites: {transform.hooks}")
     ast.fix_missing_locations(tree)
@@ -118,7 +158,9 @@ def main():
         purpose=("live Isaac simulated raw-sensor producer with independent frozen PC control; processor-in-loop, not physical sensors"
                  if os.environ.get("OCEANSIM_HIL_SOCKET") else
                  "native sensor capture and parity reference, not network HIL")), indent=2) + "\n")
-    namespace = dict(__name__="__main__", __file__=str(source), hil_capture=recorder)
+    namespace = dict(__name__="__main__", __file__=str(source), hil_capture=recorder,
+                     hil_capture_log_metrics=lambda metrics: log_metrics_summary(
+                         metrics, args.output / "native_metrics.json"))
     sys.argv = [str(source), *argv]
     try:
         exec(compile(tree, str(source) + "::hil-capture", "exec"), namespace)

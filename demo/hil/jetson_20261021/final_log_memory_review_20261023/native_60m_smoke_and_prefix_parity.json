@@ -1,0 +1,71 @@
+{
+  "kind": "native_PC_60m_exit_smoke_and_exact_old_prefix_parity_not_full_HIL_requalification",
+  "recorded_utc": "2026-10-23T08:05:12.003932+00:00",
+  "source_status": [
+    "Result=success",
+    "ExecMainStatus=0",
+    "ActiveState=inactive"
+  ],
+  "terminal_snapshot_alone_does_not_independently_prove_exit_code": true,
+  "later_checked_LoadState": "not-found",
+  "exit_code_requires_separate_waited_verification": true,
+  "samples": 201,
+  "distance_m": 60.000108913932216,
+  "native_summary": {
+    "status": "completed",
+    "termination_reason": "requested_survey_segment_reached",
+    "profile": "sea",
+    "baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "samples": 201,
+    "events": {
+      "boot": 1,
+      "sonar": 201,
+      "imu": 2000,
+      "depth": 400,
+      "dvl": 200,
+      "finish": 1
+    },
+    "sensor_truth_fields_transmitted": false,
+    "delivery": "local_native_capture_only",
+    "reference_file_host_only": "host_reference.osh.gz"
+  },
+  "capture_manifest_sha256": "65d5d1d0551ed36a6096165e2bf873e623d3b999c5800b7d580250962fb77b08",
+  "new_capture_source_sha256": "baa8509fcdccd8eb6a5bb8bb28e2ecac800b34cd3f5d51785e32e14671a5cadb",
+  "old_formal_evidence_commit": "d9faaaa",
+  "pose_channel_maximum_component_differences": {
+    "truth_position": 0.0,
+    "truth_rotation": 0.0,
+    "dr_position": 0.0,
+    "dr_rotation": 0.0,
+    "local_position": 0.0,
+    "local_rotation": 0.0,
+    "global_position": 0.0,
+    "global_rotation": 0.0
+  },
+  "all_eight_pose_channels_exactly_equal": true,
+  "physical_raw_events_compared": 2801,
+  "physical_raw_event_pack_bytes_exactly_equal": true,
+  "controlled_boot_configuration_differences": {
+    "survey_segment_distance_m": {
+      "original": 0.0,
+      "smoke": 60.0
+    },
+    "metrics": {
+      "original": {
+        "path": "/home/cgz/OceanSim/demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json"
+      },
+      "smoke": {
+        "path": "/home/cgz/OceanSim/demo/hil/jetson_20261021/final_log_memory_review_20261023/native_sea_60m_post_log_fix/native_metrics.json"
+      }
+    }
+  },
+  "controlled_initial_seed_unchanged": true,
+  "full_metrics_file_retained": true,
+  "compact_log_present": true,
+  "full_route_rerun": false,
+  "board_estimator_started": false,
+  "new_formal_HIL_qualified": false,
+  "old_OOM_result_not_changed": true,
+  "full_route_acceptance": false,
+  "final_acceptance": false
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "bounded_offline_final_log_allocation_comparison_not_formal_source_shutdown_qualification",
+  "recorded_utc": "2026-10-23T07:57:14.994452+00:00",
+  "input_metrics_file": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json",
+  "input_metrics_bytes": 20012541,
+  "input_sha256": "586460990d478096c3ff2a2df4118713cfe55e564f955dab2d8cfaaf0e19140c",
+  "source_file_unchanged": true,
+  "preserved_pre_fix_evidence_commit": "d9faaaa",
+  "old_full_message": {
+    "characters": 13924201,
+    "additional_traced_Python_allocation_peak_bytes": 27849027,
+    "elapsed_s": 0.4723907730076462,
+    "scope": "whole json.dumps plus prefix; excludes actual stdout encoding/write"
+  },
+  "new_compact_message": {
+    "characters": 551,
+    "additional_traced_Python_allocation_peak_bytes": 3143,
+    "elapsed_s": 0.00010607304284349084,
+    "message": "[OceanSim HIL] PC reference summary: {\"run_status\": \"completed\", \"termination_reason\": \"requested_survey_laps_reached\", \"full_map_completed\": true, \"survey_travelled_distance_m\": 73070.32881952196, \"sim_time_s\": 48713.666666666664, \"pings\": 243569, \"local_error_m\": 1462.1474568351023, \"global_error_m\": 4.3624755266090895, \"full_metrics_file\": \"demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2/sea_full_route_live/native_reference/native_metrics.json\", \"PC_reference_not_board_output\": true, \"complete_report_retained_on_disk\": true}\n",
+    "scope": "compact logger including StringIO write"
+  },
+  "peak_traced_allocation_reduction_ratio": 8860.651288577792,
+  "host_process_peak_RSS_bytes": 119390208,
+  "patched_capture_source_sha256": "baa8509fcdccd8eb6a5bb8bb28e2ecac800b34cd3f5d51785e32e14671a5cadb",
+  "navigation_algorithm_changed": false,
+  "physical_sensor_rates_changed": false,
+  "full_metrics_retained": true,
+  "full_source_simulation_rerun": false,
+  "full_source_shutdown_success_not_yet_validated": true,
+  "original_OOM_not_reclassified": true,
+  "full_route_acceptance": false,
+  "final_acceptance": false
+}
