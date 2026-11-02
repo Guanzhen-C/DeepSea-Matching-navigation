@@ -1,0 +1,48 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{literature_review}[2026/10/03 Chinese literature review template]
+
+\RequirePackage[a4paper,margin=24mm,headheight=16pt]{geometry}
+\RequirePackage{fontspec}
+\RequirePackage{xeCJK}
+\RequirePackage{amsmath,amssymb}
+\RequirePackage{booktabs,tabularx,array}
+\RequirePackage{enumitem}
+\RequirePackage{xcolor}
+\RequirePackage{hyperref}
+\RequirePackage{fancyhdr}
+
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setCJKmainfont{Noto Serif CJK SC}
+\setCJKsansfont{Noto Sans CJK SC}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\linespread{1.22}
+\setlist{leftmargin=2em,itemsep=0.25em,topsep=0.35em}
+
+\definecolor{ReviewBlue}{HTML}{16466B}
+\definecolor{ReviewGray}{HTML}{53616C}
+\hypersetup{colorlinks=true,linkcolor=ReviewBlue,urlcolor=ReviewBlue,citecolor=ReviewBlue}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{ReviewGray}海底地形导航文献精读}
+\fancyhead[R]{\small\color{ReviewGray}Global UTAN}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+\newcommand{\reviewtitle}[3]{%
+  \begin{center}
+    {\small\sffamily\color{ReviewBlue}海底地形导航文献精读 · #1}\par\vspace{0.6em}
+    {\LARGE\bfseries #2}\par\vspace{0.45em}
+    {\large\color{ReviewGray}#3}\par
+  \end{center}
+  \vspace{0.7em}\hrule\vspace{0.8em}
+}
+
+\newcommand{\reviewnote}[1]{%
+  \par\noindent\fcolorbox{ReviewBlue}{ReviewBlue!4}{%
+    \parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{#1}}
+  \par
+}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}

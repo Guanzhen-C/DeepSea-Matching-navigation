@@ -1,0 +1,928 @@
+\hypertarget{ux6458ux8981}{%
+\section{摘要}\label{ux6458ux8981}}
+
+声呐里程计利用时间上不同的声学环境观测估计车辆相对运动，为水下实时建图、轨迹传播和全局定位提供短时约束。多波束测深与侧扫声呐的联合使用具有几何和地貌互补潜力，但其条带采样、斜距投影、波束积分和视角依赖强度与陆地激光雷达及相机不同。陆地融合框架可以提供统一状态估计与地图关联思想，不能通过直接替换输入而保证测量模型正确。
+
+本报告综合测深概率配准、侧扫稀疏与稠密SLAM、成像声呐惯性融合、DVL标定、误差状态滤波、陆地直接融合及神经声学重建文献，围绕相对位姿、运动补偿、子帧构建、几何残差、强度匹配、退化识别、协方差和后端接口开展研究。重点分析前进条带为什么可能缺少沿航向约束、拼接先验如何影响声呐更新、转弯期间的时空误差，以及大量相关特征造成虚假置信度的风险。
+
+综合分析认为，可靠前端应同时满足测量正确、数据关联可信和状态可观三个条件。特征方法与直接方法并无无条件优劣，关键是声学特征的物理稳定性和误差建模；DVL与深度观测为运动提供重要先验，但不能替代环境对航向及比例误差的独立校正。评价应采用短时相对误差、方向性误差、协方差校准与地图一致性，不可仅用长期绝对位置曲线判断里程计质量。本文是公开文献综合研究，不包含具体项目运行、调参或仿真结果。
+
+关键词 声呐里程计 多波束 侧扫 特征匹配 惯性融合 DVL 运动补偿 可观性
+
+\hypertarget{ux7b2cux4e00ux7ae0-ux58f0ux5450ux91ccux7a0bux8ba1ux4e0eux5b9eux65f6ux5efaux56fe}{%
+\section{第一章 声呐里程计与实时建图}\label{ux7b2cux4e00ux7ae0-ux58f0ux5450ux91ccux7a0bux8ba1ux4e0eux5b9eux65f6ux5efaux56fe}}
+
+\hypertarget{ux76f8ux5bf9ux4f4dux59ffux7684ux7814ux7a76ux76eeux6807}{%
+\subsection{1.1 相对位姿的研究目标}\label{ux76f8ux5bf9ux4f4dux59ffux7684ux7814ux7a76ux76eeux6807}}
+
+里程计的基本输出是不同时间之间的运动变换。只要某个固定全局变换作用于所有局部位姿，相对变换保持不变；因此一条整体偏移的局部轨迹仍可能具有良好的短时相对运动。反之，绝对位置暂时接近真值也不保证每个短时增量正确。
+
+在水下长航程中，IMU、DVL和深度提供连续运动状态，声呐为环境关联提供外部几何或强度证据。经典水下导航综述将环境参照与纯运动积分的作用区分。\href{https://people.csail.mit.edu/lpaull/publications/Paull_JOE_2014.pdf}{［1］} 声呐里程计研究应回答环境到底增加了哪些独立可观信息，而不仅是系统增加了一种传感器。
+
+\hypertarget{ux91ccux7a0bux8ba1ux4e0eslam}{%
+\subsection{1.2 里程计与SLAM}\label{ux91ccux7a0bux8ba1ux4e0eslam}}
+
+里程计通常使用近期历史观测或局部地图，保证连续输出。SLAM在更长时间范围内关联历史区域，并优化地图及轨迹。测深粒子滤波SLAM和侧扫图优化研究提供这类长期关联方法。\href{https://doi.org/10.1177/0278364912459666}{［2］}\href{https://arxiv.org/abs/2312.13802}{［3］}
+
+若一篇侧扫SLAM论文主要通过相邻测线重访形成回环，其成果不能直接解读为每一条新ping都能提供完整在线里程计。文献比较必须说明约束产生的时间尺度和重叠条件，区分局部跟踪与后端回环。
+
+\hypertarget{ux5730ux7406ux53c2ux8003ux4e0eux5c40ux90e8ux8fdeux7eedux6027}{%
+\subsection{1.3 地理参考与局部连续性}\label{ux5730ux7406ux53c2ux8003ux4e0eux5c40ux90e8ux8fdeux7eedux6027}}
+
+局部坐标系适合连续运动表达，地图坐标系适合绝对参照。全局匹配可以纠正轨迹地理位置，但不一定直接纠正局部速度或传感器偏差。地图坐标变换与状态反馈的数学作用不同，不能以界面轨迹贴近真值作为前端模型正确的证据。
+
+本报告关注前端相对估计及其与长期建图的接口，绝对重定位作为独立关联问题讨论。地形导航综述提供了不同任务的整体分类。\href{https://eprints.soton.ac.uk/153897/1/Carreno_2010_-_A_survey__on_TBN_for_AUVs.pdf}{［4］}\href{https://doi.org/10.1016/j.oceaneng.2017.04.047}{［5］}
+
+\hypertarget{ux7b2cux4e8cux7ae0-ux6d4bux6df1ux4e0eux4fa7ux626bux7684ux7269ux7406ux89c2ux6d4b}{%
+\section{第二章 测深与侧扫的物理观测}\label{ux7b2cux4e8cux7ae0-ux6d4bux6df1ux4e0eux4fa7ux626bux7684ux7269ux7406ux89c2ux6d4b}}
+
+\hypertarget{ux591aux6ce2ux675fux4e0dux662fux4efbux610fux7a20ux5bc6ux4e09ux7ef4ux626bux63cf}{%
+\subsection{2.1 多波束不是任意稠密三维扫描}\label{ux591aux6ce2ux675fux4e0dux662fux4efbux610fux7a20ux5bc6ux4e09ux7ef4ux626bux63cf}}
+
+多波束测深通过多个方向回波形成条带状海底采样，测量分布受有效开角、离底高度、海底坡度和波束足迹影响。一次物理ping可以形成多个测深方向，但具体发射与接收结构属于设备定义，算法时间窗口不应改变其物理含义。
+
+与环形激光扫描相比，海底测深往往集中在一条横向扇面及近单值底面。即使点数多，几何方向也可能单一。多波束里程计的难点不仅是噪声大，还包括缺少足够立体与方向性结构。
+
+\hypertarget{ux4e8cux7ef4ux58f0ux5450ux7684ux7ef4ux5ea6ux635fux5931}{%
+\subsection{2.2 二维声呐的维度损失}\label{ux4e8cux7ef4ux58f0ux5450ux7684ux7ef4ux5ea6ux635fux5931}}
+
+成像声呐常记录距离和方位，俯仰方向信息不完整。侧扫则利用侧向波束及车辆移动形成条带图，单像素通常只确定斜距与波束覆盖条件，而非唯一三维点。声呐几何不能用相机透视投影直接替代。
+
+\begin{figure}
+\centering
+\includegraphics{assets/sonar_geom.png}
+\caption{式2-1 声呐方向参数化与侧扫斜距约束示意}
+\end{figure}
+
+第一行是包含方位α和俯仰φ的三维方向参数化，说明缺少一个角度会留下空间自由度；第二行是以沿航向为x轴、理想侧向扇面为x零平面的侧扫几何约束示意。实际波束具有有限宽度，因此扇面关系应带不确定度，而不是严格等式。
+
+\hypertarget{ux5f3aux5ea6ux548cux53cdux5c04ux7387}{%
+\subsection{2.3 强度和反射率}\label{ux5f3aux5ea6ux548cux53cdux5c04ux7387}}
+
+回波强度包括底质反射、入射角响应、传播损失、波束图及增益处理。相同散射区域从不同方向观察时，强度和阴影可能不同；不同设备或处理链路也会改变像素分布。GeoHab指南为回波强度和校正提供专业基础。\href{https://geohab.org/backscatter-working-group/}{［6］}
+
+强度不变性需要条件。对局部小视角变化、增益稳定且没有明显阴影变化的区域，匹配可能有效；对视角变化大或强镜面底面，直接亮度一致性较弱。研究应记录何种强度被使用，并区别原始回波、时变增益后强度和估计反射率。
+
+\hypertarget{ux540cux6e90ux591aux6a21ux6001ux7684ux5173ux8054}{%
+\subsection{2.4 同源多模态的关联}\label{ux540cux6e90ux591aux6a21ux6001ux7684ux5173ux8054}}
+
+测深与侧扫来自同一设备或声学周期，可以改善时间同步及空间关联，但不能据此假定覆盖完全相同。测深点对应波束方向与底检测，强度样本对应范围积分和处理结果。建立关联需要时间、频率、波束和斜距定义。
+
+共同姿态、声速或安装误差会影响两种输出。融合时需要防止同一几何偏差在测深残差和强度投影中被重复计算。多模态的价值在于独立或互补信息，不是形式上增加两组观测。
+
+\hypertarget{ux7b2cux4e09ux7ae0-ux60efux6027-dvlux4e0eux6df1ux5ea6ux8fd0ux52a8ux6a21ux578b}{%
+\section{第三章 惯性 DVL与深度运动模型}\label{ux7b2cux4e09ux7ae0-ux60efux6027-dvlux4e0eux6df1ux5ea6ux8fd0ux52a8ux6a21ux578b}}
+
+\hypertarget{ux5b8cux6574ux4e09ux7ef4ux8fd0ux52a8}{%
+\subsection{3.1 完整三维运动}\label{ux5b8cux6574ux4e09ux7ef4ux8fd0ux52a8}}
+
+水下车辆通常存在滚转、俯仰、升沉和转弯，不应默认所有运动都在水平面。即使主航迹近水平，姿态误差仍会改变外侧波束投影和DVL速度变换。完整运动模型可以用旋转矩阵、位置和速度表达。
+
+\begin{figure}
+\centering
+\includegraphics{assets/motion.png}
+\caption{式3-1 惯性姿态 位置和速度传播}
+\end{figure}
+
+ω\_m和a\_m分别为角速度及比力测量，b\_g和b\_a为偏差，g为导航坐标中的重力模型。重力可以按研究范围固定为已知矢量，也可以在特定初始化中估计方向；``不把重力作为待估状态''不等于从动力学中删除重力。Solà的误差状态数学资料提供旋转与状态更新的基础。\href{https://arxiv.org/abs/1711.02508}{［7］}
+
+\hypertarget{ux6700ux5c0fux72b6ux6001ux4e0eux9644ux52a0ux53c2ux6570}{%
+\subsection{3.2 最小状态与附加参数}\label{ux6700ux5c0fux72b6ux6001ux4e0eux9644ux52a0ux53c2ux6570}}
+
+一个常用运动状态包含位置、速度、姿态误差及陀螺和加速度偏差。DVL安装参数、尺度、深度偏差和时间偏差可以作为额外变量，但是否加入取决于独立观测和激励。过多不可观状态会导致估计相互补偿，而不是更准确。
+
+离线固定外参减少在线维度，但需要真实标定和不确定度；在线估计能适应某些变化，却需要持续激励及收敛检查。研究报告应说明哪些量是已知、离线估计或在线状态，而不能只列一个很长状态向量。
+
+\hypertarget{dvlux6746ux81c2ux4e0eux65cbux8f6cux901fux5ea6}{%
+\subsection{3.3 DVL杆臂与旋转速度}\label{dvlux6746ux81c2ux4e0eux65cbux8f6cux901fux5ea6}}
+
+DVL安装位置与惯性参考点不同，转弯时两者速度存在角速度叉乘杆臂项。忽略该项会把刚体旋转造成的差异解释为平动速度误差。下面模型假设底跟踪、外参约定一致，水跟踪还需水体速度项。
+
+\begin{figure}
+\centering
+\includegraphics{assets/dvl_model.png}
+\caption{式3-2 DVL底跟踪速度及杆臂模型}
+\end{figure}
+
+其中R\_bd从DVL坐标变换到机体坐标，l\_bd为机体参考点到DVL的杆臂。角速度必须使用对应时间和坐标。Pan与Wu关于水下Doppler自标定的研究提供标定和可观性的直接参考。\href{https://arxiv.org/abs/1509.02054}{［8］}
+
+\hypertarget{dvlux6389ux9501ux4e0eux4e0dux5b8cux6574ux89c2ux6d4b}{%
+\subsection{3.4 DVL掉锁与不完整观测}\label{dvlux6389ux9501ux4e0eux4e0dux5b8cux6574ux89c2ux6d4b}}
+
+底跟踪可能受离底高度、底质或姿态影响，部分波束也可能失效。把缺失速度维度补零，会人为产生错误约束；把水跟踪直接当成地速，则忽略海流。Cohen与Klein研究有限DVL测量条件下的水下导航，提供不完整观测处理的相关方向。\href{https://arxiv.org/abs/2404.13742}{［9］}
+
+无DVL时，惯性传播不确定性应按模型增加；声呐是否能补偿取决于地形和重叠。不能因为声呐仍有图像就认为速度问题自动解决。对掉锁期间的评价应同时记录有效波束和环境几何条件。
+
+\hypertarget{ux6df1ux5ea6ux8ba1ux4e0eux5171ux540cux504fux5dee}{%
+\subsection{3.5 深度计与共同偏差}\label{ux6df1ux5ea6ux8ba1ux4e0eux5171ux540cux504fux5dee}}
+
+深度计约束垂向位置，对声呐地理定位非常重要，但压力转深度和垂直基准差异可形成共同偏差。若地图高程和深度观测基准不一致，配准可能通过移动水平位置解释垂向错误。HUGIN技术论文讨论了这类深度偏差。\href{https://www.navlab.net/Publications/The_HUGIN_AUV_Terrain_Navigation_Module.pdf}{［10］}
+
+前端相对配准中，共同深度偏差可能部分抵消，但跨时间变化或姿态耦合仍会影响运动。不能简单根据传感器在两帧都存在，就认为其系统误差完全相同。
+
+\hypertarget{ux7b2cux56dbux7ae0-ux65f6ux95f4ux540cux6b65-ux8fd0ux52a8ux8865ux507fux4e0eux5b50ux5e27ux6784ux5efa}{%
+\section{第四章 时间同步 运动补偿与子帧构建}\label{ux7b2cux56dbux7ae0-ux65f6ux95f4ux540cux6b65-ux8fd0ux52a8ux8865ux507fux4e0eux5b50ux5e27ux6784ux5efa}}
+
+\hypertarget{ux7269ux7406pingux4e0eux7b97ux6cd5ux7a97ux53e3}{%
+\subsection{4.1 物理ping与算法窗口}\label{ux7269ux7406pingux4e0eux7b97ux6cd5ux7a97ux53e3}}
+
+物理ping是声学发射及回波处理的采样事件，算法窗口是估计使用的历史范围。一次ping中的多波束可以同时形成测深方向，多个连续ping用于构成具有沿航向长度的子帧。两者不应被混称为``多条同时扫描''。
+
+若车辆速度为v、物理频率为f\_p、窗口包含N个ping，则相邻采样位移和窗口前后跨度近似如下。该式只是恒速运动的几何关系，转弯或变速时应使用真实时间和姿态积分。
+
+\begin{figure}
+\centering
+\includegraphics{assets/window.png}
+\caption{式4-1 采样间距 子帧跨度和相对运动}
+\end{figure}
+
+\hypertarget{ux66f4ux9ad8ux9891ux7387ux4e0dux4fddux8bc1ux6709ux6548ux91cdux53e0}{%
+\subsection{4.2 更高频率不保证有效重叠}\label{ux66f4ux9ad8ux9891ux7387ux4e0dux4fddux8bc1ux6709ux6548ux91cdux53e0}}
+
+提高ping频率减小沿航向间距，但是否观测同一片环境还受沿航向波束足迹、姿态和遮挡影响。足迹可以重叠但内部三维点采样不同；横向条带可以接近但缺少相同散射点。重叠应由物理覆盖和地理几何估计，而不只是按时间间隔判断。
+
+子帧匹配通常希望窗口形成一定二维地形结构。然而窗口越长，运动先验误差与环境非刚性投影差异越大。长窗口的结构收益和运动畸变代价需要同时分析。
+
+\hypertarget{ux6761ux5e26ux53bbux7578ux53d8}{%
+\subsection{4.3 条带去畸变}\label{ux6761ux5e26ux53bbux7578ux53d8}}
+
+把不同时间测点转换到统一参考时刻，需要使用该测点的时间标签及车辆运动。时间错位在转弯时使点产生横向和旋转偏差，远距离波束尤其敏感。相同原则也适用于侧扫图中每一行的采集姿态。
+
+时间标签可能表示发射、接收、中点或数据包形成时间，设备链路不同不能混用。声学传播相对慢，长距离回波可能对应明显延迟。研究应根据测量定义建立时间模型，而不是只给所有点赋予图像完成时刻。
+
+\hypertarget{ux62fcux63a5ux5148ux9a8cux4e0eux72ecux7acbux7ea6ux675f}{%
+\subsection{4.4 拼接先验与独立约束}\label{ux62fcux63a5ux5148ux9a8cux4e0eux72ecux7acbux7ea6ux675f}}
+
+用惯性和DVL拼接条带并不使后续配准毫无意义，前提是历史与新观测对相同环境有真实冗余。配准可以发现拼接先验没有完全解释的环境不一致，并提供改正。没有真实重叠时，只对按先验构造的图再做自洽匹配，容易把先验重复使用成伪观测。
+
+同样，子帧的每个点位置依赖运动状态，配准误差与里程计先验相关。若把拼接后点云视为独立确定数据，再融合其位姿输出，可能过度乐观。研究应分析生成子地图时使用的信息和后续残差之间的关系。
+
+\hypertarget{ux8f6cux5f2fux7a97ux53e3}{%
+\subsection{4.5 转弯窗口}\label{ux8f6cux5f2fux7a97ux53e3}}
+
+转弯可以提供不同观察方向和参数激励，但也会改变侧扫照射、阴影和有效覆盖。把弯曲航迹上的侧扫图按直线行列解释，会扭曲地貌。固定长度窗口在转弯中应根据实际运动补偿，而不能只靠减小匹配步长解决。
+
+研究需要对速度、角速度、时间偏差和杆臂分别做误差传播。某个转弯段误差增加可能来自观测退化，也可能来自几何模型失配；二者需要通过方向性残差和传感器信息区分，而不是一律归因于``声呐不够好''。
+
+\hypertarget{ux7b2cux4e94ux7ae0-ux591aux6ce2ux675fux51e0ux4f55ux91ccux7a0bux8ba1}{%
+\section{第五章 多波束几何里程计}\label{ux7b2cux4e94ux7ae0-ux591aux6ce2ux675fux51e0ux4f55ux91ccux7a0bux8ba1}}
+
+\hypertarget{ux70b9ux5230ux9762ux4e0eux6982ux7387ux914dux51c6}{%
+\subsection{5.1 点到面与概率配准}\label{ux70b9ux5230ux9762ux4e0eux6982ux7387ux914dux51c6}}
+
+点到面残差利用局部法向，避免将沿表面的位移全部解释为距离误差。GICP进一步用局部协方差统一表面关系。\href{https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf}{［11］} 多波束概率三维SLAM研究对测量不确定性与配准进行直接讨论。\href{https://pmc.ncbi.nlm.nih.gov/articles/PMC4851074/}{［12］}
+
+\begin{figure}
+\centering
+\includegraphics{assets/gicp_model.png}
+\caption{式5-1 带两侧点协方差的配准目标示意}
+\end{figure}
+
+协方差应反映表面分布与测点误差，不同来源需明确。若协方差依赖待估位姿，完整概率解释还涉及相应规范化；上式是常见配准目标示意，不宣称对全部设备为精确最大似然模型。
+
+\hypertarget{ux6cd5ux5411ux4e0eux90bbux57df}{%
+\subsection{5.2 法向与邻域}\label{ux6cd5ux5411ux4e0eux90bbux57df}}
+
+法向估计依赖邻域尺度和点密度。条带点在一个方向稀疏，简单固定最近邻数量可能跨越不同地形，从而生成错误平面；邻域太小则对噪声敏感。法向应结合几何尺度、观测足迹和采样各向异性。
+
+下采样也影响可观性。均匀体素抽样可以降低冗余，却可能删除小面积但关键的岩脊；仅按曲率选择又可能偏爱噪声。采样策略应保留方向与空间覆盖，而不是只追求剩余点数。
+
+\hypertarget{ux5e73ux5766ux5e95ux9762ux7684ux5f31ux7ea6ux675f}{%
+\subsection{5.3 平坦底面的弱约束}\label{ux5e73ux5766ux5e95ux9762ux7684ux5f31ux7ea6ux675f}}
+
+水平平面上的点到面残差主要约束垂向及某些倾角，对平面内平移和绕法向旋转缺少信息。加入更多同平面点会增强已有方向，但不能改变本质秩。单向坡面也只对特定方向较敏感。
+
+前端因此可能出现位置看似平稳但航向缓慢偏移的现象，长期积分后横向误差明显。几何配准应给弱方向较大的不确定度，而不是通过正则化输出一个数值很稳定但不真实可观的航向。
+
+\hypertarget{ux4f4eux91cdux53e0ux4e0eux7a7aux95f4ux9884ux6d4b}{%
+\subsection{5.4 低重叠与空间预测}\label{ux4f4eux91cdux53e0ux4e0eux7a7aux95f4ux9884ux6d4b}}
+
+真实重叠足够时，环境对应可以提供运动约束；低重叠时，配准更依赖初值和先验。Barkby的GP测深研究探索空间预测以利用部分或低重叠条件。\href{https://www-personal.acfr.usyd.edu.au/sbarkby/2011_iros_bpslam.pdf}{［13］} 这需要保留预测方差和地形连续性假设，不能把外推点视为独立实测。
+
+当两条带完全缺少共同结构，普通对应配准不能凭空确定完整运动。应承认观测不足，或引入新的环境参照及更长的真实重叠历史。用更多迭代不会创造信息。
+
+\hypertarget{ux914dux51c6ux534fux65b9ux5dee}{%
+\subsection{5.5 配准协方差}\label{ux914dux51c6ux534fux65b9ux5dee}}
+
+Hessian逆可以描述局部线性化的不确定性，但若忽略对应变化、地图误差和相关性，常会偏乐观。PointNetKL以学习方式估计测深GICP协方差，为这一问题提供研究方向。\href{https://arxiv.org/abs/2003.10931}{［14］}
+
+协方差学习不应只评价矩阵损失，还应检验与真实位姿误差的匹配。弱航向或沿航向方向应被反映；域外场景应避免输出不合理小方差。协方差错误会通过融合权重影响整个轨迹，即使单次配准均值尚可。
+
+\hypertarget{ux7b2cux516dux7ae0-ux4fa7ux626bux7279ux5f81ux4e0eux5339ux914d}{%
+\section{第六章 侧扫特征与匹配}\label{ux7b2cux516dux7ae0-ux4fa7ux626bux7279ux5f81ux4e0eux5339ux914d}}
+
+\hypertarget{ux4ec0ux4e48ux662fux53efux7528ux4e8eux5b9aux4f4dux7684ux58f0ux5b66ux7279ux5f81}{%
+\subsection{6.1 什么是可用于定位的声学特征}\label{ux4ec0ux4e48ux662fux53efux7528ux4e8eux5b9aux4f4dux7684ux58f0ux5b66ux7279ux5f81}}
+
+岩石边界、底质过渡、稳定阴影轮廓和特殊地貌纹理可能形成特征。真正有用的特征需要跨视角、时间和处理条件保持可识别，而不是只在单幅图像中具有强梯度。散斑、增益边界和水柱边缘也可能有很强响应，却不是稳定环境地标。
+
+特征应结合物理位置及可见性判断。若一个强度结构随离底高度或增益变化而移动，把它当作固定三维点会形成系统性运动误差。声呐学习综述强调数据与鲁棒性问题，对特征迁移具有直接意义。\href{https://arxiv.org/abs/2412.11840}{［15］}
+
+\hypertarget{ux4f20ux7edfux7279ux5f81ux65b9ux6cd5}{%
+\subsection{6.2 传统特征方法}\label{ux4f20ux7edfux7279ux5f81ux65b9ux6cd5}}
+
+角点和局部描述子可以提供可解释的稀疏对应，便于检查空间分布及异常点。它们通常假设一定局部外观稳定性，侧扫图经过几何校正后可能更适用，但校正误差也会改变描述子。
+
+侧扫全自动SLAM研究自动检测和匹配关键点，并以声呐约束优化轨迹。\href{https://arxiv.org/abs/2304.01854}{［16］} 其重要贡献在于完整声学几何和真实数据，而不是证明自然图像角点在任何海底都可靠。均匀底质区域仍可能缺乏足够可辨特征。
+
+\hypertarget{ux5b66ux4e60ux578bux7a00ux758fux5339ux914d}{%
+\subsection{6.3 学习型稀疏匹配}\label{ux5b66ux4e60ux578bux7a00ux758fux5339ux914d}}
+
+SuperGlue把局部特征关联建模为学习匹配，LightGlue研究更高效的匹配结构。\href{https://arxiv.org/abs/1911.11763}{［17］}\href{https://arxiv.org/abs/2306.13643}{［18］} 它们是高水平通用视觉方法，适合参考匹配推断，但预训练数据通常不是侧扫声呐。输入域变化可能导致置信分数失去校准。
+
+声呐适配应考虑斜距几何、左右舷、纹理方向和阴影变化。匹配置信度不是位姿信息量：多个高置信对应若集中在同一方向或重复纹理，仍可能无法约束航向。应把匹配正确性与几何可观性分开评价。
+
+\hypertarget{ux65e0ux68c0ux6d4bux5668ux548cux7a20ux5bc6ux5339ux914d}{%
+\subsection{6.4 无检测器和稠密匹配}\label{ux65e0ux68c0ux6d4bux5668ux548cux7a20ux5bc6ux5339ux914d}}
+
+LoFTR通过Transformer形成无检测器匹配，为弱纹理图像提供一种路线。\href{https://arxiv.org/abs/2104.00680}{［19］} 稠密侧扫子帧研究则直接面向声学图像的重叠区域和位姿关系。\href{https://arxiv.org/abs/2312.13802}{［3］} 两者不可混为相同证据，前者提供通用结构，后者提供水下任务研究。
+
+稠密对应可以提高覆盖，但相关像素和阴影区域会形成大量重复信息。应关注有效对应在斜距和沿航向的分布，以及它们是否符合声学扇面和可见性条件。仅增加匹配数量，可能使错误模型更有置信，而非更准确。
+
+\hypertarget{ux7279ux5f81ux51e0ux4f55ux9a8cux8bc1}{%
+\subsection{6.5 特征几何验证}\label{ux7279ux5f81ux51e0ux4f55ux9a8cux8bc1}}
+
+侧扫对应不适合直接套用相机基础矩阵或单应性作为全部验证，因为成像模型不同。可以使用声学范围、扇面及地形先验构建约束，并进行鲁棒估计。多波束高程可以减少侧扫高程歧义，但其误差应传播到特征位置。
+
+TEASER等鲁棒配准可在具有三维对应时提供参考。\href{https://arxiv.org/abs/2001.07715}{［20］} 对侧扫二维对应，需要先定义如何得到三维或范围约束，不能因为存在鲁棒匹配库就跳过测量模型。
+
+\hypertarget{ux7b2cux4e03ux7ae0-ux4fa7ux626bux76f4ux63a5ux6cd5ux4e0eux795eux7ecfux8868ux793a}{%
+\section{第七章 侧扫直接法与神经表示}\label{ux7b2cux4e03ux7ae0-ux4fa7ux626bux76f4ux63a5ux6cd5ux4e0eux795eux7ecfux8868ux793a}}
+
+\hypertarget{ux76f4ux63a5ux5f3aux5ea6ux6b8bux5dee}{%
+\subsection{7.1 直接强度残差}\label{ux76f4ux63a5ux5f3aux5ea6ux6b8bux5dee}}
+
+直接法利用图像或回波强度差，不先提取离散角点。潜在优点是使用更多弱纹理信息，限制是依赖几何变形和辐射模型。普通亮度一致性遇到入射角、增益或阴影改变时可能失效。
+
+可以估计局部增益或偏置减少部分辐射变化，但这些参数也可能吸收本应约束运动的强度变化。需要分析参数可观性，避免所有残差都被辐射调整解释，或反过来把辐射变化全部解释为车辆位姿。
+
+\hypertarget{ux9ad8ux7a0bux5148ux9a8cux4e0eux6295ux5f71}{%
+\subsection{7.2 高程先验与投影}\label{ux9ad8ux7a0bux5148ux9a8cux4e0eux6295ux5f71}}
+
+侧扫斜距到地面位置的转换依赖高度与地形。多波束提供几何先验后，强度块可以在统一表面上关联，而不是把图像行列直接当作平面地图。有效投影还必须处理可见性与阴影，避免将当前看不到的面强行匹配。
+
+这一研究方向与陆地几何辅助视觉融合在概念上相近，但声学测量的波束积分与视角依赖仍需重新建模。类似框架思想不意味着相同残差或相同可观性。
+
+\hypertarget{ux795eux7ecfux58f0ux5b66ux91cdux5efa}{%
+\subsection{7.3 神经声学重建}\label{ux795eux7ecfux58f0ux5b66ux91cdux5efa}}
+
+NeuRSS利用侧扫神经渲染提供高程先验，并通过SLAM改进位姿及地形。\href{https://arxiv.org/abs/2405.05807}{［21］} 它说明强度数据可以参与几何推断，但不是简单``把灰度值当成三维特征''。多个视角和显式声学模型是重要条件。
+
+隐式地形、反射率和姿态之间存在耦合。网络可以改变反射率来拟合错误的照射角，也可以改变高程解释运动误差。研究应使用独立测深和跨视角观测检查，而不仅看训练回波拟合。
+
+\hypertarget{ux7279ux5f81ux6cd5ux548cux76f4ux63a5ux6cd5ux7684ux7ec4ux5408}{%
+\subsection{7.4 特征法和直接法的组合}\label{ux7279ux5f81ux6cd5ux548cux76f4ux63a5ux6cd5ux7684ux7ec4ux5408}}
+
+特征法适合建立较大位移候选，直接法适合在可信初值和辐射条件下精化；几何残差适合提供尺度与表面约束。三者可以互补，但若使用相同像素又假定完全独立，会重复计入证据。
+
+组合研究需要说明信息如何传递和哪些观测被重复使用。把多个模块串联并不自动构成更强算法；应证明每个模块改变了正确对应覆盖、可观方向或误差校准。
+
+\hypertarget{ux7b2cux516bux7ae0-ux9646ux5730ux878dux5408ux6846ux67b6ux7684ux6c34ux4e0bux8fc1ux79fb}{%
+\section{第八章 陆地融合框架的水下迁移}\label{ux7b2cux516bux7ae0-ux9646ux5730ux878dux5408ux6846ux67b6ux7684ux6c34ux4e0bux8fc1ux79fb}}
+
+\hypertarget{fast-lio2ux7684ux53efux501fux9274ux90e8ux5206}{%
+\subsection{8.1 FAST-LIO2的可借鉴部分}\label{fast-lio2ux7684ux53efux501fux9274ux90e8ux5206}}
+
+FAST-LIO2通过原始点到地图约束和紧耦合迭代滤波估计状态，并使用增量空间数据结构维护地图。\href{https://arxiv.org/abs/2107.06829}{［22］} 对水下，原始测深点利用和实时局部地图维护具有参考价值，但测点噪声、条带重叠和海底几何弱约束不同。
+
+直接使用点云不等于不需要特征。这里``不提取人工边平面特征''主要指不先筛出离散特征集合，仍依赖局部表面结构和对应。海底没有足够结构时，原始点数再多也不能提供完整位置及航向信息。
+
+\hypertarget{fast-livo2ux7684ux53efux501fux9274ux90e8ux5206}{%
+\subsection{8.2 FAST-LIVO2的可借鉴部分}\label{fast-livo2ux7684ux53efux501fux9274ux90e8ux5206}}
+
+FAST-LIVO2在统一几何地图中关联图像块，并以ESIKF进行激光、惯性和视觉融合。\href{https://arxiv.org/abs/2408.14035}{［23］} 值得借鉴的是空间统一、几何辅助强度对应和分阶段更新；不是把相机图像替换为侧扫图后继续使用透视光度残差。
+
+水下相应设计应把几何地图替换为具有声学测量误差的表面表示，把图像块投影替换为斜距与波束模型，并处理增益与反射率。状态向量还应基于IMU、DVL、深度和声呐的可观性，而不是复制陆地所有变量。
+
+\hypertarget{ux8befux5deeux72b6ux6001ux6ee4ux6ce2}{%
+\subsection{8.3 误差状态滤波}\label{ux8befux5deeux72b6ux6001ux6ee4ux6ce2}}
+
+误差状态滤波在名义状态附近估计小误差，旋转通常在流形上更新。Solà详细讨论四元数与误差状态关系。\href{https://arxiv.org/abs/1711.02508}{［7］} 迭代更新能减小线性化误差，但不能纠正错误对应或不可观状态，重复迭代也不代表新增观测。
+
+多模态顺序更新需要使用更新后的状态与合理协方差，同时避免把同一先验在每次迭代中当作新测量重复加入。迭代次数影响计算与收敛，不应被解释为观测次数。
+
+\hypertarget{ux6ed1ux52a8ux7a97ux53e3ux4f18ux5316}{%
+\subsection{8.4 滑动窗口优化}\label{ux6ed1ux52a8ux7a97ux53e3ux4f18ux5316}}
+
+滑动窗口保留多个位姿，可同时处理历史观测和偏差，为时间错位及多视角约束提供更完整表达。成像声呐关键帧研究基于雅可比和奇异值区分约束情况，设计窗口优化。\href{https://arxiv.org/abs/2106.16032}{［24］} 它提供退化感知思想，但声呐类型及场景条件要保留。
+
+窗口边缘化会形成先验，后续如果线性化点改变或不可观方向被过度约束，可能产生不一致。研究需要检查边缘化信息与当前观测的关系，而不是认为窗口越长越可靠。
+
+\hypertarget{ux7b2cux4e5dux7ae0-ux53efux89c2ux6027-ux8befux5deeux8026ux5408ux4e0eux524dux7aefux5931ux6548}{%
+\section{第九章 可观性 误差耦合与前端失效}\label{ux7b2cux4e5dux7ae0-ux53efux89c2ux6027-ux8befux5deeux8026ux5408ux4e0eux524dux7aefux5931ux6548}}
+
+\hypertarget{ux6d4bux91cfux5339ux914dux6b63ux786eux4e0eux72b6ux6001ux53efux89c2ux662fux4e24ux4ef6ux4e8b}{%
+\subsection{9.1 测量匹配正确与状态可观是两件事}\label{ux6d4bux91cfux5339ux914dux6b63ux786eux4e0eux72b6ux6001ux53efux89c2ux662fux4e24ux4ef6ux4e8b}}
+
+一组对应可以全部正确，但几何分布仍然退化。例如特征沿一条长直线或全部落在近平面，某些运动无法被区分。反之，几何看似丰富而对应错误，会产生错误的强约束。前端必须分别检验关联质量和信息结构。
+
+特征数量、残差均值和优化步长都不能单独决定可观性。应分析雅可比、信息矩阵以及对干扰参数边缘化后的有效信息。状态单位不同还需要适当尺度处理，直接比较位置和角度列的奇异值可能误导。
+
+\hypertarget{ux6cbfux822aux5411ux4e0eux822aux5411ux89d2}{%
+\subsection{9.2 沿航向与航向角}\label{ux6cbfux822aux5411ux4e0eux822aux5411ux89d2}}
+
+横向测深条带常提供较多横向坡面信息，但沿航向的共同结构有限。平坦或重复沙波区域中，沿航向位移和航向可能弱可观。侧扫多ping形成沿航向结构，有潜力提供补充，但前提是真实重复观测和正确运动补偿。
+
+若航向误差持续存在，DVL机体系速度变到导航系时就会产生横向分量误差，并在长时间内积累位置偏差。仅用位置残差不直接估计航向，并不保证航向不受影响；滤波状态之间的交叉协方差可以传递改正。
+
+\hypertarget{ux72b6ux6001ux4ea4ux53c9ux534fux65b9ux5dee}{%
+\subsection{9.3 状态交叉协方差}\label{ux72b6ux6001ux4ea4ux53c9ux534fux65b9ux5dee}}
+
+观测残差通过卡尔曼增益影响多个状态。即使测量显式只约束位置，位置与速度、姿态或偏差的协方差可能使其他状态同时变化。所谓``只修正位置''需要在更新结构中明确，而不能仅根据残差名字判断。
+
+但完全切断交叉协方差也可能丢失正确的偏差可观信息。应先检查残差和协方差是否可信，再决定保守或完整更新。为了保持稳定而禁用某些状态，可以作为研究对照，但应承认相应观测信息没有被利用。
+
+\hypertarget{ux5730ux56feux4e0eux4f4dux59ffux5171ux540cux4f30ux8ba1}{%
+\subsection{9.4 地图与位姿共同估计}\label{ux5730ux56feux4e0eux4f4dux59ffux5171ux540cux4f30ux8ba1}}
+
+若局部地图由同一段错误运动生成，当前配准可能同时受地图偏差和状态误差影响。消去地图变量后，位姿有效信息由Schur补表达。
+
+\begin{figure}
+\centering
+\includegraphics{assets/schur.png}
+\caption{式9-1 联合位姿地图估计中的有效位姿信息}
+\end{figure}
+
+将地图完全固定，相当于忽略其不确定性，通常使位姿看起来更确定。对近期自建地图，信息来源与状态相关，特别需要避免重复使用。概率地图与测深SLAM研究提供处理这类耦合的基础。\href{https://arxiv.org/abs/2203.10893}{［25］}\href{https://doi.org/10.1177/0278364912459666}{［2］}
+
+\hypertarget{ux58f0ux5450ux66f4ux65b0ux4e3aux4ec0ux4e48ux53efux80fdux5f31ux4e8eux7eafux8fd0ux52a8ux5148ux9a8c}{%
+\subsection{9.5 声呐更新为什么可能弱于纯运动先验}\label{ux58f0ux5450ux66f4ux65b0ux4e3aux4ec0ux4e48ux53efux80fdux5f31ux4e8eux7eafux8fd0ux52a8ux5148ux9a8c}}
+
+额外观测在正确模型下通常可以增加信息，但错误关联、偏差或过小方差会把状态推离合理轨迹。声呐里程计相对简单惯性DVL推算表现更差时，不能直接认定DVL有问题，也不能认为``加了传感器就必须更准''。
+
+研究应按因果链检查：测量时空定义是否正确，子帧是否真实重叠，对应是否分布合理，残差是否有系统偏置，协方差是否保守，以及更新是否影响不可观状态。仅调整一个匹配距离不能替代这条模型审计。
+
+\hypertarget{ux7b2cux5341ux7ae0-ux5173ux952eux5e27-ux5c40ux90e8ux5730ux56feux4e0eux540eux7aefux63a5ux53e3}{%
+\section{第十章 关键帧 局部地图与后端接口}\label{ux7b2cux5341ux7ae0-ux5173ux952eux5e27-ux5c40ux90e8ux5730ux56feux4e0eux540eux7aefux63a5ux53e3}}
+
+\hypertarget{ux5173ux952eux5e27ux7684ux7814ux7a76ux4f9dux636e}{%
+\subsection{10.1 关键帧的研究依据}\label{ux5173ux952eux5e27ux7684ux7814ux7a76ux4f9dux636e}}
+
+关键帧可以依据位移、转角、覆盖变化或信息增加选取。固定时间间隔实现简单，但不同速度下对应不同空间跨度；只按位移会忽略转弯观测变化；只按特征数量可能忽略信息退化。
+
+成像声呐关键帧研究将信息结构纳入选择，为更合理的窗口管理提供参考。\href{https://arxiv.org/abs/2106.16032}{［24］} 对测深侧扫需要重新定义有效覆盖和声学观测。关键帧选择的评价应关注相对误差和失败率，而不仅是减少帧数。
+
+\hypertarget{ux5c40ux90e8ux5730ux56feux66f4ux65b0}{%
+\subsection{10.2 局部地图更新}\label{ux5c40ux90e8ux5730ux56feux66f4ux65b0}}
+
+地图更新过快，会把错误状态立即固化到环境表示；更新过慢，会缺乏新地形和有效历史。可以保留测量时间、观测来源和质量，使地图不是简单点堆积。对于阴影和动态悬浮物，尤其要区分稳定底面结构和暂时回波。
+
+测深地图与侧扫地貌层可以共享空间索引，但应保存各自的观测与误差模型。统一索引不意味着两层测量等价，局部表面拟合与反射率学习需要不同参数和证据。
+
+\hypertarget{ux76f8ux5bf9ux7ea6ux675fux8f93ux51fa}{%
+\subsection{10.3 相对约束输出}\label{ux76f8ux5bf9ux7ea6ux675fux8f93ux51fa}}
+
+前端应输出位姿增量、时间范围、协方差和观测状态，而不只是单一位姿。后端需要知道该约束来自IMU传播、DVL还是声呐配准，以及是否在退化或部分掉锁情况下形成。把所有边赋予相同固定协方差，会掩盖长航程中的条件变化。
+
+连续局部位姿之间的误差通常相关。直接由两个边缘位置协方差相加得到增量协方差，会忽略交叉项。若保留联合估计或相对边生成过程，可以更合理表达短时运动不确定性。
+
+\hypertarget{ux56feux4f18ux5316ux4e0eux9519ux8befux7ea6ux675f}{%
+\subsection{10.4 图优化与错误约束}\label{ux56feux4f18ux5316ux4e0eux9519ux8befux7ea6ux675f}}
+
+iSAM2提供增量因子图基础，混合误差模型研究提供错误关联的表达。\href{https://www.borg.cc.gatech.edu/papers/kaess12ijrr.html}{［26］}\href{https://april.eecs.umich.edu/media/pdfs/olson2012rss.pdf}{［27］} 这些后端工具有助于组织可信相对边及回环，但不能弥补持续错误前端模型。单次错误相对约束若很强，也可能污染后续轨迹。
+
+图优化还需要避免把前端已经使用的绝对信息再次独立加入。信息来源审计与时间一致性应成为接口的一部分，而不是只检查数据字段格式。
+
+\hypertarget{ux7b2cux5341ux4e00ux7ae0-ux6587ux732eux8defux7ebfux4e0eux8bc1ux636eux6bd4ux8f83}{%
+\section{第十一章 文献路线与证据比较}\label{ux7b2cux5341ux4e00ux7ae0-ux6587ux732eux8defux7ebfux4e0eux8bc1ux636eux6bd4ux8f83}}
+
+\hypertarget{ux6d4bux6df1ux51e0ux4f55ux8defux7ebf}{%
+\subsection{11.1 测深几何路线}\label{ux6d4bux6df1ux51e0ux4f55ux8defux7ebf}}
+
+多波束概率SLAM、GICP协方差学习和GP测深地图分别关注几何配准、可信融合及空间预测。\href{https://pmc.ncbi.nlm.nih.gov/articles/PMC4851074/}{［12］}\href{https://arxiv.org/abs/2003.10931}{［14］}\href{https://arxiv.org/abs/2203.10893}{［25］} 三条路线共同强调：海底表面和测量误差需要建模，配准残差不是唯一评价。
+
+它们不能独立解决侧扫强度的视角变化，也不能自动建立全局地理参考。几何里程计的研究价值在于短时运动和局部结构，而不是将其相对性能扩展成绝对定位保证。
+
+\hypertarget{ux4fa7ux626bslamux8defux7ebf}{%
+\subsection{11.2 侧扫SLAM路线}\label{ux4fa7ux626bslamux8defux7ebf}}
+
+稀疏侧扫方法依赖显著特征与声学约束，稠密子帧方法利用更多重叠区域，NeuRSS进一步连接神经地形重建与位姿优化。\href{https://arxiv.org/abs/2304.01854}{［16］}\href{https://arxiv.org/abs/2312.13802}{［3］}\href{https://arxiv.org/abs/2405.05807}{［21］} 它们反映从特征到稠密及联合表示的演进，但都需要保留采集方式、重叠和证据时间尺度。
+
+若目标是高频前端里程计，应单独证明连续短时更新的效果，不能只展示回环后的整条轨迹。若论文主要完成离线或迭代建图，也应准确说明，不因为方法复杂就称为实时前端。
+
+\hypertarget{ux9646ux5730ux8fc1ux79fbux4e0eux6c34ux4e0bux4e13ux7528ux7684ux6bd4ux8f83}{%
+\subsection{11.3 陆地迁移与水下专用的比较}\label{ux9646ux5730ux8fc1ux79fbux4e0eux6c34ux4e0bux4e13ux7528ux7684ux6bd4ux8f83}}
+
+\begin{longtable}[]{@{}p{0.23\linewidth}p{0.34\linewidth}p{0.36\linewidth}@{}}
+\toprule
+路线 & 可借鉴内容 & 必须重新研究的水下条件\tabularnewline
+\midrule
+\endhead
+FAST-LIO2类直接几何融合 & 原始点利用 迭代状态估计 局部地图 & 条带重叠 波束误差 平面退化\tabularnewline
+FAST-LIVO2类多模态融合 & 统一空间地图 几何辅助强度 分阶段更新 & 斜距投影 入射角 增益与波束积分\tabularnewline
+通用学习特征匹配 & 特征交互 对应置信与高效匹配 & 声学域适配 阴影 稳定地貌特征\tabularnewline
+水下稀疏侧扫SLAM & 声学几何与自动关联 & 稀疏特征和短时连续约束\tabularnewline
+水下稠密侧扫子帧 & 重叠区域更多对应 & 相关性和子帧运动畸变\tabularnewline
+概率测深配准 & 各方向误差与测点不确定性 & 实际设备模型与弱可观状态\tabularnewline
+神经声学联合重建 & 回波与高程位姿联合推断 & 多解性 独立几何参考和在线条件\tabularnewline
+\bottomrule
+\end{longtable}
+
+\hypertarget{ux7b2cux5341ux4e8cux7ae0-ux524dux7aefux7814ux7a76ux7684ux8bc4ux4ef7ux4f53ux7cfb}{%
+\section{第十二章 前端研究的评价体系}\label{ux7b2cux5341ux4e8cux7ae0-ux524dux7aefux7814ux7a76ux7684ux8bc4ux4ef7ux4f53ux7cfb}}
+
+\hypertarget{ux77edux65f6ux76f8ux5bf9ux8befux5dee}{%
+\subsection{12.1 短时相对误差}\label{ux77edux65f6ux76f8ux5bf9ux8befux5dee}}
+
+评价应在多个时间或距离间隔上计算相对平移及旋转误差，并区分沿航向、横航向和垂向。很短间隔主要反映噪声和同步，较长间隔反映偏差和退化积累。若只报告全程平均绝对误差，很难确定前端问题发生在哪个时间尺度。
+
+整体坐标变换对齐可用于检查轨迹形状，但不能据此证明绝对精度。对里程计而言，相对误差比未经对齐的累计位置偏差更直接；对地图定位而言，则必须保留地理参考评价。指标应与研究任务一致。
+
+\hypertarget{ux516cux5e73ux8fd0ux52a8ux5148ux9a8cux5bf9ux7167}{%
+\subsection{12.2 公平运动先验对照}\label{ux516cux5e73ux8fd0ux52a8ux5148ux9a8cux5bf9ux7167}}
+
+IMU DVL深度的纯运动融合可以作为重要对照，所有方法应使用相同初始条件及传感器数据。声呐加入后的收益应在正确和困难条件下分别报告；若改变了DVL噪声或初始化，就不能把差异全部归因于声呐。
+
+消融应包括仅测深、仅侧扫、几何强度联合，以及去掉某项标定或补偿的条件。前端比较时应与后端全局校正分开，避免全局地图帮助掩盖局部相对运动问题。
+
+\hypertarget{ux9000ux5316ux4e0eux8f6cux5f2fux6d4bux8bd5}{%
+\subsection{12.3 退化与转弯测试}\label{ux9000ux5316ux4e0eux8f6cux5f2fux6d4bux8bd5}}
+
+测试应覆盖平底、单向坡面、重复沙波、独特结构、直行与转弯。转弯测试还应区分角速度、速度变化、杆臂和时间误差。只有覆盖不同可观条件，才能判断一个方法是否真正适合声呐条带。
+
+每种条件需要记录有效重叠、特征分布、信息矩阵和更新状态。输出误差增加只是一种现象，残差与协方差变化才有助于定位原因。报告失败案例应保留发生前后的信息，而不是仅截取最终轨迹。
+
+\hypertarget{ux534fux65b9ux5deeux4e0eux72ecux7acbux6027}{%
+\subsection{12.4 协方差与独立性}\label{ux534fux65b9ux5deeux4e0eux72ecux7acbux6027}}
+
+协方差校准需要检查预测不确定区域是否覆盖真实相对误差，以及弱方向是否被充分反映。重复窗口内的同一测量不能当作独立样本形成大量统计证据。评价单位应考虑独立航段和海域。
+
+跨区域及跨设备验证尤其重要。声呐深度学习综述与空间交叉验证研究分别提供鲁棒性和数据划分的背景。\href{https://arxiv.org/abs/2412.11840}{［15］}\href{https://doi.org/10.1111/ecog.02881}{［28］} 不能用同一地图随机裁剪的结果证明新的海底环境泛化。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e00-ux58f0ux5450ux878dux5408ux7684ux4fe1ux606fux76f8ux5173ux6027ux4e0eux4f30ux8ba1ux4e00ux81f4ux6027}{%
+\section{专题研究一 声呐融合的信息相关性与估计一致性}\label{ux4e13ux9898ux7814ux7a76ux4e00-ux58f0ux5450ux878dux5408ux7684ux4fe1ux606fux76f8ux5173ux6027ux4e0eux4f30ux8ba1ux4e00ux81f4ux6027}}
+
+\hypertarget{ux4e00ux4f4dux7f6eux6b8bux5deeux53efux80fdux6539ux53d8ux54eaux4e9bux72b6ux6001}{%
+\subsection{一、位置残差可能改变哪些状态}\label{ux4e00ux4f4dux7f6eux6b8bux5deeux53efux80fdux6539ux53d8ux54eaux4e9bux72b6ux6001}}
+
+在误差状态滤波中，测量的直接Jacobian只说明残差显式依赖哪些状态；实际更新还取决于预测协方差。以只对位置线性敏感的测量为例，Kalman增益的姿态行可以由姿态与位置的交叉协方差产生，速度行和惯性偏置行也可能具有非零值。因此，``残差只包含位置''与``算法绝不改变航向和偏置''是不同命题。
+
+这种耦合本身并非错误。车辆运动使位置、速度、姿态及惯性偏置之间存在统计联系，合理的间接更新可以利用历史信息。风险来自交叉协方差是否真实，以及声呐似然是否正确。如果平坦地形中的位置残差主要来自地图偏差，而滤波把它解释为姿态或加速度偏置，就可能沿错误方向持续调整状态。误差状态数学框架可参考Solà的完整推导。\href{https://arxiv.org/abs/1711.02508}{［7］}
+
+分析前端更新需要同时检查残差Jacobian、完整增益及各状态实际增量，而不能只看观测标签。选择冻结某些状态是一种模型约束，应说明可观性或风险依据；如果冻结后仍通过错误的协方差反馈间接影响其他状态，也未真正解决一致性问题。
+
+\hypertarget{ux4e8cux72b6ux6001ux66f4ux65b0ux4e0dux80fdux4e0eux534fux65b9ux5deeux4efbux610fux5206ux79bb}{%
+\subsection{二、状态更新不能与协方差任意分离}\label{ux4e8cux72b6ux6001ux66f4ux65b0ux4e0dux80fdux4e0eux534fux65b9ux5deeux4efbux610fux5206ux79bb}}
+
+若研究策略限制某些状态不接受测量修正，却仍使用原来的完整更新公式缩小其协方差，滤波器会变得过度自信。相反，仅手动改写均值而不更新交叉协方差，也会改变后续传播和融合的统计含义。正确实现应让状态投影、更新算子和协方差传播保持一致。
+
+误差状态的姿态注入还有流形问题。小角度误差进入名义旋转后，需要按所采用的左扰动或右扰动约定重新表达误差协方差。不同论文的符号约定不一定相同，直接拼接公式容易出现旋转方向、坐标框架或转置错误。理论报告应先固定坐标定义，再讨论算法结构，不宜仅依靠代码变量名称判断正确性。
+
+\hypertarget{ux4e09ux5b66ux4e60ux589eux5f3advlux4f1aux5f15ux5165ux989dux5916ux76f8ux5173ux6027}{%
+\subsection{三、学习增强DVL会引入额外相关性}\label{ux4e09ux5b66ux4e60ux589eux5f3advlux4f1aux5f15ux5165ux989dux5916ux76f8ux5173ux6027}}
+
+当网络利用IMU序列预测或修正DVL速度，而惯性传播又使用相同IMU时，预测误差与测量误差不再自然独立。Cross-Correlation-Aware Deep INS/DVL Fusion直接研究了这种相关性。\href{https://arxiv.org/abs/2503.21727}{［29］} 它说明学习融合不能只把网络输出当作一个更精确的新传感器，然后沿用完全独立噪声的Kalman更新。
+
+\begin{figure}
+\centering
+\includegraphics{assets/correlated_update.png}
+\caption{预测误差与观测噪声相关时的线性最小方差更新示意}
+\end{figure}
+
+本式采用创新ν＝He＋v的约定，e为预测状态误差，v为观测噪声，P和R分别为其协方差，C为交叉协方差。创新协方差S和增益K均因C发生变化。它是一般线性估计关系，不声称复写该论文的具体网络或全部滤波定义；若采用相反误差约定，相关项符号也需要同步处理。
+
+这一判断也适用于以惯性航迹生成训练标签或构造伪观测的声呐网络。网络输出如果部分继承运动先验，融合时应识别共享信息。增加``传感器分支''数量，不一定增加独立证据；有时只是把同一组IMU或DVL信息以不同形式重复输入。
+
+实际研究可以比较独立噪声近似与显式相关模型的创新、协方差覆盖率及短时误差，而不只比较网络输出的速度RMSE。即使均值误差下降，置信区间仍可能失准。学习模型与经典滤波的结合应同时回答``输出是否更准''和``输出有多独立''两个问题。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e8c-ux65f6ux95f4ux504fux5dee-ux6746ux81c2ux4e0eux8f6cux5f2fux8befux5deeux4f20ux64ad}{%
+\section{专题研究二 时间偏差 杆臂与转弯误差传播}\label{ux4e13ux9898ux7814ux7a76ux4e8c-ux65f6ux95f4ux504fux5dee-ux6746ux81c2ux4e0eux8f6cux5f2fux8befux5deeux4f20ux64ad}}
+
+\hypertarget{ux4e00ux65f6ux95f4ux8befux5deeux4e0dux662fux56faux5b9aux4f4dux7f6eux504fux7f6e}{%
+\subsection{一、时间误差不是固定位置偏置}\label{ux4e00ux65f6ux95f4ux8befux5deeux4e0dux662fux56faux5b9aux4f4dux7f6eux504fux7f6e}}
+
+设声呐时间标签存在小偏差δt。在近恒速运动中，其一阶位置误差约为速度乘以δt；在旋转运动中，远距离测点还会受到角速度、量测距离和方向的共同影响。因而同一时间偏差可能在直线航行时不显著，却在转弯时形成明显点云弯曲或条带错位。
+
+时间偏差也可能与DVL安装角或惯性姿态误差混淆。若只在短直线段进行标定，参数之间缺少足够激励，多个参数组合都可能解释观测。水下Doppler自标定研究讨论标定参数与运动条件，为设计激励提供直接参考。\href{https://arxiv.org/abs/1509.02054}{［8］} 不能把某种运动下的低残差等同于所有运动下的参数正确。
+
+研究应分别考虑设备内时间定义、采集链路延迟和处理发布时间。处理慢导致输出延后，与测量时间标签错误不是同一个问题。前者可以用对应时刻的运动传播处理，后者会改变观测几何。将两者都简化为``算法慢了''会掩盖原因。
+
+\hypertarget{ux4e8cux53d1ux5c04ux4e0eux63a5ux6536ux65f6ux523bux7684ux51e0ux4f55}{%
+\subsection{二、发射与接收时刻的几何}\label{ux4e8cux53d1ux5c04ux4e0eux63a5ux6536ux65f6ux523bux7684ux51e0ux4f55}}
+
+声学回波在发射至接收之间具有传播时间，车辆在此期间可能移动和转动。设备内部已经做了哪些运动、姿态和声速补偿，需要查明输出定义后才能选择简化模型。短距离、低速和低角速度条件下，可以研究某个参考时刻的近似；条件变坏时，需要分析近似误差是否超过测量噪声。
+
+这不意味着所有侧扫系统都必须使用同一种高阶传播模型，而是不能把光学图像的瞬时投影假设无条件搬到声学。不同设备的输出可能是原始采样、经过底面检测的量程角度，或已校正地理点，不同处理级别决定算法还需要负责哪些误差。
+
+\hypertarget{ux4e09ux6746ux81c2ux5bf9dvlux4e0eux58f0ux5450ux7684ux4e0dux540cux5f71ux54cd}{%
+\subsection{三、杆臂对DVL与声呐的不同影响}\label{ux4e09ux6746ux81c2ux5bf9dvlux4e0eux58f0ux5450ux7684ux4e0dux540cux5f71ux54cd}}
+
+DVL的速度杆臂体现为角速度与安装偏移的叉乘项，声呐的安装杆臂则还影响量测原点和地形投影。转弯过程中，这些项随角速度变化；若忽略或符号错误，会形成与转弯方向相关的残差。此类规律比单一最终位置误差更适合定位标定问题。
+
+另一方面，过度扩展在线标定状态也会带来风险。安装角、时间偏差和杆臂可能在有限运动下高度耦合；将全部参数自由估计，优化器可能用错误标定吸收地图或声速误差。理论选择应遵循``离线有充分激励标定、在线只估计可观且确有变化的参数''的原则，并保留固定参数的不确定度。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e09-ux76f8ux5bf9ux4f4dux59ffux534fux65b9ux5deeux4e0eux540eux7aefux7ea6ux675f}{%
+\section{专题研究三 相对位姿协方差与后端约束}\label{ux4e13ux9898ux7814ux7a76ux4e09-ux76f8ux5bf9ux4f4dux59ffux534fux65b9ux5deeux4e0eux540eux7aefux7ea6ux675f}}
+
+\hypertarget{ux4e00ux7eddux5bf9ux8befux5deeux5927ux4e0dux5fc5ux7136ux610fux5473ux7740ux77edux65f6ux589eux91cfux5dee}{%
+\subsection{一、绝对误差大不必然意味着短时增量差}\label{ux4e00ux7eddux5bf9ux8befux5deeux5927ux4e0dux5fc5ux7136ux610fux5473ux7740ux77edux65f6ux589eux91cfux5dee}}
+
+在一个固定坐标变换下，如果整个局部轨迹仅有相同平移或旋转偏置，那么短时相对位姿可以仍然准确。真正污染相对运动的是随时间变化的偏置、尺度、航向、速度或轨迹形变。因此，声呐里程计的研究应把绝对漂移、固定坐标系误差和增量误差分开。
+
+这一差别也需要在协方差中体现。以线性化误差为例，相对误差由起点和终点误差的两个Jacobian组合，其协方差除两端自身协方差外，还包含两端交叉协方差项。相邻状态通常相关，忽略交叉项会误估增量可靠性。端点绝对协方差大，若共同误差在差分中抵消，相对协方差仍可能较小。
+
+\begin{figure}
+\centering
+\includegraphics{assets/relative_covariance.png}
+\caption{相对误差的一阶传播与端点交叉协方差}
+\end{figure}
+
+这里A\_i和A\_j由选定的相对位姿定义及扰动坐标决定，P\_ij表示端点误差的交叉协方差，并非相对约束自身协方差。该式在同一线性化误差空间中成立；涉及旋转时需用一致的切空间和伴随变换。若只知道两端各自的边缘协方差，而没有交叉项，不能无依据地得到精确相对协方差。
+
+\hypertarget{ux4e8cux7a97ux53e3ux91cdux53e0ux4f7fux76f8ux5bf9ux7ea6ux675fux5f7cux6b64ux76f8ux5173}{%
+\subsection{二、窗口重叠使相对约束彼此相关}\label{ux4e8cux7a97ux53e3ux91cdux53e0ux4f7fux76f8ux5bf9ux7ea6ux675fux5f7cux6b64ux76f8ux5173}}
+
+若每条相对约束都由高度重叠的声呐子帧生成，不同约束之间也共享观测和运动先验。后端若把这些约束作为彼此独立的因子，会重复增加信息。减少发布频率可以降低部分冗余，但并不自动消除共享地图和公共标定误差。
+
+增量图优化如iSAM2提供有效组织和求解约束的机制，不能替研究者判断约束是否独立。\href{https://www.borg.cc.gatech.edu/papers/kaess12ijrr.html}{［26］} 需要在输入定义上说明是原始测量因子、经过边缘化的窗口因子，还是使用先验再次估计得到的相对位姿。三者对应的信息结构不同，不应因都能写成``位姿差残差''而视为等价。
+
+\hypertarget{ux4e09ux5c40ux90e8ux5730ux56feux7684ux4e0dux786eux5b9aux6027ux4e0dux80fdux5b8cux5168ux9690ux53bb}{%
+\subsection{三、局部地图的不确定性不能完全隐去}\label{ux4e09ux5c40ux90e8ux5730ux56feux7684ux4e0dux786eux5b9aux6027ux4e0dux80fdux5b8cux5168ux9690ux53bb}}
+
+当前帧到局部地图的配准常把地图固定，这是一种方便的条件近似。若地图由此前带误差的位姿生成，且这些位姿与当前预测相关，固定地图会忽略相关误差。在长期单向航行或弱地形中，这种近似可能让几何残差持续稳定，却低估整个轨迹的不确定性。
+
+联合优化中可以通过Schur补把地图或历史变量边缘化为位姿信息，但边缘化后得到的是带相关结构的先验，不是若干无关测量。高斯过程测深SLAM及在线概率建图提供了表达空间相关的不同思路。\href{https://www-personal.acfr.usyd.edu.au/sbarkby/2011_iros_bpslam.pdf}{［13］}\href{https://arxiv.org/abs/2211.05601}{［30］} 它们并非声呐前端的唯一方案，却说明环境估计应被当作不确定对象。
+
+\hypertarget{ux56dbux7eddux5bf9ux5339ux914dux53cdux9988ux4e0eux5c40ux90e8ux8fdeux7eedux6027}{%
+\subsection{四、绝对匹配反馈与局部连续性}\label{ux56dbux7eddux5bf9ux5339ux914dux53cdux9988ux4e0eux5c40ux90e8ux8fdeux7eedux6027}}
+
+全局地形匹配得到的地图坐标校正，可以应用于全局输出，而不立即重写全部局部运动状态。这有利于维持里程计接口的连续性。若要进一步校正速度、姿态或偏置，则需要明确联合观测模型及一致协方差，而不是根据全局位置差直接改写惯性状态。
+
+如果前端与后端都使用同一批测深数据，对后端校正的再次融合也应检查共享信息。全局结果不是天然独立的额外传感器。研究需要将地理参考修正、局部坐标变换和运动状态反馈作为三个不同操作分析，分别确定其可接受的模型与风险。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux56db-ux7279ux5f81ux4fe1ux606fux91cfux4e0eux58f0ux5b66ux89c2ux6d4bux53efux8fa8ux8bc6ux6027}{%
+\section{专题研究四 特征信息量与声学观测可辨识性}\label{ux4e13ux9898ux7814ux7a76ux56db-ux7279ux5f81ux4fe1ux606fux91cfux4e0eux58f0ux5b66ux89c2ux6d4bux53efux8fa8ux8bc6ux6027}}
+
+\hypertarget{ux4e00ux5339ux914dux6570ux91cfux4e0dux7b49ux4e8eux4f4dux59ffux4fe1ux606f}{%
+\subsection{一、匹配数量不等于位姿信息}\label{ux4e00ux5339ux914dux6570ux91cfux4e0dux7b49ux4e8eux4f4dux59ffux4fe1ux606f}}
+
+大量对应集中在同一条纹、相近斜距或很小图像区域时，可能对某些运动方向高度敏感，对其他方向几乎不敏感。匹配算法的置信分数表示其训练目标下的对应可信度，不直接表示对全部六自由度位姿的约束强度。
+
+合理的特征选择应同时考虑重复率、几何分布、声学可见性和预测信息。可以研究加入候选特征后信息矩阵的最弱方向如何变化，或其对目标参数边缘协方差的影响。行列式指标偏向整体体积缩小，最小特征值指标偏向保护最弱方向，两者应根据任务选择；数值尺度不同的状态还需要合理归一化。
+
+\hypertarget{ux4e8cux591aux6ce2ux675fux548cux4fa7ux626bux600eux6837ux5f62ux6210ux4e92ux8865}{%
+\subsection{二、多波束和侧扫怎样形成互补}\label{ux4e8cux591aux6ce2ux675fux548cux4fa7ux626bux600eux6837ux5f62ux6210ux4e92ux8865}}
+
+多波束提供范围与方向约束，侧扫提供不同底质或散射结构的关联。在有可辨纹理而几何近似平坦的区域，强度特征可能补充几何弱方向；在纹理均匀而地形起伏明显的区域，几何可能更可靠。互补是否成立，取决于侧扫对应能否形成真实空间约束，而不是两种数据是否装在同一设备中。
+
+同源数据可以减少不同设备之间的时间与安装问题，但也可能共享相同声速、运动畸变和阴影条件。联合似然需要考虑这些共同原因。若所有侧扫点位置都由同一多波束地图确定，几何与强度残差也未必独立，不能只把两种信息矩阵相加后宣称精度必然提高。
+
+\hypertarget{ux4e09ux9634ux5f71ux662fux4fe1ux606fux4e5fux662fux89c6ux89d2ux4f9dux8d56ux73b0ux8c61}{%
+\subsection{三、阴影是信息，也是视角依赖现象}\label{ux4e09ux9634ux5f71ux662fux4fe1ux606fux4e5fux662fux89c6ux89d2ux4f9dux8d56ux73b0ux8c61}}
+
+阴影边缘可提示障碍物几何和照射方向，但它通常不是固定在海底的三维散射点。随着车辆高度和观察方向变化，阴影区域会移动。把阴影尖角当作永久地标可能产生错误对应；完全删除阴影又可能丢失重要形态信息。
+
+可微侧扫渲染、法向估计和侧扫地形重建研究为建模这些关系提供直接研究资料。\href{https://arxiv.org/abs/2206.07821}{［31］}\href{https://arxiv.org/abs/2206.07819}{［32］}\href{https://arxiv.org/abs/2206.07810}{［33］} 更合适的研究区分是``散射表面点''``遮挡轮廓''和``照射阴影''，为不同类型使用不同观测解释。该方向需要物理模型与学习表示结合，而不是只提高角点检测数量。
+
+\hypertarget{ux56dbux957fux671fux76f8ux5bf9ux5bfcux822aux4ecdux6709ux4e0dux53efux6d88ux9664ux7684ux81eaux7531ux5ea6}{%
+\subsection{四、长期相对导航仍有不可消除的自由度}\label{ux56dbux957fux671fux76f8ux5bf9ux5bfcux822aux4ecdux6709ux4e0dux53efux6d88ux9664ux7684ux81eaux7531ux5ea6}}
+
+没有外部地理参照或可信回环时，纯局部里程计不能凭空确定全球位置。对某些环境，即使几何和纹理融合较好，仍可能保留整体坐标系自由度和局部弱方向。真实研究目标应是降低短时误差、改善可观性并诚实输出不确定性，而不是要求任何地形中无限航程绝不漂移。
+
+DVL掉锁学习研究可以改善特定条件下的短时速度预测，但不能被理解为永久替代独立环境或速度观测。\href{https://arxiv.org/abs/2504.07697}{［34］} 同样，陆地FAST-LIO2和FAST-LIVO2的有效结构值得借鉴，却不构成对水下条带数据可观性的保证。\href{https://arxiv.org/abs/2107.06829}{［22］}\href{https://arxiv.org/abs/2408.14035}{［23］}
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e94-ux6587ux732eux6bd4ux8f83ux7684ux56e0ux679cux8bbeux8ba1}{%
+\section{专题研究五 文献比较的因果设计}\label{ux4e13ux9898ux7814ux7a76ux4e94-ux6587ux732eux6bd4ux8f83ux7684ux56e0ux679cux8bbeux8ba1}}
+
+\hypertarget{ux4e00ux516cux5e73ux5bf9ux7167ux8981ux4fddux6301ux76f8ux540cux7684ux4fe1ux606fux8d77ux70b9}{%
+\subsection{一、公平对照要保持相同的信息起点}\label{ux4e00ux516cux5e73ux5bf9ux7167ux8981ux4fddux6301ux76f8ux540cux7684ux4fe1ux606fux8d77ux70b9}}
+
+比较纯运动导航与声呐融合时，应使用同一IMU、DVL、深度数据和相同标定条件。如果声呐方案同时修改DVL滤波或初始偏置，那么结果变化不能全部归因于声呐。研究可以先比较原始运动先验，再逐项增加几何、强度及联合更新，保持其他条件不变。
+
+对于学习匹配和传统匹配，同样需要控制输入校正、图像分辨率、覆盖窗口和几何验证。若一种方法使用真实地形先验，另一种只使用平面投影，应说明比较的是完整方案而非匹配器本身。把不等价的数据条件隐藏在实现细节中，会使文献结论难以迁移。
+
+\hypertarget{ux4e8cux9000ux5316ux65b9ux5411ux7684ux8bc4ux4ef7ux6bd4ux603bux8befux5deeux66f4ux6709ux89e3ux91caux529b}{%
+\subsection{二、退化方向的评价比总误差更有解释力}\label{ux4e8cux9000ux5316ux65b9ux5411ux7684ux8bc4ux4ef7ux6bd4ux603bux8befux5deeux66f4ux6709ux89e3ux91caux529b}}
+
+短时平移误差可以按沿航向、横向和垂向分解，旋转误差可以按绕不同轴的方向分析；同时记录观测几何、有效覆盖及信息矩阵弱方向。这样能够区分航向漂移造成的横向累计误差、沿航向纹理混淆和深度偏差。
+
+不同窗口长度和行驶距离的相对误差也应分开。极短间隔可以被运动先验主导，较长间隔才体现环境约束的稳定性。单一平均RMSE会把局部突变、错误对应及持续偏差混在一起，需要配合误差分位数、尾部事件和连续失效时长。
+
+\hypertarget{ux4e09ux7814ux7a76ux7ed3ux8bbaux5e94ux505cux5728ux8bc1ux636eux652fux6301ux7684ux4f4dux7f6e}{%
+\subsection{三、研究结论应停在证据支持的位置}\label{ux4e09ux7814ux7a76ux7ed3ux8bbaux5e94ux505cux5728ux8bc1ux636eux652fux6301ux7684ux4f4dux7f6e}}
+
+侧扫子帧SLAM提供的是特定真实数据、设备条件和算法结构下的直接证据；通用视觉匹配提供的是自然图像任务中的方法证据；陆地融合框架提供的是高效估计结构。它们可以构成有逻辑的水下研究路线，但不能拼接成``已有论文证明整套迁移方案达到某精度''的结论。
+
+本报告据此将文献比较落在观测模型、可观性、相关性与误差传播四个层面。后续研究应优先检验哪些信息真正独立且有效，再讨论网络规模或特征数量。以上内容是文献基础上的研究设计与理论分析，不含已完成本地实验的描述。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e00-ux7279ux5f81ux9a71ux52a8ux58f0ux5450ux91ccux7a0bux8ba1ux7684ux5b8cux6574ux5904ux7406ux94fe}{%
+\section{深化研究一 特征驱动声呐里程计的完整处理链}\label{ux6df1ux5316ux7814ux7a76ux4e00-ux7279ux5f81ux9a71ux52a8ux58f0ux5450ux91ccux7a0bux8ba1ux7684ux5b8cux6574ux5904ux7406ux94fe}}
+
+\hypertarget{ux4e00ux8f93ux5165ux5e94ux4fddux7559ux7269ux7406ux65f6ux95f4ux548cux91c7ux6837ux8eabux4efd}{%
+\subsection{一、输入应保留物理时间和采样身份}\label{ux4e00ux8f93ux5165ux5e94ux4fddux7559ux7269ux7406ux65f6ux95f4ux548cux91c7ux6837ux8eabux4efd}}
+
+里程计的输入不是一张已经显示出来的声呐截图。多波束输入至少应包含ping时刻、波束方向或可追溯测深坐标、有效标志及质量信息；侧扫输入应包含时间、左右舷、斜距采样和未经显示配色修改的强度。IMU、DVL、深度计分别保留原始时间与更新周期。设备中一次发射形成多少接收波束，应依据设备手册和驱动数据定义，不能由算法窗口大小推断。
+
+每个数据元素应具有可追溯标识。一个子帧重复用于多个窗口并不产生多个独立原始观测；为避免过度自信，需要知道不同约束之间共享哪些ping、地图点和运动先验。后处理滤波、裁剪和运动补偿的版本也应记录，否则无法判断两种方法是否真正使用相同信息。
+
+\hypertarget{ux4e8cux8fd0ux52a8ux4f20ux64adux548cux5b50ux5e27ux6784ux5efa}{%
+\subsection{二、运动传播和子帧构建}\label{ux4e8cux8fd0ux52a8ux4f20ux64adux548cux5b50ux5e27ux6784ux5efa}}
+
+先进行惯性传播，再按DVL与深度观测进行更新，形成声呐运动补偿的先验轨迹。DVL应区分对底速度和对水速度，水流相对速度不能未经建模当作对地速度。对子帧内的每个声学元素使用对应时刻的位姿和外参，映射到统一参考时刻；传播误差随时间存在相关性，不能把映射后的每个点都看成相互独立。
+
+建议首先以物理覆盖设计子帧，再选择ping数量。低速下固定数量可能产生几乎没有沿航向尺度的条带，高速下同样数量可能具有显著畸变。转弯时应关注位姿插值、角速度和外参杆臂，不应假设子帧内车辆始终沿直线匀速。
+
+\hypertarget{ux4e09ux51e0ux4f55ux7279ux5f81ux4e0eux5f3aux5ea6ux7279ux5f81ux5206ux5de5}{%
+\subsection{三、几何特征与强度特征分工}\label{ux4e09ux51e0ux4f55ux7279ux5f81ux4e0eux5f3aux5ea6ux7279ux5f81ux5206ux5de5}}
+
+几何特征可以提取脊谷交汇、曲率变化、凸凹边界等持久结构。TTT SLAM提供了测深特征与鲁棒关联的直接研究依据。\href{https://www.sciencedirect.com/science/article/pii/S0029801824001148}{［35］} 侧扫特征则可来自稳定强度结构、可解释的目标边界和底质变化；它们具有不同的观察依赖，不能只因二维位置接近就配成同一类地标。
+
+特征数据应保留位置、描述子、尺度、方向、来源ping以及几何不确定性。对于侧扫样本，斜距与条带位置只限制地标的部分自由度，不能像普通相机像素一样直接构造透视射线。若借助测深曲面得到三维坐标，应把曲面误差及运动补偿误差传给该特征，而不是得到一个没有误差的三维点。
+
+\hypertarget{ux56dbux5339ux914dux5e94ux7531ux5916ux89c2ux5019ux9009ux8d70ux5411ux51e0ux4f55ux9a8cux8bc1}{%
+\subsection{四、匹配应由外观候选走向几何验证}\label{ux56dbux5339ux914dux5e94ux7531ux5916ux89c2ux5019ux9009ux8d70ux5411ux51e0ux4f55ux9a8cux8bc1}}
+
+第一层使用描述子产生候选；第二层检查左右舷、距离范围、预计可见性和物理覆盖；第三层使用鲁棒几何模型检验一致性；第四层在有效对应上进行概率精化。每层分别保存淘汰原因，才能区分没有可重复特征、描述子失配和几何模型不正确。
+
+SuperGlue、LightGlue和LoFTR提供通用图像对应方法参考，但训练域及相机模型不同，不能直接作为声呐有效性证据。\href{https://arxiv.org/abs/1911.11763}{［17］}\href{https://arxiv.org/abs/2306.13643}{［18］}\href{https://arxiv.org/abs/2104.00680}{［19］} 若采用学习匹配，至少要在真实声呐上检查跨航向、跨底质和跨设备变化。高匹配分数不等于低位姿误差；概率精化仍要依赖实际声学几何。
+
+\hypertarget{ux4e94ux589eux91cfux4f18ux5316ux4e0eux5730ux56feux66f4ux65b0}{%
+\subsection{五、增量优化与地图更新}\label{ux4e94ux589eux91cfux4f18ux5316ux4e0eux5730ux56feux66f4ux65b0}}
+
+相对位姿优化可以使用稀疏特征几何、测深点到面残差及经过校正的强度残差。对应不确定或地形退化时，应降低该方向的信息，而不是无条件覆盖运动先验。新地形先作为带不确定性的观测加入局部地图，待有重复支持后再形成稳定结构；否则一次错误更新会污染地图并在以后不断自我强化。
+
+关键帧应根据覆盖、信息变化和运动情况形成，不必严格等时间。里程计输出包含相对位姿、参考时刻、协方差及观测来源，后端才能正确使用。当前地图或后端给出的绝对位置不能被重复作为独立里程计证据，否则会形成闭环自证而不是新的测量。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e8c-ux4eceux6b8bux5deeux5230ux53efux89c2ux6027ux7684ux6570ux5b66ux89e3ux91ca}{%
+\section{深化研究二 从残差到可观性的数学解释}\label{ux6df1ux5316ux7814ux7a76ux4e8c-ux4eceux6b8bux5deeux5230ux53efux89c2ux6027ux7684ux6570ux5b66ux89e3ux91ca}}
+
+\hypertarget{ux4e00ux70b9ux5230ux9762ux6b8bux5deeux53caux5176ux5c40ux90e8ux96c5ux53efux6bd4}{%
+\subsection{一、点到面残差及其局部雅可比}\label{ux4e00ux70b9ux5230ux9762ux6b8bux5deeux53caux5176ux5c40ux90e8ux96c5ux53efux6bd4}}
+
+对已建立的对应，令p为当前子帧中的点，q和n为地图点及法向，R和t为相对位姿。下面采用平移增量位于目标坐标系、旋转使用右扰动的局部约定；其他扰动约定会改变雅可比形式，应保持代码、协方差和解释一致。
+
+\begin{figure}
+\centering
+\includegraphics{assets/odom_jacobian.png}
+\caption{点到面残差的局部线性化}
+\end{figure}
+
+这里的雅可比是本报告针对明确约定的数学说明。Solà等的Lie理论资料可作为扰动与导数约定的参考。\href{https://arxiv.org/abs/1812.01537}{［36］} 在实现中，需要用数值有限差分检查解析雅可比；若改变坐标系或扰动方向而不改变协方差，就可能出现看似能运行但物理意义错误的更新。
+
+\hypertarget{ux4e8cux5e73ux9762ux6d77ux5e95ux4e3aux4ec0ux4e48ux4e0dux80fdux63d0ux4f9bux6c34ux5e73ux8fd0ux52a8ux7ea6ux675f}{%
+\subsection{二、平面海底为什么不能提供水平运动约束}\label{ux4e8cux5e73ux9762ux6d77ux5e95ux4e3aux4ec0ux4e48ux4e0dux80fdux63d0ux4f9bux6c34ux5e73ux8fd0ux52a8ux7ea6ux675f}}
+
+在水平平面上，法向主要指向垂直方向，水平平移不显著改变点到面残差；绕法向旋转也不改变平面形状。因此观测信息矩阵在这些方向可能接近奇异。即使数千个点具有很低残差，也不能从同一平面确定完整相对位姿。
+
+若平面具有整体倾斜，法向投影能约束一个水平组合，沿等深方向仍可能退化。两组不同方向的坡面可增加信息，但它们必须真正在当前观测中出现。算法将弱方向填入一个小协方差，会让后端过度相信并未被测量约束的相对运动；保留运动先验及合理的不确定性更符合物理信息。
+
+\hypertarget{ux4e09ux5f3aux5ea6ux7eb9ux7406ux80fdux5426ux8865ux8db3ux9000ux5316ux65b9ux5411}{%
+\subsection{三、强度纹理能否补足退化方向}\label{ux4e09ux5f3aux5ea6ux7eb9ux7406ux80fdux5426ux8865ux8db3ux9000ux5316ux65b9ux5411}}
+
+在几何平坦但存在稳定底质纹理的海底，侧扫可能提供沿航向或方向信息。然而需要三个条件：纹理在多次观测下可重复、投影到地形的映射正确、强度变化主要来源于位置而不是增益或入射角。几何平坦只说明多波束在某些方向弱，并不证明侧扫一定能补足。
+
+应分别计算纯几何、纯强度和联合残差的信息方向，并考虑二者共享运动、地形和观测时间产生的相关性。联合残差点数更多不意味着独立信息更多。若多个特征集中在一条方向相同的边界，匹配数量很多也可能只有一个有效方向。
+
+\hypertarget{ux56dbux6cd5ux5411ux4e0dux786eux5b9aux6027ux4e0eux90bbux57dfux9009ux62e9}{%
+\subsection{四、法向不确定性与邻域选择}\label{ux56dbux6cd5ux5411ux4e0dux786eux5b9aux6027ux4e0eux90bbux57dfux9009ux62e9}}
+
+法向由邻域估计，受点云密度、窗口尺度、真实曲率和姿态误差影响。邻域过小可能把噪声当作曲面，邻域过大则把真实脊谷平均成平面。不同深度、开角和航速下，点云密度不一致，固定点数邻域与固定米制邻域会产生不同物理意义，应明确比较。
+
+GICP通过局部协方差表达几何结构，PointNetKL直接研究了测深配准协方差推断。\href{https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf}{［11］}\href{https://arxiv.org/abs/2003.10931}{［14］} CELLO-3D则是陆地点云中学习配准协方差的参考，不是水下验证证据。\href{https://arxiv.org/abs/1810.01470}{［37］} 数据驱动协方差可以作为补充，但需检验目标海域的校准，不能以网络输出一个正定矩阵就宣称已经解决退化。
+
+\hypertarget{ux4e94ux4f18ux5316ux6570ux503cux7a33ux5b9aux4e0eux771fux5b9eux53efux4fe1ux5ea6}{%
+\subsection{五、优化数值稳定与真实可信度}\label{ux4e94ux4f18ux5316ux6570ux503cux7a33ux5b9aux4e0eux771fux5b9eux53efux4fe1ux5ea6}}
+
+为了数值计算加入阻尼会使线性系统可逆，但阻尼不等于新增传感器信息。由阻尼后的矩阵直接求逆并作为实际测量协方差，可能隐含人为强先验。研究报告应分别说明数值正则化、先验约束和真实观测信息，并检查输出协方差是否覆盖独立参考误差。
+
+同样，鲁棒核减少外点影响，并不保证所有残差模型正确。若内点本身具有共同声速偏差或错误地形投影，鲁棒优化仍可能稳定地收敛到错误位姿。因此需要同时检查残差均值、空间模式、观测相关性和相对轨迹一致性。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e09-ux822aux5411dvlux4e0eux6761ux5e26ux8fd0ux52a8ux8befux5deeux7684ux4f20ux64ad}{%
+\section{深化研究三 航向、DVL与条带运动误差的传播}\label{ux6df1ux5316ux7814ux7a76ux4e09-ux822aux5411dvlux4e0eux6761ux5e26ux8fd0ux52a8ux8befux5deeux7684ux4f20ux64ad}}
+
+\hypertarget{ux4e00ux822aux5411ux8befux5deeux600eux6837ux53d8ux6210ux4f4dux7f6eux6f02ux79fb}{%
+\subsection{一、航向误差怎样变成位置漂移}\label{ux4e00ux822aux5411ux8befux5deeux600eux6837ux53d8ux6210ux4f4dux7f6eux6f02ux79fb}}
+
+在近似水平运动的简化分析中，水平速度由车体速度和航向决定。下式仅用于解释这一机制，完整系统仍应使用三维姿态、实际DVL外参及杆臂模型。
+
+\begin{figure}
+\centering
+\includegraphics{assets/horizontal_dvl.png}
+\caption{近似水平运动中的航向与速度误差}
+\end{figure}
+
+航向误差会把车体前向速度的一部分转为错误侧向速度，随时间积分为位置误差。更准确的车体速度测量不能单独消除这个效应。另一方面，如果速度也有误差，单凭最终位置漂移形状难以判断误差来自DVL还是航向；需要比较速度创新、方向误差和转弯条件。
+
+\hypertarget{ux4e8cdvlux6807ux5b9aux5fc5ux987bux5177ux6709ux8db3ux591fux6fc0ux52b1}{%
+\subsection{二、DVL标定必须具有足够激励}\label{ux4e8cdvlux6807ux5b9aux5fc5ux987bux5177ux6709ux8db3ux591fux6fc0ux52b1}}
+
+DVL尺度、安装角和IMU误差可能在有限运动中相互耦合。长期匀速直行不一定支持同时估计这些参数，增加状态维数也不等于增加可观信息。DVL自标定研究提供了分析及方法依据，应根据实际动作和输入条件判断哪些参数适合在线估计。\href{https://arxiv.org/abs/1509.02054}{［8］}
+
+研究可先用离线标定固定主要外参，再通过独立航段检验残差；只有在数据体现稳定可辨识性后，才加入缓慢变化的在线参数。对底掉锁、少波束和异常速度应保留原始状态，不能用滤波后的平滑曲线掩盖设备质量变化。\href{https://arxiv.org/abs/2404.13742}{［9］}
+
+\hypertarget{ux4e09ux4e3aux4ec0ux4e48ux6761ux5e26ux8befux5339ux914dux53efux80fdux6bd4ux8fd0ux52a8ux5148ux9a8cux66f4ux5dee}{%
+\subsection{三、为什么条带误匹配可能比运动先验更差}\label{ux4e09ux4e3aux4ec0ux4e48ux6761ux5e26ux8befux5339ux914dux53efux80fdux6bd4ux8fd0ux52a8ux5148ux9a8cux66f4ux5dee}}
+
+低重叠条带可能将某个相似沙波或斜坡误作同一结构。若优化沿弱方向产生任意位移，这个错误增量会改变后续局部地图坐标，之后的观测又与已污染地图匹配，形成累计偏差。问题不在于声呐一定无用，而在于弱约束被误当作完整位姿测量。
+
+建议分析每次声呐更新前后的位姿变化、信息特征值和残差分布，并将误差分别投影到沿航向、横向和垂直方向。若声呐只稳定改善垂直与横向，不应因完整三维更新形式而推定沿航向也获益。相对增量评价能够揭示这种情况，而单一累计位置误差容易混淆原因。
+
+\hypertarget{ux56dbux8f6cux5f2fux5e76ux4e0dux5929ux7136ux6709ux5229ux6216ux4e0dux5229}{%
+\subsection{四、转弯并不天然有利或不利}\label{ux56dbux8f6cux5f2fux5e76ux4e0dux5929ux7136ux6709ux5229ux6216ux4e0dux5229}}
+
+转弯可以改善航向和安装角的激励，也可能使条带畸变、视角变化和时间同步误差更明显。应把``运动激励有利于参数可观''与``声呐窗口更难配准''分开研究。若所有转弯附近误差增加，先检查时间、角速度、杆臂、插值和窗口跨度，再决定是否改变匹配算法。
+
+改变窗口长度时需要保持输出时间定义一致。较长窗口的参考时刻滞后，如果将其位置与当前时刻参考直接比较，会把系统延迟误报为定位误差。对外输出应附带参考时间；若传播到当前时刻，则也要传播这段运动的不确定性。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux56db-ux771fux5b9eux6570ux636eux57faux51c6ux4e0eux590dux73b0ux8fb9ux754c}{%
+\section{深化研究四 真实数据基准与复现边界}\label{ux6df1ux5316ux7814ux7a76ux56db-ux771fux5b9eux6570ux636eux57faux51c6ux4e0eux590dux73b0ux8fb9ux754c}}
+
+\hypertarget{ux4e00ux4e0dux540cux6570ux636eux96c6ux63d0ux4f9bux7684ux76d1ux7763ux4e0dux76f8ux540c}{%
+\subsection{一、不同数据集提供的监督不相同}\label{ux4e00ux4e0dux540cux6570ux636eux96c6ux63d0ux4f9bux7684ux76d1ux7763ux4e0dux76f8ux540c}}
+
+AI4Shipwrecks适合侧扫语义结构研究，不提供由分割标签直接得到的连续位姿监督。\href{https://arxiv.org/abs/2401.14546}{［38］} SubPipe包含真实水下检查序列及导航资料，可用于多模态同步、特征和序列分析，但导航参考来源和相机等额外传感器必须与研究输入区分。\href{https://github.com/remaro-network/SubPipe-dataset}{［39］} 高分测深栅格则适合地形结构分析，不能独自验证原始ping去畸变。
+
+\begin{longtable}[]{@{}p{0.22\linewidth}p{0.35\linewidth}p{0.36\linewidth}@{}}
+\toprule
+数据形态 & 能合理评价的内容 & 缺少时不能声称的结果\tabularnewline
+\midrule
+\endhead
+静态侧扫图及标注 & 特征、语义、纹理稳定性 & 连续六自由度里程计精度\tabularnewline
+连续声呐及导航日志 & 时间关联、相对运动与失效机制 & 没有独立参考的绝对精度\tabularnewline
+原始多波束及标定 & 几何、声速、波束与条带处理 & 仅有栅格时的设备链路验证\tabularnewline
+来源独立的高分测深图 & 地形及地图关联研究 & 真实声学强度建模正确性\tabularnewline
+\bottomrule
+\end{longtable}
+
+\hypertarget{ux4e8cux501fux9274ux9646ux5730ux65b9ux6cd5ux65f6ux5e94ux4fddux7559ux4e0eux66ffux6362ux4ec0ux4e48}{%
+\subsection{二、借鉴陆地方法时应保留与替换什么}\label{ux4e8cux501fux9274ux9646ux5730ux65b9ux6cd5ux65f6ux5e94ux4fddux7559ux4e0eux66ffux6362ux4ec0ux4e48}}
+
+FAST-LIO2可借鉴高频惯性传播、迭代更新和增量地图管理；FAST-LIVO2可借鉴几何与图像信息协同的结构。\href{https://arxiv.org/abs/2107.06829}{［22］}\href{https://arxiv.org/abs/2408.14035}{［23］} 必须替换的是传感器观测模型、条带构建、投影、强度一致性以及噪声相关性。将侧扫图称为相机图像、将测深条带称为激光全景点云，不构成科学迁移。
+
+若选择特征前端，不必保留官方直接法的所有更新形式；仍可保留惯性传播和状态估计接口，用声呐特征的实际约束替代视觉残差。迁移对象是可证明适用的算法结构，不是名称或固定状态维数。深度计和DVL已经提供的独立信息应显式进入模型，无法辨识的附加参数不应为了模仿官方状态而强行加入。
+
+\hypertarget{ux4e09ux76f4ux63a5ux6cd5ux4e0eux7279ux5f81ux6cd5ux7684ux516cux5e73ux5bf9ux7167}{%
+\subsection{三、直接法与特征法的公平对照}\label{ux4e09ux76f4ux63a5ux6cd5ux4e0eux7279ux5f81ux6cd5ux7684ux516cux5e73ux5bf9ux7167}}
+
+比较时固定原始序列、标定、时间同步、运动先验、实际覆盖和参考时刻。直接法若采用更多窗口或已有密集地图，其输入条件不同，应另设控制实验。特征法若只在纹理明显区输出，也需要把其无输出段计入可用率，而不是仅评价成功段。
+
+对照至少包括运动先验、仅测深、仅侧扫辅助、几何与强度联合、特征初始化加直接精化。额外的全局位置反馈应单独作为一个实验因素；否则无法判断前端增益究竟来自声呐还是已知绝对地图。最终留出序列不能用于调整特征数量、窗口跨度或权重。
+
+\hypertarget{ux56dbux6700ux5c0fux53efux6267ux884cux7814ux7a76ux987aux5e8f}{%
+\subsection{四、最小可执行研究顺序}\label{ux56dbux6700ux5c0fux53efux6267ux884cux7814ux7a76ux987aux5e8f}}
+
+阶段一核查测量时间、外参和速度类型，并以有限差分检查雅可比。阶段二建立仅运动先验与测深几何基线，分析每个退化方向。阶段三加入真实侧扫特征与物理投影，首先检验对应正确率，再研究相对运动增益。阶段四比较稀疏、稠密和混合更新，记录共同信息与关联失败。阶段五在未使用过的地貌、转弯和掉锁序列上检验长期相对变化、输出延迟和协方差。
+
+每阶段都应具有可停下的检查条件：未确认时间同步不解释状态漂移，未确认对应不调整融合权重，未确认独立参考不宣称绝对精度。以上是研究执行建议，不是自行开展的实验记录。它使后续研究能够从具体证据出发修改一个环节，而不是反复更换算法名称。
+
+\hypertarget{ux4e94ux58f0ux5450ux91ccux7a0bux8ba1ux4e13ux9898ux5e94ux5f62ux6210ux7684ux6210ux679c}{%
+\subsection{五、声呐里程计专题应形成的成果}\label{ux4e94ux58f0ux5450ux91ccux7a0bux8ba1ux4e13ux9898ux5e94ux5f62ux6210ux7684ux6210ux679c}}
+
+成果包括测量模型及坐标约定、可追溯子帧构建、特征与关联质量、退化方向分析、相对位姿与协方差接口，以及独立基准上的条件性能。需要保留失败更新和失败原因，说明平坦、低重叠、重复结构及异常速度下哪些信息仍可信。
+
+研究的最终判断不是``局部轨迹从不漂移''。没有独立绝对参照时，长期漂移通常无法完全消除；真正应证明的是声呐在有信息的条件下改善了短时运动，对无信息条件不制造虚假约束，并能够向后续地图匹配提供时间一致、统计可信的相对运动信息。
+
+\hypertarget{ux7b2cux5341ux4e09ux7ae0-ux5f00ux653eux95eeux9898ux4e0eux7814ux7a76ux7ed3ux8bba}{%
+\section{第十三章 开放问题与研究结论}\label{ux7b2cux5341ux4e09ux7ae0-ux5f00ux653eux95eeux9898ux4e0eux7814ux7a76ux7ed3ux8bba}}
+
+\hypertarget{ux6cbfux822aux5411ux4fe1ux606fux7684ux771fux5b9eux6765ux6e90}{%
+\subsection{13.1 沿航向信息的真实来源}\label{ux6cbfux822aux5411ux4fe1ux606fux7684ux771fux5b9eux6765ux6e90}}
+
+增加窗口、提高采样频率或提取更多特征，都可能改善数据覆盖，但必须证明它们增加了独立的沿航向信息。由运动先验生成的纵向结构，不能直接当成声呐重新观测到的纵向结构。研究应把真实重叠、地形梯度方向和声学纹理稳定性联系起来。
+
+\hypertarget{ux53efux89e3ux91caux7684ux51e0ux4f55ux5f3aux5ea6ux878dux5408}{%
+\subsection{13.2 可解释的几何强度融合}\label{ux53efux89e3ux91caux7684ux51e0ux4f55ux5f3aux5ea6ux878dux5408}}
+
+未来有价值的方向是在统一表面中保存高程、法向、反射率与各自可信度，让测深解释几何、侧扫解释可见回波，IMU和DVL解释运动。该方向需要明确共享误差和多解性，不能只把两个模块输出平均。
+
+\hypertarget{ux53efux4fe1ux524dux7aefux7684ux57faux672cux6761ux4ef6}{%
+\subsection{13.3 可信前端的基本条件}\label{ux53efux4fe1ux524dux7aefux7684ux57faux672cux6761ux4ef6}}
+
+可靠前端首先应忠实表达物理测量和时空关系，其次应获得可验证的环境关联，最后应在不可观方向保持合理不确定性。特征方法和直接方法只是不同的信息组织方式，任何一种都可能因错误模型而失效，也都可能在合适条件下有效。
+
+陆地融合算法提供成熟的状态估计和空间表示思想，水下专用研究提供声学几何与真实数据依据。有效迁移应以重新推导残差、雅可比、协方差和可观性为核心，而不是保留陆地算法名称。前端的成果应由独立短时相对误差、方向性精度和鲁棒性证明，不能由最终全局轨迹代替。
+
+综上，声呐里程计研究的关键不是单纯增加传感器或特征数量，而是利用真实重叠及互补物理信息，在弱地形、转弯和观测失效条件下仍保持可信的相对运动输出。这个研究结论来自测深、侧扫、惯性与融合文献的综合分析，不包含未完成的实验承诺。
+
+\hypertarget{ux53c2ux8003ux6587ux732e}{%
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}}
+
+{[}1{]} Paull L, Saeedi S, Seto M, Li H. AUV Navigation and Localization: A Review. IEEE Journal of Oceanic Engineering, 2014, 39(1):131--149. \href{https://people.csail.mit.edu/lpaull/publications/Paull_JOE_2014.pdf}{公开来源}。
+
+{[}2{]} Barkby S, Williams S B, Pizarro O, Jakuba M V. Bathymetric particle filter SLAM using trajectory maps. The International Journal of Robotics Research, 2012, 31(12):1409--1430. \href{https://doi.org/10.1177/0278364912459666}{公开来源}。
+
+{[}3{]} Zhang J, Xie Y, Ling L, Folkesson J. A Dense Subframe-Based SLAM Framework With Side-Scan Sonar. IEEE Journal of Oceanic Engineering, 2025, 50(2):1087--1102. DOI:10.1109/JOE.2024.3503663. \href{https://arxiv.org/abs/2312.13802}{公开来源}。
+
+{[}4{]} Carreño S, Wilson P, Ridao P, Petillot Y. A survey on terrain based navigation for AUVs. OCEANS, 2010. DOI:10.1109/OCEANS.2010.5664372. \href{https://eprints.soton.ac.uk/153897/1/Carreno_2010_-_A_survey__on_TBN_for_AUVs.pdf}{公开来源}。
+
+{[}5{]} Melo J, Matos A. Survey on advances on terrain based navigation for autonomous underwater vehicles. Ocean Engineering, 2017, 139:250--264. \href{https://doi.org/10.1016/j.oceaneng.2017.04.047}{公开来源}。
+
+{[}6{]} Lurton X, Lamarche G 主编 GeoHab Backscatter Working Group. Backscatter measurements by seafloor-mapping sonars Guidelines and Recommendations. 专业技术指南, 2015及后续资料. \href{https://geohab.org/backscatter-working-group/}{公开来源}。
+
+{[}7{]} Solà J. Quaternion kinematics for the error-state Kalman filter. 技术论文, 2017, arXiv:1711.02508. \href{https://arxiv.org/abs/1711.02508}{公开来源}。
+
+{[}8{]} Pan X, Wu Y. Underwater Doppler Navigation With Self-calibration. The Journal of Navigation, 2016. DOI:10.1017/S0373463315000703. \href{https://arxiv.org/abs/1509.02054}{公开来源}。
+
+{[}9{]} Cohen N, Klein I. Seamless Underwater Navigation with Limited Doppler Velocity Log Measurements. 作者公开论文, 2024, arXiv:2404.13742. \href{https://arxiv.org/abs/2404.13742}{公开来源}。
+
+{[}10{]} Ånonsen K B, Hagen O K, Hegrenæs Ø, Hagen P E. The HUGIN AUV Terrain Navigation Module. OCEANS, 2013. \href{https://www.navlab.net/Publications/The_HUGIN_AUV_Terrain_Navigation_Module.pdf}{公开来源}。
+
+{[}11{]} Segal A V, Haehnel D, Thrun S. Generalized-ICP. Robotics Science and Systems, 2009. \href{https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf}{公开来源}。
+
+{[}12{]} Palomer A, Ridao P, Ribas D. Multibeam 3D Underwater SLAM with Probabilistic Registration. Sensors, 2016, 16(4):560. \href{https://pmc.ncbi.nlm.nih.gov/articles/PMC4851074/}{公开来源}。
+
+{[}13{]} Barkby S, Williams S B, Pizarro O, Jakuba M V. Bathymetric SLAM with No Map Overlap using Gaussian Processes. IROS, 2011:1242--1248. \href{https://www-personal.acfr.usyd.edu.au/sbarkby/2011_iros_bpslam.pdf}{公开来源}。
+
+{[}14{]} Torroba I, Sprague C I, Bore N, Folkesson J. PointNetKL: Deep Inference for GICP Covariance Estimation in Bathymetric SLAM. IEEE Robotics and Automation Letters, 2020, 5(3):4078--4085; 作者版本arXiv:2003.10931. \href{https://arxiv.org/abs/2003.10931}{公开来源}。
+
+{[}15{]} Aubard M, Madureira A, Teixeira L, Pinto J. Sonar-Based Deep Learning in Underwater Robotics: Overview, Robustness, and Challenges. IEEE Journal of Oceanic Engineering, 2025, 50(3):1866--1884. DOI:10.1109/JOE.2025.3531933. \href{https://arxiv.org/abs/2412.11840}{公开来源}。
+
+{[}16{]} Zhang J, Xie Y, Ling L, Folkesson J. A Fully-automatic Side-scan Sonar SLAM Framework. 作者公开论文, 2023. 相关出版DOI:10.1049/rsn2.12500. \href{https://arxiv.org/abs/2304.01854}{公开来源}。
+
+{[}17{]} Sarlin P E, DeTone D, Malisiewicz T, Rabinovich A. SuperGlue: Learning Feature Matching with Graph Neural Networks. CVPR, 2020. \href{https://arxiv.org/abs/1911.11763}{公开来源}。
+
+{[}18{]} Lindenberger P, Sarlin P E, Pollefeys M. LightGlue: Local Feature Matching at Light Speed. ICCV, 2023. \href{https://arxiv.org/abs/2306.13643}{公开来源}。
+
+{[}19{]} Sun J, Shen Z, Wang Y, Bao H, Zhou X. LoFTR: Detector-Free Local Feature Matching with Transformers. CVPR, 2021. \href{https://arxiv.org/abs/2104.00680}{公开来源}。
+
+{[}20{]} Yang H, Shi J, Carlone L. TEASER: Fast and Certifiable Point Cloud Registration. IEEE Transactions on Robotics, 2021, 37(2):314--333. \href{https://arxiv.org/abs/2001.07715}{公开来源}。
+
+{[}21{]} Xie Y, Zhang J, Bore N, Folkesson J. NeuRSS: Enhancing AUV Localization and Bathymetric Mapping with Neural Rendering for Sidescan SLAM. 作者公开论文, 2024, arXiv:2405.05807. \href{https://arxiv.org/abs/2405.05807}{公开来源}。
+
+{[}22{]} Xu W, Cai Y, He D, Lin J, Zhang F. FAST-LIO2: Fast Direct LiDAR-Inertial Odometry. IEEE Transactions on Robotics, 2022, 38(4):2053--2073. \href{https://arxiv.org/abs/2107.06829}{公开来源}。
+
+{[}23{]} Zheng C 等. FAST-LIVO2: Fast, Direct LiDAR--Inertial--Visual Odometry. IEEE Transactions on Robotics, 2025, 41:326--346. \href{https://arxiv.org/abs/2408.14035}{公开来源}。
+
+{[}24{]} Xu Y, Zheng R, Zhang S, Liu M. Robust Inertial-aided Underwater Localization based on Imaging Sonar Keyframes. IEEE Transactions on Instrumentation and Measurement, 2022, 71:7501812. DOI:10.1109/TIM.2022.3156980. \href{https://arxiv.org/abs/2106.16032}{公开来源}。
+
+{[}25{]} Torroba I, Sprague C I, Folkesson J. Fully-Probabilistic Terrain Modelling and Localization With Stochastic Variational Gaussian Process Maps. IEEE Robotics and Automation Letters, 2022, 7(4):8729--8736. \href{https://arxiv.org/abs/2203.10893}{公开来源}。
+
+{[}26{]} Kaess M, Johannsson H, Roberts R, Ila V, Leonard J, Dellaert F. iSAM2: Incremental smoothing and mapping using the Bayes tree. The International Journal of Robotics Research, 2012, 31(2):216--235. \href{https://www.borg.cc.gatech.edu/papers/kaess12ijrr.html}{公开来源}。
+
+{[}27{]} Olson E, Agarwal P. Inference on networks of mixtures for robust robot mapping. Robotics Science and Systems, 2012. \href{https://april.eecs.umich.edu/media/pdfs/olson2012rss.pdf}{公开来源}。
+
+{[}28{]} Roberts D R 等. Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography, 2017, 40:913--929. \href{https://doi.org/10.1111/ecog.02881}{公开来源}。
+
+{[}29{]} Cohen N, Klein I. Enhancing Underwater Navigation through Cross-Correlation-Aware Deep INS/DVL Fusion. OCEANS 相关作者版本, 2025, arXiv:2503.21727. \href{https://arxiv.org/abs/2503.21727}{公开来源}。
+
+{[}30{]} Torroba I, Cella M, Terán A, Rolleberg N, Folkesson J. Online Stochastic Variational Gaussian Process Mapping for Large-Scale Bathymetric SLAM in Real Time. IEEE Robotics and Automation Letters, 2023. DOI:10.1109/LRA.2023.3264750. \href{https://arxiv.org/abs/2211.05601}{公开来源}。
+
+{[}31{]} Xie Y, Bore N, Folkesson J. Towards Differentiable Rendering for Sidescan Sonar Imagery. IEEE/OES AUV Symposium, 2022. DOI:10.1109/\allowbreak AUV53081.\allowbreak 2022.\allowbreak 9965917. \href{https://arxiv.org/abs/2206.07821}{公开来源}。
+
+{[}32{]} Xie Y, Bore N, Folkesson J. Neural Network Normal Estimation and Bathymetry Reconstruction from Sidescan Sonar. 作者公开论文, 2022, arXiv:2206.07819. \href{https://arxiv.org/abs/2206.07819}{公开来源}。
+
+{[}33{]} Xie Y, Bore N, Folkesson J. Bathymetric Reconstruction From Sidescan Sonar With Deep Neural Networks. IEEE Journal of Oceanic Engineering, 2023, 48(2):372--383. DOI:10.1109/JOE.2022.3220330. \href{https://arxiv.org/abs/2206.07810}{公开来源}。
+
+{[}34{]} Yampolsky Z, Cohen N, Klein I. Transformer-Based Robust Underwater Inertial Navigation in Prolonged Doppler Velocity Log Outages. OCEANS 相关作者版本, 2025, arXiv:2504.07697. \href{https://arxiv.org/abs/2504.07697}{公开来源}。
+
+{[}35{]} Zhang Q, Kim J. TTT SLAM: A feature-based bathymetric SLAM framework. Ocean Engineering, 2024, 294:116777. DOI:10.1016/j.oceaneng.2024.116777. \href{https://www.sciencedirect.com/science/article/pii/S0029801824001148}{公开来源}。
+
+{[}36{]} Solà J, Deray J, Atchuthan D. A micro Lie theory for state estimation in robotics. 作者技术论文, 2018及修订版本, arXiv:1812.01537. \href{https://arxiv.org/abs/1812.01537}{公开来源}。
+
+{[}37{]} Landry D, Pomerleau F, Giguère P. CELLO-3D: Estimating the Covariance of ICP in the Real World. 作者公开论文, 2018, arXiv:1810.01470. \href{https://arxiv.org/abs/1810.01470}{公开来源}。
+
+{[}38{]} Sethuraman A V, Sheppard A, Bagoren O, Pinnow C, Anderson J, Havens T C, Skinner K A. Machine Learning for Shipwreck Segmentation from Side Scan Sonar Imagery: Dataset and Benchmark. The International Journal of Robotics Research, 2024在线出版. DOI:10.1177/0278364924126685. \href{https://arxiv.org/abs/2401.14546}{公开来源}。
+
+{[}39{]} Álvarez-Tuñón O, Marnet L R, Antal L, Aubard M, Costa M, Brodskiy Y. SubPipe: A Submarine Pipeline Inspection Dataset for Segmentation and Visual-inertial Localization. 作者公开论文与官方数据集, 2024, arXiv:2401.17907. \href{https://github.com/remaro-network/SubPipe-dataset}{公开来源}。
+
+\hypertarget{ux6587ux732eux8bc1ux636eux4e0eux9605ux8bfbux8303ux56f4}{%
+\section{文献证据与阅读范围}\label{ux6587ux732eux8bc1ux636eux4e0eux9605ux8bfbux8303ux56f4}}
+
+以下区分公开全文、可见方法章节、摘要和软件资料。摘要层面的文献只用于陈述其公开问题定义、总体方法和证据类型，不据此补写未公开公式、参数或逐项实验结果。通用视觉和陆地研究仅作为方法来源，不等同于水下有效性证明。
+
+\begin{longtable}[]{@{}p{0.07\linewidth}p{0.29\linewidth}p{0.58\linewidth}@{}}
+\toprule
+编号 & 证据类型 & 本报告使用范围\tabularnewline
+\midrule
+\endhead
+1 & 水下导航综述 & 作者公开全文\tabularnewline
+2 & 测深SLAM直接研究 & 公开摘要及作者相关方法论文\tabularnewline
+3 & 侧扫SLAM直接研究 & 开放全文与官方实现\tabularnewline
+4 & 水下地形导航综述 & 作者公开全文\tabularnewline
+5 & 水下地形导航综述 & 出版摘要与机构公开全文\tabularnewline
+6 & 声学强度物理基础 & 官方指南与相关章节\tabularnewline
+7 & 误差状态数学基础 & 作者公开全文\tabularnewline
+8 & DVL标定与可观性直接研究 & 作者公开全文\tabularnewline
+9 & DVL不完整观测直接研究 & 作者公开全文\tabularnewline
+10 & 工程系统与海试证据 & 作者公开全文\tabularnewline
+11 & 概率配准基础 & 作者公开全文\tabularnewline
+12 & 多波束概率配准直接研究 & 开放全文\tabularnewline
+13 & 测深SLAM直接研究 & 作者公开全文\tabularnewline
+14 & 测深配准不确定性直接研究 & 作者公开全文与机构出版核对\tabularnewline
+15 & 声呐学习综述 & 开放作者全文\tabularnewline
+16 & 侧扫SLAM直接研究 & 作者公开全文与官方实现\tabularnewline
+17 & 通用图像匹配参考 & 作者摘要与公开论文入口\tabularnewline
+18 & 通用图像匹配参考 & 作者公开全文\tabularnewline
+19 & 通用稠密匹配参考 & 作者公开全文\tabularnewline
+20 & 鲁棒全局配准基础 & 作者公开全文\tabularnewline
+21 & 侧扫重建与SLAM直接研究 & 作者公开全文\tabularnewline
+22 & 陆地方法迁移参考 & 作者公开全文与官方实现\tabularnewline
+23 & 陆地多模态方法迁移参考 & 作者公开全文与官方实现\tabularnewline
+24 & 成像声呐惯性融合直接研究 & 作者公开全文与相关出版DOI核对\tabularnewline
+25 & 概率海底地图直接研究 & 作者公开全文与官方实现\tabularnewline
+26 & 增量因子图基础 & 作者实验室书目与方法说明\tabularnewline
+27 & 鲁棒多假设图优化基础 & 作者公开全文\tabularnewline
+28 & 空间独立评价基础 & 正式出版方法综述\tabularnewline
+29 & 学习融合相关性直接研究 & 作者公开全文\tabularnewline
+30 & 在线测深概率建图直接研究 & 作者公开论文摘要与官方实现说明\tabularnewline
+31 & 声学可微模型研究 & 作者公开全文\tabularnewline
+32 & 声学表面法向重建研究 & 作者公开全文\tabularnewline
+33 & 侧扫几何重建直接研究 & 作者公开全文与机构出版核对\tabularnewline
+34 & DVL掉锁学习研究 & 作者摘要与公开论文入口\tabularnewline
+35 & 测深特征与鲁棒SLAM直接研究 & 出版摘要、引言与可见方法片段 不声称全文复现\tabularnewline
+36 & 状态估计数学基础 & 作者摘要及公开数学资料入口 本报告推导为独立说明\tabularnewline
+37 & 数据驱动配准协方差参考 & 作者摘要及公开论文入口 不作为水下实验结论\tabularnewline
+38 & 真实侧扫数据与学习基准 & 作者摘要及作者数据网站 不将分割标签视为里程计真值\tabularnewline
+39 & 真实水下多模态序列数据 & 作者论文摘要与官方数据说明 位姿参考来自导航估计而非无误差真值\tabularnewline
+\bottomrule
+\end{longtable}

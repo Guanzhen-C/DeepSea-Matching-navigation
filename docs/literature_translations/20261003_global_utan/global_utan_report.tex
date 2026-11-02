@@ -1,0 +1,125 @@
+\documentclass[11pt]{article}
+\usepackage{literature_review}
+
+\begin{document}
+\reviewtitle{第 01 篇}{Global UTAN：无先验位姿的多波束海底地形全局跟踪}{中文精读、方法解构与证据核查}
+
+\noindent\textbf{原文：}Qianyi Zhang, Jinwhan Kim, ``Terrain-Based Global Tracking Without Prior Pose Information Using Multibeam Echosounder Measurements,'' \emph{IEEE Transactions on Instrumentation and Measurement}, vol.~75, art.~7506113, 2026. DOI: \href{https://doi.org/10.1109/TIM.2026.3716492}{10.1109/TIM.2026.3716492}.\\
+\textbf{资料状态：}已核对用户提供的 IEEE Xplore 论文 PDF，13 页，含摘要、方法、公式、实验、结论和参考文献；不是仅据摘要撰写。\\
+\textbf{报告性质：}研究性中文译读与分析，\emph{不是原文逐字译本或独立复现实验报告}。文中实测数值均注明原文表号，工程建议与作者实验结论分开表述。
+
+\section*{一页结论}
+\reviewnote{\textbf{论文解决的问题：}在已知海底地形先验图、但没有可靠初始位置或航向的条件下，利用多波束测深实时恢复水平位姿，并在位置突然跳变（KRP）或滤波发散后重新定位。\textbf{核心组合：}地形梯度局部特征 $\rightarrow$ VLAD 子图检索与跳变检测 $\rightarrow$ TEASER++ 全局配准 $\rightarrow$ 多假设 cohort 粒子滤波。\textbf{最重要的边界：}“无先验位姿”不等于“无先验地图”；论文使用真实海试测深，但航位推算噪声与 KRP 为实验模拟注入，尚非 AUV 载机实海试闭环验证。}
+
+\section{研究问题与原文假设}
+
+传统航位推算（DR）误差随时间累积；依靠外部声学基站又增加部署成本。海底地形辅助导航（UTAN）用实时测深与艇载先验地形图匹配，可提供不依赖外部基站的定位约束。困难在于：初始位姿未知、地形相似导致多个伪高峰、航向误差影响匹配，以及任务中断或突发扰动造成的“被绑架机器人问题”（KRP）。论文第 I--II 节指出，单靠局部滤波不易从这些情况恢复；单纯全图相关匹配则计算量高，也难以连续跟踪。
+
+原文的输入是\textbf{预存的测深地形图、实时多波束回波构成的局部地形图和 DR 增量}。位姿状态仅考虑水平位置与艏向 $\mathbf{x}=[x,y,\psi]^\mathsf{T}$。作者明确假设深度、横滚和俯仰由传感器及航行器稳定性控制在有界误差内，且短时间 DR 足够准，可拼接局部测深图（原文第 III-A 节）。这些条件并非所有深海或高动态任务都能满足。
+
+\section{算法流程：从地图检索到连续跟踪}
+
+\subsection{离线：把先验地形图变成可检索的子图数据库}
+
+作者先把先验图 $\mathcal{M}$ 划为 $M$ 个互不重叠的子图 $\mathcal{M}_i$。每个子图提取\textbf{地形梯度特征}：在局部高起伏区域取地图块作描述子，并旋转至主方向，使局部匹配尽可能不受初始艏向影响。全部描述子经过缺失值最近邻填补，再用 $k$-means 建立 $K$ 个聚类中心 $\mathbf c_k$。对第 $i$ 个子图，VLAD 聚合各描述子与其最近聚类中心的残差：
+\begin{equation}
+  \mathbf V_i=\left[\sum_{\mathbf d\in D_i}\mathbb{1}\!\left[k=\operatorname{NN}(\mathbf d)\right](\mathbf d-\mathbf c_k)\right]_{k=1}^{K}.
+\end{equation}
+经幂归一化和 $L_2$ 归一化后，每个子图保存\emph{地形网格、局部特征及 VLAD 向量}。与只统计词频的 BoW 不同，VLAD 保留描述子相对词中心的残差，因而在较小码本下仍具有辨别力（原文第 III-B 节）。这一步需要\textbf{预先拥有覆盖任务区的地形图}。
+
+\subsection{在线：检测跳变、提出全局候选位姿}
+
+实时多波束数据和短时 DR 构成局部网格 $\bar{\mathcal M}$，提取特征并编码为 $\bar{\mathbf V}$。用 $\|\bar{\mathbf V}-\mathbf V_i\|_2$ 对全部先验子图排序，取最相似的前 $m$ 个。若当前跟踪位姿落在这些子图覆盖区内，算法认为未发生 KRP，只配准覆盖当前位置的候选子图；否则判断发生 KRP，对前 $m$ 个候选都尝试匹配（原文算法 1，第 IV 节）。
+
+匹配的局部地形特征交给 TEASER++ 估计全局刚体对齐与候选位姿。之后以局部测深图和先验子图重叠区域的深度均方误差把关：
+\begin{equation}
+  \operatorname{MSE}=\frac{1}{L}\sum_{j=1}^{L}(z_j-\hat z_j)^2<\tau_{\mathrm{MSE}}.
+\end{equation}
+只有通过阈值的候选被送入粒子滤波。这里的\emph{地形检索}减少全图精配准次数；\emph{TEASER++}负责从错误对应中求稳健初始对齐；\emph{MSE}负责拒绝明显不符的解。单个模块都不是作者从零发明，贡献在于针对全局跟踪的组合与触发方式。
+
+\subsection{在线：cohort 粒子滤波保留多个假设}
+
+通过全局配准的每个候选位姿会注入若干粒子。若新粒子与现有粒子水平距离不超过 $\delta_1$，归入最近 cohort；否则创建新 cohort。这样一个 cohort 对应一种空间假设，避免把相隔甚远的多峰粒子直接平均成一个无意义位置（原文第 V-A 节）。粒子仍按标准 PF 做运动预测与测深似然更新：
+\begin{align}
+  \mathbf{x}^{i,j}_t &= \mathbf{x}^{i,j}_{t-1}+R(\psi)(\mathbf c_t+\boldsymbol\epsilon),\\
+  w^{i,j}_t &= w^{i,j}_{t-1}\exp\!\left[-\frac{\operatorname{MSE}^{i,j}_t}{2\sigma^2}\right],\qquad
+  N_{\mathrm{eff}}=\frac{1}{\sum_{i,j}(\tilde w^{i,j}_t)^2}.
+\end{align}
+当 $N_{\mathrm{eff}}$ 低于阈值时重采样；总粒子数超过上限则随机下采样。作者并\textbf{没有}把每一个多峰候选都转为一个确定解。
+
+输出选择先用上一时刻结果和控制量得到一步预测 $\check{\mathbf x}_t$。若存在与预测水平距离不超过 $\delta_2$ 的 cohort，就选其中距离预测最近者，以保持轨迹连续；若全部 cohort 都远离预测，视为滤波发散，改选\textbf{平均测深 MSE 最小}的 cohort。对预测范围外、但 MSE 相对范围内最佳 cohort 没有显著优势的 cohort，粒子权重置零，使其在后续重采样中逐渐退出（原文算法 3，第 V-C 节）。这一策略直接针对“伪峰导致突然跳到错误位置”。
+
+\section{实验设置与可核对的结果}
+
+\subsection{证据性质}
+
+论文使用两套\textbf{真实测深海试数据}：浅水 Ripples 和深水 New England Seamounts；参考真值由采集船舶的 GNSS 轨迹提供。但输入 DR 轨迹由真值添加高斯噪声生成，KRP 则通过删除一段控制输入与对应测量来模拟；每个数据集做 10 组噪声实验（原文第 VI 节）。因此应称为“基于真实海试测深数据的离线算法验证”，\textbf{不应直接说成在 AUV 上完成在线海试}。所有方法由 MATLAB 在单核 Intel Core i9-12900K、32 GB 内存机器上运行。
+
+\begin{table}[htbp]
+\centering\small
+\caption{两组数据的先验地图及作者给出的主要设置（原文表 I）}
+\begin{tabularx}{\linewidth}{lYY}
+\toprule
+设置 & Ripples & New England Seamounts\\
+\midrule
+先验子图数量与尺寸 & 24；$200\,\mathrm m\times200\,\mathrm m$ & 197；$10\,\mathrm{km}\times10\,\mathrm{km}$\\
+地形特点 & 平均水深约 $30\,\mathrm m$ & 先验图覆盖约 $2\times10^4\,\mathrm{km}^2$\\
+深度 MSE 门限 $\tau_{\rm MSE}$ & $0.1$ & $10000$\\
+候选子图数 $m$ & $5$ & $5$\\
+cohort 分组阈值 $\delta_1$ & $100$ & $1000$\\
+输出选择阈值 $\delta_2$ & $300$ & $500$\\
+无效 cohort 阈值 $\eta$ & $0.4$ & $3000$\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+两个数据集的门限相差很大，说明方法\textbf{不是一组无须重调参数的通用配置}；$\tau_{\rm MSE}$ 等阈值与地图深度变化和子图尺度相关。
+
+\subsection{浅水 Ripples：小粒子集仍可工作}
+
+按原文表 II--III，在粒子上限为 5、码本大小为 64 的相同配置下，Global UTAN 的平均水平定位误差为 $31.22\,\mathrm m$、总计算时间 $48\,\mathrm s$、KRP 检测 inlier rate 为 $0.68$、平均恢复时间 $1.52\,\mathrm s$；BoW PF 对应为 $136.32\,\mathrm m$、$55\,\mathrm s$、$0.47$、$4.02\,\mathrm s$。这组比较直接支持\emph{VLAD 检索加 cohort PF 在小码本、小粒子数下优于文中 BoW PF}，但结果依赖该数据集和作者调参。原文表 IV 的消融实验进一步显示，使用 100 粒子和 4096 词码本时，99\% 误差跳变条件尾部期望（CTE）由 BoW PF 的 $5.62\,\mathrm m$ 降至 BoW CPF 的 $3.53\,\mathrm m$，由 VLAD PF 的 $5.42\,\mathrm m$ 降至完整 Global UTAN 的 $3.39\,\mathrm m$；这比只报告平均误差更能体现 cohort 对伪峰的抑制。
+
+\subsection{深水 New England Seamounts：关键对比看原始数值}
+
+按原文表 VI，在 100 粒子、256 词码本时，结果如下。\emph{中位定位误差}用于减轻极大的随机初始 DR 偏差对均值的影响；表中时间是整段 MATLAB 实验计算时间，不是每次重定位时延。
+
+\begin{table}[htbp]
+\centering\small
+\caption{深水数据集 100 粒子、256 词码本的对比（原文表 VI）}
+\begin{tabular}{lrrrr}
+\toprule
+方法 & 中位定位误差/m & 总计算时间/s & KRP inlier rate & KRP 恢复时间/s\\
+\midrule
+BoW PF & 57.27 & 107 & 0.36 & 15.40\\
+Global UTAN & 44.75 & 99 & 0.77 & 9.34\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+从原始数字计算：定位误差相对 BoW PF 下降约 $21.9\%$，计算时间下降约 $7.5\%$，恢复时间下降约 $39.4\%$；KRP inlier rate 从 $0.36$ 到 $0.77$，\textbf{增加 0.41（41 个百分点）}。论文摘要及结论把最后一项称为“提高约 53\%”，但未在这些段落明确给出百分比的分母；对外汇报宜优先引用 $0.36\rightarrow0.77$ 的原始值，避免误解为常规的相对增幅。原文第 VI-B 节另报告：对 197 个子图执行一次 KRP 检测和全局定位平均约 $0.28\,\mathrm s$；这是\emph{触发时延}，不能与整段计算时间互换。
+
+\section{对方法的评价：适用之处与尚未证明之处}
+
+\textbf{有价值之处。}方法没有要求可靠的起始水平位姿和艏向；把快速候选检索、抗外点配准与多峰连续跟踪分层处理，计算量随子图检索而受控。利用 99\% CTE 衡量罕见的大跳变，也比只看均值更贴近航行安全需求。消融结果支持 cohort 管理模块的独立贡献，而不仅是换用了 VLAD。
+
+\textbf{不能外推的地方。}第一，先验地形图是必要输入，并且实时图与先验图的尺度、分辨率需足够一致；作者在结论中也提出增强尺度不变性。第二，深度、横滚、俯仰误差未被作为状态联合估计；平坦地形可能令艏向弱可观测（原文第 V-B、VII 节）。第三，KRP 检测、cohort 分组与剔除是启发式规则，阈值需按地图特征调整，尚无严格的联合概率模型。第四，本文对 DR 噪声和 KRP 的检验属于\emph{离线注入}，并未给出艇载资源、通信中断、时变海底或先验图系统偏差下的完整性能保证。
+
+\textbf{本项目可借鉴的验证方式（建议，非原文已验证结论）。}若要借鉴此法，先用已有多波束数据和独立先验地图复现“未知初始艏向 + 大初始偏差 + 随机 KRP”三类工况；统一报告中位/均值误差、99\% CTE、误检/漏检率、恢复时间和每 ping/每次全局定位延时。再做地图分辨率错配、姿态补偿误差和地形重复度的压力测试。只有这些测试通过后，才能讨论艇载在线部署。
+
+\section*{术语与来源说明}
+
+\begin{tabularx}{\linewidth}{lY}
+\toprule
+术语 & 本报告译法与含义\\
+\midrule
+Global UTAN & 全局水下地形辅助导航；本文特指作者提出的连续全局跟踪框架。\\
+KRP & 被绑架机器人问题；位置突然变化且估计器未观测到。\\
+Pseudo-peak & 伪峰；相似地形导致多个错误但似然很高的候选。\\
+VLAD & 局部描述子残差聚合；用于先验子图快速检索。\\
+Cohort PF & 分群粒子滤波；保留并管理多个位姿假设。\\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.7em}\noindent\textbf{唯一直接精读来源：}\href{https://doi.org/10.1109/TIM.2026.3716492}{Zhang \& Kim, IEEE TIM 2026, DOI: 10.1109/TIM.2026.3716492}。本报告所述公式、实验和数值均以用户提供的 13 页 IEEE 论文 PDF 为准；没有把作者引用的其他论文当作已取得全文的证据。
+
+\end{document}

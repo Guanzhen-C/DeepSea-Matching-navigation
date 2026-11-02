@@ -1,0 +1,855 @@
+\hypertarget{ux6458ux8981}{%
+\section{摘要}\label{ux6458ux8981}}
+
+深海全局重定位研究解决初始位姿未知、惯性航位推算长期漂移或定位失效后，如何利用海底环境与先验地图恢复位置的问题。与局部地形匹配不同，它必须面对候选覆盖、相似地貌、多峰分布、地图偏差和错误位置确认风险。单次配准残差较小，只能说明某个候选能够解释当前观测，不足以证明车辆在该地点。
+
+本报告以地形导航工程研究、粒子滤波理论、测深点云地点识别、鲁棒全局配准、概率地图和多假设图优化为基础，建立从全局候选生成到持续跟踪的研究体系。重点讨论点质量滤波、粒子滤波、Rao--Blackwell化、cohort跟踪、无效候选、地图似然、共模误差、观测相关性、候选确认与异步输出。现已取得并核读Global UTAN的13页IEEE正式论文全文：本版据原文补充VLAD检索、TEASER++配准、cohort粒子滤波的具体规则、实验数值及适用边界；本报告自行提出的概率一致性研究建议仍与该论文原方法严格区分。
+
+文献综合分析认为，全局定位成熟度应由正确候选能否被发现、真实候选能否在多模态期间被保留、错误候选能否被后续观测否定，以及失效后能否重新恢复来评价。平坦地形和重复地貌需要不确定性与序列证据，而不是仅依赖更强的单帧搜索。多波束提供地形几何，侧扫可提供补充辨识信息，但必须满足地图来源、声学几何和辐射一致性条件。报告提出分层概率研究框架和独立评价体系，所有分析均来自公开文献与通用理论，不包含具体项目实验结果。
+
+关键词 全局重定位 海底地形 多假设 粒子滤波 候选检索 鲁棒配准 可信导航
+
+\hypertarget{ux7b2cux4e00ux7ae0-ux5168ux5c40ux91cdux5b9aux4f4dux7684ux95eeux9898ux8fb9ux754c}{%
+\section{第一章 全局重定位的问题边界}\label{ux7b2cux4e00ux7ae0-ux5168ux5c40ux91cdux5b9aux4f4dux7684ux95eeux9898ux8fb9ux754c}}
+
+\hypertarget{ux5c40ux90e8ux8ddfux8e2aux4e0eux5168ux5c40ux53d1ux73b0}{%
+\subsection{1.1 局部跟踪与全局发现}\label{ux5c40ux90e8ux8ddfux8e2aux4e0eux5168ux5c40ux53d1ux73b0}}
+
+局部跟踪假定正确位置附近已有较高概率，主要用新观测修正有限误差。全局发现则要在大范围地图中寻找位置，正确地点可能不在当前估计附近。两者需要不同的候选生成策略：局部优化即使计算十分精确，也通常无法跳出错误区域。
+
+水下长期导航依靠IMU和速度测量传播状态，误差具有时间累积和系统性成分。经典水下导航与地形导航综述讨论环境参照的作用，并说明先验地图定位与SLAM的区别。\href{https://people.csail.mit.edu/lpaull/publications/Paull_JOE_2014.pdf}{［1］}\href{https://eprints.soton.ac.uk/153897/1/Carreno_2010_-_A_survey__on_TBN_for_AUVs.pdf}{［2］}\href{https://doi.org/10.1016/j.oceaneng.2017.04.047}{［3］} 全局重定位研究应明确地图范围、已知姿态信息、初始位置分布和允许的定位时间。
+
+\hypertarget{ux5931ux6548ux6062ux590dux4e0eux88abux7ed1ux67b6ux95eeux9898}{%
+\subsection{1.2 失效恢复与被绑架问题}\label{ux5931ux6548ux6062ux590dux4e0eux88abux7ed1ux67b6ux95eeux9898}}
+
+定位失效可能由传感器掉锁、地图关联错误、未建模偏差或重复地貌引起。被绑架问题用于研究当前真实位置突然与原先验不一致时能否重新定位，并不只指物理搬动车辆。水下持续错误先验也可能形成类似困难：滤波只在旧位置附近搜索，从而永远无法看到真实地点。
+
+Global UTAN正式论文将无先验位姿跟踪、被绑架问题、滤波发散和伪峰作为研究对象，结合VLAD子图检索、TEASER++初始化和cohort粒子跟踪。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 该方法的详细规则与实验数值见本报告第十章；这里的``无先验位姿''不等于``无先验地形图''。
+
+\hypertarget{ux5df2ux77e5ux5730ux56feux7684ux8d28ux91cfux6761ux4ef6}{%
+\subsection{1.3 已知地图的质量条件}\label{ux5df2ux77e5ux5730ux56feux7684ux8d28ux91cfux6761ux4ef6}}
+
+全局地图可能来自船载测深、AUV历史测线或融合地形产品。不同来源在分辨率、垂直基准和误差相关性上不同。一个地图区域具有小栅格间距，并不意味着可支持相同量级的绝对定位。全球融合地图还需要来源类型和勘误信息。\href{https://www.gebco.net/data_and_products/gridded_bathymetry_data/}{［5］}\href{https://www.ncei.noaa.gov/products/etopo-global-relief-model}{［6］}\href{https://www.gebco.net/data-products/gridded-bathymetry-data/data-set-errata}{［7］}
+
+地图不存在可靠覆盖时，重定位算法不能通过搜索自动得到真实位置。合理研究应允许``当前无法确认''的结果，区分地图缺失、测量异常和多峰歧义，而不是始终强制输出一个确定坐标。
+
+\hypertarget{ux7b2cux4e8cux7ae0-ux5730ux5f62ux5339ux914dux7684ux72b6ux6001ux548cux89c2ux6d4bux6a21ux578b}{%
+\section{第二章 地形匹配的状态和观测模型}\label{ux7b2cux4e8cux7ae0-ux5730ux5f62ux5339ux914dux7684ux72b6ux6001ux548cux89c2ux6d4bux6a21ux578b}}
+
+\hypertarget{ux72b6ux6001ux7ef4ux5ea6ux9009ux62e9}{%
+\subsection{2.1 状态维度选择}\label{ux72b6ux6001ux7ef4ux5ea6ux9009ux62e9}}
+
+若深度和滚转俯仰有较强外部观测，全局搜索可以把重点放在水平位置与航向。但这是一种带不确定度的条件化，不应把姿态误差视为严格零。深度计偏差、安装姿态误差及航向误差可能耦合进水平匹配。
+
+低维状态有利于候选覆盖，高维状态有利于表达偏差，但样本或网格需求增加。是否在线估计深度偏差、DVL比例或其他参数，应由可观性与任务条件决定。Pan与Wu关于DVL自标定的研究说明，参数识别依赖实际运动激励。\href{https://arxiv.org/abs/1509.02054}{［8］}
+
+\hypertarget{ux5730ux5f62ux51e0ux4f55ux4f3cux7136}{%
+\subsection{2.2 地形几何似然}\label{ux5730ux5f62ux51e0ux4f55ux4f3cux7136}}
+
+对每个候选位姿，把测深点转换到地图坐标并计算高程残差。高程采用向上为正时，模型如下。b表示共同垂向偏差，C应包含测量、地图和相关误差，而不仅是一个固定测距方差。
+
+\begin{figure}
+\centering
+\includegraphics{assets/map_residual.png}
+\caption{式2-1 候选位姿的高程残差与信息结构}
+\end{figure}
+
+这一模型使水平位移通过地形梯度改变预测高程。若地图平坦，所有候选可产生相似残差；若地图具有重复结构，多个远距离候选都可形成尖锐峰。局部信息矩阵不能单独证明全局唯一性。
+
+\hypertarget{ux89c2ux6d4bux8986ux76d6ux4e0eux6709ux6548ux6570ux91cf}{%
+\subsection{2.3 观测覆盖与有效数量}\label{ux89c2ux6d4bux8986ux76d6ux4e0eux6709ux6548ux6570ux91cf}}
+
+候选位姿不同，有效地图覆盖也可能不同。某个候选只有少量点落在有效地图内，残差和可能小于具有完整覆盖的正确候选。评分必须结合覆盖及概率规范化，不能用未经校正的最小残差和跨候选比较。
+
+此外，同一ping多个波束存在共同姿态、深度与声速误差，相邻ping也可共享偏差。增加点数可以增加几何采样密度，却不等于增加同样数量的独立位置证据。海底匹配研究应说明观测分组与误差相关假设。
+
+\hypertarget{ux5730ux56feux4f4dux7f6eux4e0dux786eux5b9aux6027}{%
+\subsection{2.4 地图位置不确定性}\label{ux5730ux56feux4f4dux7f6eux4e0dux786eux5b9aux6027}}
+
+地图中的高程测点来自具有位置误差的调查轨迹。对斜坡，水平位置误差会转化成高程预测误差；对断崖，线性传播可能不适用。Torroba等关于不确定输入SVGP的工作直接研究了测量位置不确定性与地图预测。\href{https://arxiv.org/abs/2203.10893}{［9］}
+
+使用连续概率地图时，需要同时考虑均值和预测方差。若真实位置落在缺测插值区域，较小残差可能只说明插值曲面较平滑，而非观测与地图具有明确对应。预测方差应参与候选权重，同时需要检查模型是否充分表达外推风险。
+
+\hypertarget{ux7b2cux4e09ux7ae0-ux5168ux5c40ux5019ux9009ux751fux6210ux4e0eux5730ux70b9ux8bc6ux522b}{%
+\section{第三章 全局候选生成与地点识别}\label{ux7b2cux4e09ux7ae0-ux5168ux5c40ux5019ux9009ux751fux6210ux4e0eux5730ux70b9ux8bc6ux522b}}
+
+\hypertarget{ux5019ux9009ux751fux6210ux7684ux72ecux7acbux804cux8d23}{%
+\subsection{3.1 候选生成的独立职责}\label{ux5019ux9009ux751fux6210ux7684ux72ecux7acbux804cux8d23}}
+
+全局候选生成的首要指标是覆盖：真实地点是否进入待检验集合。候选排序负责效率，而后续配准和序列检验负责确认。将这三件事混为一次最高分选择，容易使早期漏检或伪峰直接决定最终位置。
+
+候选可以来自均匀地图网格、粗分辨率轮廓搜索、手工地形描述子或学习检索。每种方法都需要处理搜索范围与地图边界。若依赖当前估计附近生成候选，即使后续使用``全局配准''，整体系统仍不一定具有全局重定位能力。
+
+\hypertarget{ux9ad8ux7a0bux548cux5f62ux6001ux63cfux8ff0ux5b50}{%
+\subsection{3.2 高程和形态描述子}\label{ux9ad8ux7a0bux548cux5f62ux6001ux63cfux8ff0ux5b50}}
+
+高程直方图、坡度分布、曲率、方向谱和脊谷结构可以用于粗检索。它们的优点是几何含义清楚，缺点是可能对局部偏差和覆盖变化敏感。去均值能减少垂直偏差，却删除绝对深度；旋转不变性有助于未知航向，但也可能丢失方向信息。
+
+设计描述子时应把不变性与辨识性平衡。对未知航向检索，先使用适度旋转不变特征，再由候选配准恢复方向，是一种一般策略。若把所有幅度、方向和尺度均归一化，很多不同地貌可能被映射成相近描述子，候选数量反而增加。
+
+\hypertarget{ux5b66ux4e60ux578bux70b9ux4e91ux68c0ux7d22}{%
+\subsection{3.3 学习型点云检索}\label{ux5b66ux4e60ux578bux70b9ux4e91ux68c0ux7d22}}
+
+PointNetVLAD将点特征与全局聚合结合，MinkLoc3D以稀疏卷积构造地点描述子。\href{https://arxiv.org/abs/1804.03492}{［10］}\href{https://arxiv.org/abs/2011.04530}{［11］} 这两类研究提供了陆地点云检索的结构参考，但海底点云通常接近单一曲面且以条带观测，陆地建筑和立体结构提供的辨识性不能自动迁移。
+
+测深点云回环检测研究直接面向海底数据，学习局部特征与关联，用于回环识别和粗对齐。\href{https://arxiv.org/abs/2209.08578}{［12］} 它说明地形特征学习具有潜力，但真实海域训练覆盖不足仍是限制。检索评价应考虑查询条带覆盖、不同航向与不同传感器密度，而非只查询完整且接近训练采样的子地图。
+
+\hypertarget{ux5b50ux5730ux56feux5c3aux5ea6ux9009ux62e9}{%
+\subsection{3.4 子地图尺度选择}\label{ux5b50ux5730ux56feux5c3aux5ea6ux9009ux62e9}}
+
+较短子地图及时性好、姿态畸变小，却可能缺乏独特地貌；较长子地图更有辨識信息，但需要更长时间且累积运动误差。子地图长度应与声呐覆盖、运动精度和环境结构相联系，不宜把某个固定ping数量视为全局通用参数。
+
+多尺度检索可以先用大尺度低频结构缩小范围，再用局部细节排序。但如果粗层地图缺失或平滑掉目标结构，真位置可能在第一阶段被排除。粗筛应保留合理召回率，并提供无法找到可信候选时的替代路径。
+
+\hypertarget{ux7b2cux56dbux7ae0-ux914dux51c6ux521dux59cbux5316ux4e0eux5c40ux90e8ux7cbeux5316}{%
+\section{第四章 配准初始化与局部精化}\label{ux7b2cux56dbux7ae0-ux914dux51c6ux521dux59cbux5316ux4e0eux5c40ux90e8ux7cbeux5316}}
+
+\hypertarget{ux914dux51c6ux524dux7684ux6a21ux578bux4e00ux81f4ux6027}{%
+\subsection{4.1 配准前的模型一致性}\label{ux914dux51c6ux524dux7684ux6a21ux578bux4e00ux81f4ux6027}}
+
+候选检索通常返回区域而不是精确位姿。精化前需要统一坐标、点密度、有效覆盖及基准面，并对候选之间使用一致观测子集。若一个候选使用不同点数或不同平滑尺度，评分变化可能来自处理方式，而不是地理位置。
+
+对共模垂向偏差，原始高程、去均值轮廓和联合偏差估计各有适用性。研究中应保留绝对深度是否已知这一条件，而不能一方面删除高程均值，另一方面声称使用全部绝对地形信息。
+
+\hypertarget{ux5c40ux90e8ux914dux51c6}{%
+\subsection{4.2 局部配准}\label{ux5c40ux90e8ux914dux51c6}}
+
+ICP和GICP适合在较可信候选附近精化。GICP使用两组点的局部协方差表达表面关系。\href{https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf}{［13］} 海底条带配准需要进一步区分几何局部协方差和设备噪声，两者具有不同含义。平面近似的协方差并不能自动表达声速或姿态系统偏差。
+
+局部优化的停止条件只表示目标变化变小或更新变小。它不提供全局地点正确性。错误峰附近同样可能收敛，而且因局部曲率大给出看似很小的位姿方差。全局重定位必须另外保存候选身份与后续证据。
+
+\hypertarget{ux9c81ux68d2ux914dux51c6}{%
+\subsection{4.3 鲁棒配准}\label{ux9c81ux68d2ux914dux51c6}}
+
+TEASER以鲁棒估计和条件性可认证思想处理包含错误对应的点云配准。\href{https://arxiv.org/abs/2001.07715}{［14］} 对全局重定位，其合理角色是为候选提供较稳健的初值或变换假设。足够正确的对应仍是前提，候选地点是否相同不由配准算法名称决定。
+
+分支定界类搜索可以在给定范围内系统探索位姿，3D-BBS提供相关公开实现参考。\href{https://arxiv.org/abs/2310.10023}{［15］} 其优势是降低对局部初值的依赖，但目标函数、地图表达和误差条件仍决定结果。评分全局最优不等于真实位置正确，也不能代替序列一致性。
+
+\hypertarget{ux53d8ux6362ux4e0dux786eux5b9aux6027}{%
+\subsection{4.4 变换不确定性}\label{ux53d8ux6362ux4e0dux786eux5b9aux6027}}
+
+配准应提供各方向的不确定性，而不是只有一个匹配分数。PointNetKL面向测深GICP协方差估计，说明不确定度是融合中的关键变量。\href{https://arxiv.org/abs/2003.10931}{［16］} 学习协方差可能比在线重复采样更高效，但必须验证在未见地貌和不同点密度下是否校准。
+
+若在全局多峰期间仅保存一组位姿和协方差，容易把地点选择风险误表成小范围连续误差。应区分候选内协方差和候选间概率。前者描述选定地点附近的误差，后者描述到底处于哪个地点。
+
+\hypertarget{ux7b2cux4e94ux7ae0-ux70b9ux8d28ux91cfux6ee4ux6ce2-ux7c92ux5b50ux6ee4ux6ce2ux4e0eux5206ux5c42ux4f30ux8ba1}{%
+\section{第五章 点质量滤波 粒子滤波与分层估计}\label{ux7b2cux4e94ux7ae0-ux70b9ux8d28ux91cfux6ee4ux6ce2-ux7c92ux5b50ux6ee4ux6ce2ux4e0eux5206ux5c42ux4f30ux8ba1}}
+
+\hypertarget{ux70b9ux8d28ux91cfux6ee4ux6ce2ux7684ux5730ux5f62ux5e94ux7528}{%
+\subsection{5.1 点质量滤波的地形应用}\label{ux70b9ux8d28ux91cfux6ee4ux6ce2ux7684ux5730ux5f62ux5e94ux7528}}
+
+点质量滤波在离散状态网格上递推概率。二维水平位置问题中，它可以较完整表达候选峰，且不依赖随机粒子恰好落在某个峰内。Ånonsen与Hallingstad的直接水下研究及HUGIN公开工程论文说明了该路线的实际应用。\href{https://www.navlab.net/Publications/Terrain_Aided_Underwater_Navigation_Using_Point_Mass_And_Particle_Filters.pdf}{［17］}\href{https://www.navlab.net/Publications/The_HUGIN_AUV_Terrain_Navigation_Module.pdf}{［18］}
+
+当需要同时估计航向和多个偏差，网格状态数量快速增加。分层估计可以将某些近高斯连续变量条件化，但需要传播它们对地形似然的影响。简单固定这些变量会产生过于乐观的位置分布。
+
+\hypertarget{ux7c92ux5b50ux6ee4ux6ce2ux7684ux9012ux63a8ux673aux5236}{%
+\subsection{5.2 粒子滤波的递推机制}\label{ux7c92ux5b50ux6ee4ux6ce2ux7684ux9012ux63a8ux673aux5236}}
+
+粒子滤波用位置假设及权重近似后验。运动提议产生新候选，地形似然更新权重，重采样把有限资源集中到较可信区域。一般重要性权重必须补偿提议分布，否则混合不同采样策略会扭曲后验。
+
+\begin{figure}
+\centering
+\includegraphics{assets/pf_weight.png}
+\caption{式5-1 重要性权重与有效样本数量}
+\end{figure}
+
+Arulampalam等介绍了顺序重要性采样与相关粒子滤波变体。\href{https://doi.org/10.1109/78.978374}{［19］} 对海底而言，难点不仅是递推公式，而是似然强度、采样覆盖和多峰持续存在的关系。有效样本数低反映权重集中，却不能直接说明真实定位已收敛。
+
+\hypertarget{ux63d0ux8baeux5206ux5e03}{%
+\subsection{5.3 提议分布}\label{ux63d0ux8baeux5206ux5e03}}
+
+运动提议根据短时里程计传播粒子，有利于持续跟踪，但如果里程计偏差较大，真实峰可能逐渐离开粒子覆盖。观测提议从当前测量推测候选，可以帮助恢复，却可能在重复地貌中生成错误峰。混合提议结合两者，需要正确的采样概率补偿。
+
+鲁棒Monte Carlo定位研究讨论运动和观测驱动样本的组合，是恢复能力的重要理论参考。\href{https://www.borg.cc.gatech.edu/projects/monte-carlo-localization.html}{［20］} 其陆地实验不直接证明水下适用性，但提出的问题同样存在：仅依赖旧先验会失去全局发现能力，仅依赖当前观测则可能缺乏时间连续性。
+
+\hypertarget{ux7c92ux5b50ux8d2bux5316ux4e0eux9519ux8befux6536ux655b}{%
+\subsection{5.4 粒子贫化与错误收敛}\label{ux7c92ux5b50ux8d2bux5316ux4e0eux9519ux8befux6536ux655b}}
+
+重采样会复制高权重粒子并删除低权重粒子。当错误地貌偶然形成强峰时，真实候选可能在一次重采样后完全消失。此后局部传播只能让错误峰内粒子移动，无法自行找回真实峰。粒子数增加、噪声增大和随机注入都只能部分缓解，不能替代正确似然与候选恢复。
+
+Fox的KLD采样依据后验复杂度调整样本量，其目标是控制样本近似误差。\href{https://papers.neurips.cc/paper_files/paper/2001/hash/c5b2cebf15b205503560c4e8e6d1ea78-Abstract.html}{［21］} 对海底多模态问题，除了数量，还需检查每个候选是否有足够样本。全部新增样本都在错误峰内，近似会更精确地表达错误结果。
+
+\hypertarget{raoblackwellux5316}{%
+\subsection{5.5 Rao--Blackwell化}\label{raoblackwellux5316}}
+
+Rao--Blackwell化将一部分变量条件于粒子后用解析或近高斯方法估计，减少高维采样负担。测深SLAM中，Barkby等研究轨迹粒子与高斯过程地图的结合。\href{https://doi.org/10.1177/0278364912459666}{［22］} 该研究是联合轨迹地图估计，不应与已知地图中的纯位置粒子跟踪混为一谈。
+
+在重定位中，可以考虑对候选身份或水平位姿采样，对局部偏差进行条件估计。但是否满足解析条件、如何处理不同候选的参数耦合、是否遗漏非高斯偏差，均需独立研究。分层不是忽略不确定性，而是用适当表示减少冗余。
+
+\hypertarget{ux7b2cux516dux7ae0-cohortux591aux5019ux9009ux8ddfux8e2aux4e0eux65e0ux6548ux5047ux8bbe}{%
+\section{第六章 Cohort多候选跟踪与无效假设}\label{ux7b2cux516dux7ae0-cohortux591aux5019ux9009ux8ddfux8e2aux4e0eux65e0ux6548ux5047ux8bbe}}
+
+\hypertarget{ux4e3aux4ec0ux4e48ux9700ux8981ux5019ux9009ux5206ux7ec4}{%
+\subsection{6.1 为什么需要候选分组}\label{ux4e3aux4ec0ux4e48ux9700ux8981ux5019ux9009ux5206ux7ec4}}
+
+多个相隔很远的地点候选具有不同的证据历史。把它们放在一个全局重采样池中，暂时较弱的真实候选可能被较强伪峰吞并。按地点候选分组，可以分别传播和评价，再在候选层比较支持程度。
+
+Global UTAN原文第V节把全局配准给出的粒子按空间距离归入已有cohort或创建新cohort，并根据运动预测距离和测深MSE选定输出、剔除无效cohort。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 以下关于显式候选概率、地图外假设及候选保护的讨论是本报告在一般多模态贝叶斯框架下提出的研究分析，并非原文已实现的规则。候选保护的目标是降低过早决策，而不是人为确保某个候选始终保留。
+
+\hypertarget{ux5019ux9009ux5185ux4e0eux5019ux9009ux95f4ux4e0dux786eux5b9aux6027}{%
+\subsection{6.2 候选内与候选间不确定性}\label{ux5019ux9009ux5185ux4e0eux5019ux9009ux95f4ux4e0dux786eux5b9aux6027}}
+
+候选内分布表示该地点附近的位姿误差，候选间权重表示不同地点解释当前序列的相对程度。两者可以形式化为混合分布，并为无效或地图外解释保留一项。
+
+\begin{figure}
+\centering
+\includegraphics{assets/mixture.png}
+\caption{式6-1 多地点后验与无效假设的一般混合表达}
+\end{figure}
+
+如果两个地点均有较高权重，它们的加权平均可能落在没有任何观测支持的中间海域。因此多模态时不宜把跨地点均值作为确定位置。合理输出可以包括多个候选、候选内估计或暂时保留相对运动，但需要明确定位状态。
+
+\hypertarget{ux65e0ux6548ux5019ux9009ux4e0eux5730ux56feux5916ux89e3ux91ca}{%
+\subsection{6.3 无效候选与地图外解释}\label{ux65e0ux6548ux5019ux9009ux4e0eux5730ux56feux5916ux89e3ux91ca}}
+
+若系统只给有限候选分配概率，即使所有候选都错误，归一化后仍会出现``最可信''的一个。最高权重只是相对比较，不是候选真实存在的证明。无效假设允许当前观测无法由已有候选解释，避免强迫系统从错误集合中选出确定位置。
+
+构建无效似然需要注意概率尺度。若无效模型过宽，可能吸收所有观测；若过窄，仍会强迫匹配。其设计应基于外点、地图缺失和未建模误差的统计证据，而不只是设置一个人为分数。Olson与Agarwal的混合推断研究提供显式错误假设的基础思路。\href{https://april.eecs.umich.edu/media/pdfs/olson2012rss.pdf}{［23］}
+
+\hypertarget{ux5019ux9009ux751fux547dux5468ux671f}{%
+\subsection{6.4 候选生命周期}\label{ux5019ux9009ux751fux547dux5468ux671f}}
+
+候选需要有出生、跟踪、确认、失效和替换的状态。新候选应由独立的全局检索或搜索生成，并记录观测时间和覆盖；跟踪应使用后续未被重复计入的测量；失效应由证据不一致或覆盖缺失解释，而不是只因为当前排名略低。
+
+如果旧候选错误却仍占据几乎全部资源，恢复会困难；如果频繁生成和切换候选，输出会不稳定。候选生命周期设计需要把追踪持久性与新证据响应平衡。该问题属于多假设估计的通用研究问题，不应仅通过一个``切换阈值''概括。
+
+\hypertarget{ux5e8fux5217ux8bc1ux636eux4e0eux786eux8ba4}{%
+\subsection{6.5 序列证据与确认}\label{ux5e8fux5217ux8bc1ux636eux4e0eux786eux8ba4}}
+
+一个候选要被确认，需要解释车辆从一个观测位置移动到后续位置时，地图预测如何持续变化。真实候选应同时满足地形、运动和观测时间一致性。重复使用同一组测量不能替代后续新证据，即使算法执行了许多迭代。
+
+确认不应要求所有地形都产生固定强度信息。平坦区域可能暂时无法区分候选，但后续进入特征区域可以消除歧义。在缺少区分证据时，维持多模态是科学结果，不能为了输出单一坐标而过早收敛。
+
+\hypertarget{ux7b2cux4e03ux7ae0-ux9c81ux68d2ux4f3cux7136-ux76f8ux5173ux6027ux4e0eux5730ux56feux8befux5dee}{%
+\section{第七章 鲁棒似然 相关性与地图误差}\label{ux7b2cux4e03ux7ae0-ux9c81ux68d2ux4f3cux7136-ux76f8ux5173ux6027ux4e0eux5730ux56feux8befux5dee}}
+
+\hypertarget{ux5916ux70b9ux548cux91cdux5c3e}{%
+\subsection{7.1 外点和重尾}\label{ux5916ux70b9ux548cux91cdux5c3e}}
+
+测深可能包含异常回波、遮挡边缘和错误底面检测。重尾似然或混合外点模型可以降低少量异常值主导权重的风险，但模型需要保留真实陡峭地形，不可把所有大残差都自动视为外点。
+
+鲁棒方法仍会被大量结构性错误影响。如果地图整体偏移，或者错误候选在大片重复地形上都产生小残差，常规鲁棒损失也可能偏爱错误地点。鲁棒似然和多候选表示解决不同问题，需要共同分析。
+
+\hypertarget{ux5171ux6a21ux504fux5dee}{%
+\subsection{7.2 共模偏差}\label{ux5171ux6a21ux504fux5dee}}
+
+同一测量组的共同深度偏差可以用相关协方差表示。联合负对数似然包含残差项和协方差规范化项。
+
+\begin{figure}
+\centering
+\includegraphics{assets/corr.png}
+\caption{式7-1 共模误差模型与联合似然}
+\end{figure}
+
+若将共同偏差错当作每个波束独立误差，似然会随点数过度尖锐。若反过来把所有几何都当作完全共同误差，也会丢失真实的形态信息。研究需要把局部独立噪声、ping级偏差和测线级偏差按物理来源区分。
+
+\hypertarget{ux5e73ux5766ux533aux57dfux7684ux8bdaux5b9eux4e0dux786eux5b9aux6027}{%
+\subsection{7.3 平坦区域的诚实不确定性}\label{ux5e73ux5766ux533aux57dfux7684ux8bdaux5b9eux4e0dux786eux5b9aux6027}}
+
+平坦海底的高程似然在水平位置上应较平缓。若算法在平坦区给出非常小的水平协方差，应检查是否由过强运动先验、共同误差重复计数或插值曲面伪梯度引起。提高数据密度不改变根本不可观方向。
+
+粗地图导航论文对插值区及地形信息航迹的讨论，为这类问题提供直接背景。\href{https://eprints.soton.ac.uk/480480/1/joe.pdf}{［24］} 本报告的理论判断是，在弱地形期间应依靠合理运动传播和不确定度扩展，待新的独立特征进入观测后再收缩，而不是要求地图始终持续修正。
+
+\hypertarget{ux5782ux5411ux504fux5deeux8fb9ux7f18ux5316}{%
+\subsection{7.4 垂向偏差边缘化}\label{ux5782ux5411ux504fux5deeux8fb9ux7f18ux5316}}
+
+当同时估计水平位置和垂向偏差时，有效位置信息需要扣除两者耦合部分。通过去均值消去偏差具有一定鲁棒性，但也删除绝对深度辨识信息。联合估计保留更多信息，却需要偏差先验及足够地形方向变化。
+
+\begin{figure}
+\centering
+\includegraphics{assets/nuisance.png}
+\caption{式7-2 干扰参数边缘化后的有效位置信息}
+\end{figure}
+
+这说明参数增加不是越多越好。对不可观参数给很强先验，会把不确定性隐藏为``精确状态''；完全自由估计则可能使位置失去约束。研究应分析信息矩阵及参数相关性，再决定建模方式。
+
+\hypertarget{ux6982ux7387ux5730ux56feux7684ux5916ux63a8}{%
+\subsection{7.5 概率地图的外推}\label{ux6982ux7387ux5730ux56feux7684ux5916ux63a8}}
+
+高斯过程与SVGP提供连续高程及方差，适合表达不同覆盖区域的预测可信度。\href{https://arxiv.org/abs/2203.10893}{［9］} Barkby相关研究展示了利用空间相关性在低重叠条件下构造测深预测的思路。\href{https://www-personal.acfr.usyd.edu.au/sbarkby/2011_iros_bpslam.pdf}{［25］} 但空间相关模型具有尺度和地貌限制，不能解释为未测区域具有与实测区相同可信度。
+
+外推区域的候选如果因为预测方差大而获得较小规范化残差，可能被错误偏爱。概率评分应包含正确归一化并反映缺乏观测支持的程度。单纯让所有缺测区产生很宽高斯，并不能自动实现可靠拒绝。
+
+\hypertarget{ux7b2cux516bux7ae0-ux4fa7ux626bux5730ux8c8cux4fe1ux606fux7684ux53c2ux4e0eux65b9ux5f0f}{%
+\section{第八章 侧扫地貌信息的参与方式}\label{ux7b2cux516bux7ae0-ux4fa7ux626bux5730ux8c8cux4fe1ux606fux7684ux53c2ux4e0eux65b9ux5f0f}}
+
+\hypertarget{ux5148ux9a8cux5730ux56feux662fux5426ux5305ux542bux5f3aux5ea6}{%
+\subsection{8.1 先验地图是否包含强度}\label{ux5148ux9a8cux5730ux56feux662fux5426ux5305ux542bux5f3aux5ea6}}
+
+只有高程地图时，不能凭空得到真实反射率。侧扫可以用于实时观测之间的相对匹配，或与已存储的声学地图关联；若仅有地形先验，则需通过明确声学模型建立间接关系，其不确定性通常更高。
+
+GeoHab指南说明回波强度依赖底质、入射角和测量处理。\href{https://geohab.org/backscatter-working-group/}{［26］} 因而``高程相似''与``强度相似''不是同一判断。研究中应清楚说明侧扫比较的另一端是什么：历史图像、反射率地图、经校正回波地图，还是由模型预测的强度。
+
+\hypertarget{ux5730ux8c8cux7eb9ux7406ux4e0eux51e0ux4f55ux5019ux9009}{%
+\subsection{8.2 地貌纹理与几何候选}\label{ux5730ux8c8cux7eb9ux7406ux4e0eux51e0ux4f55ux5019ux9009}}
+
+一种一般策略是先用多波束生成几何候选，再用已有侧扫纹理验证候选。它的潜在价值在于区分几何近似的不同底质区域。但如果两种地图来自同一错误轨迹，或共享错误姿态校正，它们的证据并不独立。
+
+侧扫稀疏和稠密SLAM研究提供真实声学匹配与位姿约束方法。\href{https://arxiv.org/abs/2304.01854}{［27］}\href{https://arxiv.org/abs/2312.13802}{［28］} 这些研究以重叠声呐观测为基础，不能直接当成与任意全球高程图绝对关联的证明。绝对重定位还需有对应的地理参考声学地图。
+
+\hypertarget{ux795eux7ecfux6e32ux67d3ux4e0eux5730ux56feux5173ux8054}{%
+\subsection{8.3 神经渲染与地图关联}\label{ux795eux7ecfux6e32ux67d3ux4e0eux5730ux56feux5173ux8054}}
+
+NeuRSS将侧扫高程先验与位姿图优化交替联系。\href{https://arxiv.org/abs/2405.05807}{［29］} 它为强度与地形联合研究提供参考，但隐式反射率、几何和位姿之间的多解性依然需要独立观测。模型能够拟合回波，不代表全球地图候选一定正确。
+
+声呐学习综述对鲁棒性和数据域差异的分析提醒，检索与匹配网络必须评价跨设备、增益和地貌条件。\href{https://arxiv.org/abs/2412.11840}{［30］} 不能把自然图像特征匹配的成熟性直接等同于海底强度匹配的成熟性。
+
+\hypertarget{ux7b2cux4e5dux7ae0-ux4e0eux76f8ux5bf9ux91ccux7a0bux8ba1ux53caux56e0ux5b50ux56feux7684ux5173ux7cfb}{%
+\section{第九章 与相对里程计及因子图的关系}\label{ux7b2cux4e5dux7ae0-ux4e0eux76f8ux5bf9ux91ccux7a0bux8ba1ux53caux56e0ux5b50ux56feux7684ux5173ux7cfb}}
+
+\hypertarget{ux77edux65f6ux8fd0ux52a8ux4fe1ux606f}{%
+\subsection{9.1 短时运动信息}\label{ux77edux65f6ux8fd0ux52a8ux4fe1ux606f}}
+
+全局跟踪需要相对运动推动候选到下一时刻。一个局部里程计的绝对轨迹整体偏移，不必然污染短时增量；但航向、速度或比例误差随时间变化时，增量会受到影响。因此应该评价指定时间或距离间隔的相对位姿，而不只看累计位置误差。
+
+若全局结果作为局部运动状态的反馈，可能帮助修正可观偏差，也可能把错误候选直接传播到所有后续状态。需要区分坐标变换修正和内部速度、姿态及偏差更新，后者要求明确协方差与相关性处理。
+
+\hypertarget{mapux5230odomux7684ux5750ux6807ux5173ux7cfb}{%
+\subsection{9.2 Map到Odom的坐标关系}\label{mapux5230odomux7684ux5750ux6807ux5173ux7cfb}}
+
+Odom保持短时连续，Map表达全局参照。若在时刻t\_r得到地图位置，可用该时刻的相对位姿把全局校正传播到当前时刻。下式的前提是同一参考坐标、时间标签和刚体变换约定。
+
+\begin{figure}
+\centering
+\includegraphics{assets/mapodom.png}
+\caption{式9-1 延迟地形更新向当前输出的位姿传播}
+\end{figure}
+
+这一关系解决时间和坐标衔接，不会自行改善短时里程计的相对精度。软化地图坐标校正可以改善输出连续性，但如果持续滞后于正确位置，也会引入实时误差。平滑性与正确性必须分开评价。
+
+\hypertarget{ux56e0ux5b50ux56feux7684ux804cux8d23}{%
+\subsection{9.3 因子图的职责}\label{ux56e0ux5b50ux56feux7684ux804cux8d23}}
+
+因子图组织相对运动、地形匹配与回环等跨时间约束，iSAM2是增量推断的重要基础。\href{https://www.borg.cc.gatech.edu/papers/kaess12ijrr.html}{［31］} 正确地图因子能够改善全局轨迹一致性，错误绝对因子则可能迫使轨迹产生不合理形变。优化器不能用算法名称代替候选验证。
+
+多模态期间可在候选层保留多个解释，已确认单模态期间再采用连续图优化；或者使用混合因子表达多个关联。这些是不同研究架构，必须说明哪个模块决定地点、哪个模块精化轨迹。粒子滤波和图优化不是同一种算法，也不必互相排斥。
+
+\hypertarget{ux91cdux590dux4fe1ux606fux4e0eux76f8ux5173ux6027}{%
+\subsection{9.4 重复信息与相关性}\label{ux91cdux590dux4fe1ux606fux4e0eux76f8ux5173ux6027}}
+
+如果粒子滤波和图优化都使用同一组测深，再把粒子结果当成独立地形测量加入图，会重复计算信息。相似问题还出现在全局反馈纠正局部状态后，再把局部输出当作独立运动先验。需要建立信息来源与相关关系，而不能只因为模块接口不同就假定独立。
+
+一种研究上的保守做法是按观测身份记录信息用途，明确某个输出是已有观测的压缩结果，还是新的独立测量。联合估计可更完整处理相关性，但实现复杂；分层估计应给出近似和适用条件。
+
+\hypertarget{ux7b2cux5341ux7ae0-ux5de5ux7a0bux4e0eux516cux5f00ux5b9eux73b0ux8bc1ux636e}{%
+\section{第十章 工程与公开实现证据}\label{ux7b2cux5341ux7ae0-ux5de5ux7a0bux4e0eux516cux5f00ux5b9eux73b0ux8bc1ux636e}}
+
+\hypertarget{ux6210ux719fux5de5ux7a0bux8defux7ebf}{%
+\subsection{10.1 成熟工程路线}\label{ux6210ux719fux5de5ux7a0bux8defux7ebf}}
+
+HUGIN公开论文说明了地形导航模块的传感器、滤波及海试背景，MBARI官方TRN项目资料展示了真实海底相对导航的工程应用。\href{https://www.navlab.net/Publications/The_HUGIN_AUV_Terrain_Navigation_Module.pdf}{［18］}\href{https://www.mbari.org/project/terrain-relative-navigation/}{［32］} 这些来源的重要价值是完整测量链路与真实运行，而非把某个算法在理想输入上的成功当作整个系统成熟。
+
+MB-System公开TRN代码为检查地图查询、观测和滤波实现提供入口。\href{https://github.com/dwcaress/MB-System}{［33］} 软件可复现性需要说明版本、输入及运行条件。开源代码存在，不代表其作者对所有新的设备和地图作出精度承诺。
+
+\hypertarget{ux5148ux8fdbux5019ux9009ux8ddfux8e2aux8defux7ebf}{%
+\subsection{10.2 先进候选跟踪路线}\label{ux5148ux8fdbux5019ux9009ux8ddfux8e2aux8defux7ebf}}
+
+Global UTAN强调无需先验位姿和持续全局跟踪，本文已依据正式全文核对其检索、鲁棒初始化、分组跟踪和两组数据的比较结果。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 但论文采用真实测深数据配合模拟生成的DR噪声及KRP，不能把离线结果表述成AUV艇载在线海试；详细参数、数值和证据边界见下文10.3节。
+
+针对模糊更新的鲁棒粒子滤波论文也直接研究了地形歧义。\href{https://doi.org/10.1016/j.mechatronics.2023.103133}{［34］} 它可作为问题相关文献，但只有摘要时不应推导作者具体重采样或判别条件。充分调研的含义是说明已知和未知，而不是用推测补齐每篇论文。
+
+\hypertarget{global-utanux6b63ux5f0fux5168ux6587ux6838ux8bfbux7b97ux6cd5ux6570ux503cux4e0eux8fb9ux754c}{%
+\subsection{10.3 Global UTAN正式全文核读：算法、数值与边界}\label{global-utanux6b63ux5f0fux5168ux6587ux6838ux8bfbux7b97ux6cd5ux6570ux503cux4e0eux8fb9ux754c}}
+
+已核对Zhang与Kim发表于IEEE TIM的13页正式论文全文，而不再只依据机构摘要。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 本节按原文第III--VI节及表I--VI，分开陈述\textbf{论文确实实现的算法}、\textbf{原文实验数值}和\textbf{本报告提出的扩展问题}。原文解决的是已知先验地形图中的未知初始水平位姿与航向跟踪；并非无地图建图或从任意海域凭空求绝对位置。
+
+\textbf{离线地图准备。} 先验地形图分为互不重叠子图。每个子图提取高起伏区域的地形梯度局部特征，描述子旋转到主方向以提高未知航向下的可匹配性；对描述子缺失值做最近邻填补后，用k-means生成码本。VLAD将每个局部描述子相对于最近码字的残差聚合，并进行幂归一化和L2归一化。数据库为每个子图保存网格、局部描述子和VLAD向量。VLAD不只是``更大的BoW''：它保留残差结构，使较小码本仍有地貌辨识能力（原文第III节）。
+
+\textbf{在线KRP检测及全局定位。} 用短时DR和多波束测深构建局部网格并计算VLAD向量，对全部先验子图按向量距离排序。取最相似的前\(m\)个子图；若当前跟踪位置落在这些子图覆盖区内，原文算法1判定未发生KRP，仅配准覆盖当前估计的候选；否则判定KRP并配准全部前\(m\)个候选。局部梯度特征匹配进入TEASER++求刚体对齐，配准后以重叠深度的均方误差门限筛除候选。这个KRP判据是\textbf{检索区域与当前估计的空间一致性检查}，不是独立传感器直接观测到车辆发生瞬移。因此相似地貌、地图缺失或错误检索仍可能造成误检或漏检。
+
+\textbf{Cohort粒子跟踪。} 每个通过配准的候选位姿注入粒子；若距离现有粒子不超过\(\delta_1\)，并入最近cohort，否则新建cohort。各粒子按二维位置与艏向运动模型传播，用测深-地图MSE形成\(\exp[-\mathrm{MSE}/(2\sigma^2)]\)似然，按有效样本数触发重采样。粒子总数超过\(N_{\max}\)时随机下采样，注入后粒子权重重置为\(1/N\)。在输出阶段，若有cohort位于一步运动预测的\(\delta_2\)范围内，选距离预测最近者；否则视为发散，选平均MSE最小者。预测范围外且MSE没有显著优势的cohort被置零权重，随后从重采样中退出（原文算法2、3）。这与本报告前文提出的``候选间显式概率质量''和``地图外无效状态''不同：\textbf{原论文没有给出严格的联合概率模型}，作者在结论中也明确承认cohort管理及KRP检测依赖启发式规则。
+
+\textbf{实验数据的准确口径。} 两组实验使用真实海试测深：Ripples浅水数据的24个\(200\,\mathrm m\times200\,\mathrm m\)先验子图；New England Seamounts深水数据的197个\(10\,\mathrm{km}\times10\,\mathrm{km}\)先验子图，先验图覆盖约\(2\times10^4\,\mathrm{km}^2\)。但DR由真值加高斯噪声生成，KRP通过删去一段控制与测量来模拟；每组有10次噪声试验。作者使用MATLAB、单核i9-12900K和32 GB内存。实测测深并不等于实船/实艇闭环运行该估计器；算法时延也不能直接等同于艇载时延。
+
+\begin{longtable}[]{@{}llrrrr@{}}
+\toprule
+场景 (粒子/码本) & 方法 & 误差/m & 用时/s & inlier & 恢复/s\tabularnewline
+\midrule
+\endhead
+Ripples (5/64) & BoW PF & 136.32 & 55 & 0.47 & 4.02\tabularnewline
+Ripples (5/64) & Global UTAN & 31.22 & 48 & 0.68 & 1.52\tabularnewline
+New England (100/256) & BoW PF & 57.27 & 107 & 0.36 & 15.40\tabularnewline
+New England (100/256) & Global UTAN & 44.75 & 99 & 0.77 & 9.34\tabularnewline
+\bottomrule
+\end{longtable}
+
+上表分别摘自原文表II--III和表VI；\textbf{不能把浅水均值与深水中位数横向比较}。深水同配置下，定位误差相对BoW PF降低约21.9\%，恢复时间降低约39.4\%；KRP检测inlier rate从0.36到0.77，增加0.41（41个百分点）。论文摘要和结论用``提高约53\%''描述这一项，但未在相应段落交代该百分比的分母，因此本报告优先引用原始数值，不把它误写成常规基线相对提升。原文第VI-B节另给出：197个先验子图的一次KRP检测加全局定位平均约0.28 s；这属于\textbf{每次触发的处理时间}，不能与表中的整段计算时间互换。
+
+\textbf{消融与参数敏感性。} 原文表IV在100粒子、4096词时比较BoW PF、BoW加cohort、VLAD加普通PF和完整方法：99\%误差跳变条件尾部期望依次为5.62、3.53、5.42、3.39 m，支持cohort管理缓和罕见大跳变。表I中浅水/深水的配准MSE门限为0.1/10000，cohort分组阈值为100/1000，无效cohort阈值为0.4/3000，说明配置依赖地图尺度和地形起伏；原文还测试了候选子图数\(m\)、输出选择阈值\(\delta_2\)等敏感性。结论因此应写成``在两组实测测深、模拟噪声与KRP、作者调参条件下有效''，不能外推为所有深海地图即插即用。
+
+\textbf{对本报告理论框架的关系。} 这篇论文提供了``快速检索---鲁棒配准---多假设跟踪''的具体可核对实例，也暴露了严格概率解释、跨分辨率地图、深度/横滚/俯仰误差和艇载验证方面的开放问题。本报告提出的候选概率质量、相关测深似然及地图外假设是可研究的改进方向，不应在引用Global UTAN时写成其原算法已经具备的功能。
+
+\hypertarget{ux7b2cux5341ux4e00ux7ae0-ux8bc4ux4ef7ux4f53ux7cfbux4e0eux7814ux7a76ux9a8cux8bc1ux6761ux4ef6}{%
+\section{第十一章 评价体系与研究验证条件}\label{ux7b2cux5341ux4e00ux7ae0-ux8bc4ux4ef7ux4f53ux7cfbux4e0eux7814ux7a76ux9a8cux8bc1ux6761ux4ef6}}
+
+\hypertarget{ux521dux59cbux5316ux8986ux76d6}{%
+\subsection{11.1 初始化覆盖}\label{ux521dux59cbux5316ux8986ux76d6}}
+
+全局重定位应在多个初始位置和航向不确定条件下检验。至少记录真实候选召回率、配准成功率、最终正确确认率和确认所需观测长度。各阶段指标不能互相代替：检索找到真实地图块，不意味着姿态已经正确。
+
+初始条件需要覆盖地图内部、边界、缺测区和重复地貌。若仅在已知真实位置附近给候选，就属于局部初始化研究，而非真正全局发现。不同方法使用不同搜索范围，也不能直接比较成功率。
+
+\hypertarget{ux8ddfux8e2aux4e0eux6062ux590d}{%
+\subsection{11.2 跟踪与恢复}\label{ux8ddfux8e2aux4e0eux6062ux590d}}
+
+持续评价需要记录错误地点确认、错误持续时间、恢复时间和恢复后稳定性。被绑架测试应明确发生时刻及变化方式，不能只看最终误差是否恢复；某方法长时间提供错误确定位置，再偶然恢复，其完整性仍然不足。
+
+平坦区域应评价不确定度增长是否合理，进入新结构后是否正确收敛。地图偏差应单独测试，避免把所有失效都归因于随机噪声。多波束与侧扫组合还应有单模态消融，以证明各自新增信息。
+
+\hypertarget{ux4e0dux786eux5b9aux5ea6ux6821ux51c6}{%
+\subsection{11.3 不确定度校准}\label{ux4e0dux786eux5b9aux5ea6ux6821ux51c6}}
+
+候选置信度应该与实际正确率相匹配。经常标为高置信却定位错误，说明系统过度自信；始终保持极低置信，即使位置正确也可能无法支持任务决策。评价应同时关注精度与可信输出比例。
+
+候选内连续协方差与候选间概率需要分别评价。可以检查真实误差在预测区域中的覆盖率，以及已确认候选的错误比例，但统计单位应是独立事件或航段，而非将高度相关的每帧当成独立样本。
+
+\hypertarget{ux5730ux7406ux4e0eux8bbeux5907ux6cdbux5316}{%
+\subsection{11.4 地理与设备泛化}\label{ux5730ux7406ux4e0eux8bbeux5907ux6cdbux5316}}
+
+学习描述子、协方差和侧扫匹配器需要按海域、航次及设备划分测试。空间结构交叉验证研究说明，相邻数据随机分割会造成乐观估计。\href{https://doi.org/10.1111/ecog.02881}{［35］} 地图与查询若共用原始测线，还需检查是否共享定位误差或测量伪影。
+
+不同设备开角、点数及增益改变输入统计。研究应明确预处理是否使用测试信息，并保留设备参数和地图来源。只有训练域中表现较好，不足以证明深海长期部署的普适性。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e00-ux591aux5019ux9009ux91cdux5b9aux4f4dux4e2dux7684ux6982ux7387ux4e00ux81f4ux6027}{%
+\section{专题研究一 多候选重定位中的概率一致性}\label{ux4e13ux9898ux7814ux7a76ux4e00-ux591aux5019ux9009ux91cdux5b9aux4f4dux4e2dux7684ux6982ux7387ux4e00ux81f4ux6027}}
+
+\hypertarget{ux4e00ux5019ux9009ux751fux6210ux4e0dux7b49ux4e8eux540eux9a8cux4f30ux8ba1}{%
+\subsection{一、候选生成不等于后验估计}\label{ux4e00ux5019ux9009ux751fux6210ux4e0dux7b49ux4e8eux540eux9a8cux4f30ux8ba1}}
+
+全局检索输出的是一组值得进一步检查的地点，不是完整位置后验。描述子相似度通常来自检索训练目标或距离函数；粒子权重则需要表示在指定测量模型下的概率。两者量纲、归一化方式和先验条件都可能不同。因此，把检索分数经过任意指数变换后直接当作位置概率，虽然容易实现，却不能自动获得贝叶斯解释。
+
+研究上应区分三类对象。第一类是候选生成分布，用于决定搜索资源投向哪里；第二类是测量似然，用于说明观测在候选处出现的可能性；第三类是候选先验，用于表达车辆此前可能位于哪些区域。若检索已经使用当前子帧，初始化粒子后又使用同一子帧进行一次强似然更新，必须检查提议补偿，否则当前信息可能被重复计入。一般顺序重要性采样公式为这一检查提供数学依据。\href{https://doi.org/10.1109/78.978374}{［19］}
+
+如果提议是多个局部配准分布的混合，分母应是实际采样策略对应的总密度，而不是只保留当前所属分组的密度。当候选之间存在重叠时，同一粒子可以被多个提议分量解释。忽略这种重叠可能使被多次提出的地点得到额外权重。上述分析是通用重要性采样的推论，并非Global UTAN论文第V节所采用的显式混合提议或概率权重修正；原文采用启发式cohort管理并在粒子注入后重置权重。
+
+\hypertarget{ux4e8cux5019ux9009ux5185ux91cdux91c7ux6837ux4e0eux5019ux9009ux95f4ux8bc1ux636e}{%
+\subsection{二、候选内重采样与候选间证据}\label{ux4e8cux5019ux9009ux5185ux91cdux91c7ux6837ux4e0eux5019ux9009ux95f4ux8bc1ux636e}}
+
+设某候选组具有总概率质量π，组内粒子归一化权重为w。组内重采样把w重新分配给样本，不应无意中把π也重置为与其他组相同。否则，连续观测积累的地点证据会在重采样后消失。反过来，组内粒子较多也不应天然意味着该候选更可信；样本预算是近似精度，候选质量是推断结果，二者需要分开保存。
+
+在条件独立近似成立时，候选的预测观测证据可以由预测粒子权重与各粒子的似然加权求和估计，再用于更新候选间质量。该证据包含一个重要效应：一个候选只有极少量粒子能解释观测，而另一个候选较大范围均能解释观测，二者即使最优残差相同，整体证据也不一定相同。只比较每组``最好的一粒''会奖励偶然找到的尖锐伪峰，丢掉不确定性体积的信息。
+
+\begin{figure}
+\centering
+\includegraphics{assets/cohort_evidence.png}
+\caption{候选组预测证据与质量更新的一般表达}
+\end{figure}
+
+这里H\_j为候选假设，Z为预测观测证据，π为候选质量，w为组内预测粒子的归一化权重。分母需要包含所有正在比较的假设，包括适用时的无效解释。该式要求候选先验、组内条件分布及观测似然相互一致，不能用任意检索分数替代其中任一项。
+
+与此同时，分组保护也会改变近似策略。为了不使暂时弱势候选立即消失，可以保留最低样本预算，但不能把最低预算解读为最低概率。研究报告和算法输出应分别记录候选质量、组内有效样本量及分配样本数，防止三种指标混用。
+
+\hypertarget{ux4e09ux89c4ux8303ux5316ux9879ux4e3aux4ec0ux4e48ux5f71ux54cdux4e0dux540cux5019ux9009ux7684ux516cux5e73ux6bd4ux8f83}{%
+\subsection{三、规范化项为什么影响不同候选的公平比较}\label{ux4e09ux89c4ux8303ux5316ux9879ux4e3aux4ec0ux4e48ux5f71ux54cdux4e0dux540cux5019ux9009ux7684ux516cux5e73ux6bd4ux8f83}}
+
+假设候选A对应高质量实测地图，候选B对应缺测外推地图。若仅比较加权残差，B因为预测方差较大，可能获得较小的标准化残差；然而完整高斯负对数似然还包含协方差行列式项，宽分布并不免费获得高似然。概率地图研究强调地图预测不确定性，其意义不仅是降低权重，还包括使观测解释具有一致概率尺度。\href{https://arxiv.org/abs/2203.10893}{［9］}
+
+同样，候选有效覆盖不同也影响比较。某地点只解释少量容易匹配的点，不应因为其平均残差低而击败解释完整条带的地点。可以采用共同观测子集进行比较，或显式建模未覆盖观测的概率。简单丢弃地图外点再计算平均误差，可能系统性偏爱覆盖较差的候选。
+
+对鲁棒损失也应保持这一认识。工程目标函数可以用于寻找变换，但若要比较不同候选的概率，需要说明损失对应何种误差模型及其归一化。把任意鲁棒目标的负指数作为候选概率，是一个需要校准的近似，而不是无需验证的等式。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e8c-ux65f6ux95f4ux76f8ux5173ux89c2ux6d4bux4e0eux4f2aux6536ux655bux673aux5236}{%
+\section{专题研究二 时间相关观测与伪收敛机制}\label{ux4e13ux9898ux7814ux7a76ux4e8c-ux65f6ux95f4ux76f8ux5173ux89c2ux6d4bux4e0eux4f2aux6536ux655bux673aux5236}}
+
+\hypertarget{ux4e00ux6761ux5e26ux91cdux53e0ux5e26ux6765ux7684ux8bc1ux636eux91cdux590d}{%
+\subsection{一、条带重叠带来的证据重复}\label{ux4e00ux6761ux5e26ux91cdux53e0ux5e26ux6765ux7684ux8bc1ux636eux91cdux590d}}
+
+连续子帧往往共享物理ping。如果前一子帧包含第1至第N个ping，后一子帧包含第2至第N+1个ping，那么仅一个ping是新增观测。两个子帧可以用于不同配准任务，但不能在忽略相关性的情况下都作为完全独立的地形证据。否则，重复底面结构会使后验收缩快于真实信息增长。
+
+这种问题不限于原始点重复。相邻条带使用同一深度偏差、同一声速修正及同一局部地图插值误差，即使点编号不同，残差也可能高度相关。对序列证据的研究应考虑物理观测时间、共有误差源和地图支持范围，而不仅是每帧的点数。
+
+对于平稳标量序列，常见有效样本量近似可以用总样本量除以``1加上各阶相关系数的两倍和''表示。该关系说明频率提高并不按同样比例增加独立证据，但真实侧扫和测深数据通常不满足简单平稳假设，因此不宜把此近似直接用作设备通用标定公式。更可靠的研究方式是按独立航段、空间块和共同误差参数估计相关性。
+
+\hypertarget{ux4e8cux6e29ux5ea6ux5316ux4f3cux7136ux7684ux4f5cux7528ux4e0eux5c40ux9650}{%
+\subsection{二、温度化似然的作用与局限}\label{ux4e8cux6e29ux5ea6ux5316ux4f3cux7136ux7684ux4f5cux7528ux4e0eux5c40ux9650}}
+
+当独立性近似过强时，可以把似然取小于1的幂，以减缓过度集中。这属于广义或温度化更新，具有实用价值，但温度参数并不会自动恢复遗漏的相关模型。不同地形、覆盖和运动条件的相关性不相同，一个固定温度可能在某些区域仍过度自信，在另一些区域又浪费真实信息。
+
+因此，温度化适合被定位为近似误差管理手段，其效果需要通过覆盖率、创新统计和错误确认率检验。若研究目标是可解释的不确定性，应优先识别共同偏差、地图误差和共有子帧，而不是只调节似然曲线使轨迹看起来平滑。
+
+\hypertarget{ux4e09ux9519ux8befux5cf0ux4e3aux4f55ux8d8aux8ddfux8e2aux8d8aux786eux5b9a}{%
+\subsection{三、错误峰为何越跟踪越``确定''}\label{ux4e09ux9519ux8befux5cf0ux4e3aux4f55ux8d8aux8ddfux8e2aux8d8aux786eux5b9a}}
+
+一个错误候选只要在短航段内具有相似地形，就可能持续获得较低残差。重采样使样本集中，局部优化进一步缩小方差，随后新观测又在相同错误区域内被解释。若系统把已有结果生成的地图或校正轨迹视为独立事实，还可能形成自证循环。
+
+歧义更新粒子滤波的直接水下研究提示，应单独处理观测多义性，而不只依靠普通滤波的递推稳定性。\href{https://doi.org/10.1016/j.mechatronics.2023.103133}{［34］} 从一般估计理论看，防止自证循环需要区分外部参考地图、在线估计地图、当前观测和历史校正之间的信息流。一个候选的局部残差越来越稳定，并不能证明其全球位置正确。
+
+后续航段的证据应具有辨别力，而不仅是持续存在。若车辆一直沿重复沙波方向前进，新的测量虽然数量增加，可能仍无法区分候选。改变覆盖方向或进入不同尺度地貌才可能改变地点的可辨识性。这是信息条件问题，不能以``等待若干秒''替代。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux4e09-ux8f93ux51faux51b3ux7b56-ux5931ux6548ux7ba1ux7406ux4e0eux5b8cux6574ux6027}{%
+\section{专题研究三 输出决策 失效管理与完整性}\label{ux4e13ux9898ux7814ux7a76ux4e09-ux8f93ux51faux51b3ux7b56-ux5931ux6548ux7ba1ux7406ux4e0eux5b8cux6574ux6027}}
+
+\hypertarget{ux4e00mapux8f93ux51faux4e0eux591aux6a21ux6001ux98ceux9669}{%
+\subsection{一、MAP输出与多模态风险}\label{ux4e00mapux8f93ux51faux4e0eux591aux6a21ux6001ux98ceux9669}}
+
+选取最大后验候选可以给出一个可操作位置，但它是决策规则，不是证明剩余候选不存在。若两个候选分别占有相近质量，MAP结果可能随一个新观测突然切换。若输出只发布一个小协方差，接收系统会误以为位置在单一地点附近高度确定。
+
+混合分布的总体方差可分为候选内方差与候选均值之间的方差。后者反映地点歧义，往往远大于候选内部误差。直接发布混合均值又可能落入没有任何支持的区域，因此需要将多模态位置估计与单一控制输出区分。可以输出候选列表、候选概率、选中模式与定位状态，而不是强制压缩为一个高斯量。
+
+\begin{figure}
+\centering
+\includegraphics{assets/mixture_covariance.png}
+\caption{统一欧氏位置坐标中的混合均值与总体协方差}
+\end{figure}
+
+式中μ\_j和P\_j分别为候选位置均值和协方差，π\_j为归一化质量。该表达适用于同一欧氏位置坐标；对跨越角度周期边界或大范围旋转的位姿混合，不能直接按普通向量平均。总体方差能表达地点风险，却不能解决多模态均值不适合控制输出的问题。
+
+连续性也是一种损失函数。选择上一候选附近的模式可以减少跳变，但不能让连续性覆盖足够强的新证据。滞后确认可以降低切换频率，却会延长错误模式停留时间。研究应分别衡量误报率、恢复时间和危险的错误确认时间，而不能只比较曲线平滑程度。
+
+\hypertarget{ux4e8cux65e0ux6548ux5047ux8bbeux4e0dux80fdux53eaux662fux5168ux90fdux4e0dux884cux7684ux6807ux7b7e}{%
+\subsection{二、无效假设不能只是``全都不行''的标签}\label{ux4e8cux65e0ux6548ux5047ux8bbeux4e0dux80fdux53eaux662fux5168ux90fdux4e0dux884cux7684ux6807ux7b7e}}
+
+无效假设需要解释哪些情况：真实位置在候选集合外、参考地图不存在对应区域、设备数据质量失常，或测量模型尚不能描述环境。不同情况的恢复动作并不相同。候选集外需要扩大搜索，地图缺失需要保持相对导航，设备失常需要降低测量作用，模型失配则需要修正观测解释。
+
+Global UTAN原文算法3的``无效cohort''不是显式地图外概率状态：它比较预测区域内最佳cohort的测深MSE与区域外cohort的MSE；若区域外cohort没有足够优势，就把其粒子权重置零，使其在后续重采样中退出。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 该机制有利于抑制伪峰，但不等于本节建议建立的、可解释地图缺失或测量模型失配的无效假设。
+
+\hypertarget{ux4e09ux6982ux7387ux5305ux7edcux4e0eux6709ux754cux8befux5deeux5305ux7edc}{%
+\subsection{三、概率包络与有界误差包络}\label{ux4e09ux6982ux7387ux5305ux7edcux4e0eux6709ux754cux8befux5deeux5305ux7edc}}
+
+概率方法依赖分布模型，可以表达各候选的相对可信度；集合成员方法依赖误差边界，可以表达所有仍满足条件的位置。粗地图多zonotope研究为后者提供直接水下资料。\href{https://onlinelibrary.wiley.com/doi/abs/10.1002/rob.22407}{［36］} 二者并不是互相替代的精度等级，而是不同假设体系。
+
+若误差实际超出边界，集合交集可能为空；若边界过宽，集合长期无法收缩。若概率尾部分布被低估，粒子后验又可能排除真实位置。因此，选择估计表示之前应先说明地图偏差是否具有可验证界限、是否有可靠统计样本，以及需要何种风险解释。将二者并列研究有助于区分分布假设错误与搜索算法失败。
+
+\hypertarget{ux4e13ux9898ux7814ux7a76ux56db-ux5730ux56feux8d28ux91cfux4e0eux8de8ux5c3aux5ea6ux91cdux5b9aux4f4d}{%
+\section{专题研究四 地图质量与跨尺度重定位}\label{ux4e13ux9898ux7814ux7a76ux56db-ux5730ux56feux8d28ux91cfux4e0eux8de8ux5c3aux5ea6ux91cdux5b9aux4f4d}}
+
+\hypertarget{ux4e00ux8d85ux5206ux5730ux56feux4f55ux65f6ux4f1aux4f24ux5bb3ux5b9aux4f4d}{%
+\subsection{一、超分地图何时会伤害定位}\label{ux4e00ux8d85ux5206ux5730ux56feux4f55ux65f6ux4f1aux4f24ux5bb3ux5b9aux4f4d}}
+
+学习超分可以恢复较细的空间表达，但若生成的岩脊、洼地或坡折位置与真实环境不符，地形匹配会把模型纹理当作绝对参照。风险不仅是高程均方误差，还包括局部梯度的方向和特征位置。地图越``有纹理''，并不意味着导航信息越可靠。
+
+粗地图导航研究与概率地图研究共同提供一个重要背景：定位需要同时处理地图尺度和地图误差，而不是只追求网格变细。\href{https://eprints.soton.ac.uk/480480/1/joe.pdf}{［24］}\href{https://arxiv.org/abs/2203.10893}{［9］} 对学习生成细节，合理研究方向是保留原始低分辨率测量约束、地图来源与预测不确定性，按尺度检查哪些结构具有观测支持。
+
+全局候选检索可以先用较稳健的长波形态减少搜索，再用可信的细尺度实测结构精化。若细尺度只来自网络先验，应降低其独立证据地位。多尺度方法的关键不是多个分辨率文件，而是各尺度的信息来源和可靠程度有明确区别。
+
+\hypertarget{ux4e8cux5730ux56feux5750ux6807ux8befux5deeux4e0eux8f66ux8f86ux8befux5deeux7684ux4e0dux53efux8fa8ux8bc6ux90e8ux5206}{%
+\subsection{二、地图坐标误差与车辆误差的不可辨识部分}\label{ux4e8cux5730ux56feux5750ux6807ux8befux5deeux4e0eux8f66ux8f86ux8befux5deeux7684ux4e0dux53efux8fa8ux8bc6ux90e8ux5206}}
+
+如果参考地图整体存在水平偏移，车辆匹配可以在该地图坐标系内非常准确，却仍在地理基准下存在系统误差。海底绝对定位精度必须说明基准、地图地理参考、传感器校准及真值来源。相对于地图的误差和相对于独立地理真值的误差不能混称。
+
+垂向偏差也有类似问题。联合估计地图高程偏差可以避免把偏差误解成水平运动，但在近恒定坡面上，垂向平移和沿坡位移可能相互补偿。状态扩展虽增加解释能力，也可能降低水平定位可观性。应分析参数边缘化后的信息，而不是认为增加偏差状态必然提高定位精度。
+
+\hypertarget{ux4e09ux53efux590dux73b0ux91cdux5b9aux4f4dux7814ux7a76ux5e94ux4fddux5b58ux4ec0ux4e48}{%
+\subsection{三、可复现重定位研究应保存什么}\label{ux4e09ux53efux590dux73b0ux91cdux5b9aux4f4dux7814ux7a76ux5e94ux4fddux5b58ux4ec0ux4e48}}
+
+仅保存最终轨迹难以判断失败机制。充分的文献复现应保存候选检索排名、各候选初始变换、原始观测覆盖、候选内协方差、候选质量随时间的变化、无效假设支持以及使用过的物理ping标识。这些数据能区分``正确候选未检出''``正确候选被错误配准''``正确候选被过早删除''和``输出决策选择错误''四类机制。
+
+进一步应保留时序接口：候选评分对应的观测时刻、输出发布时间及使用的运动增量。否则，异步处理延迟可能被误判为地图匹配误差。该数据要求属于研究设计，不构成已经完成相应实验的声明。
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule
+研究阶段 & 主要判据 & 不能单独代表的结论\tabularnewline
+\midrule
+\endhead
+候选检索 & 正确区域召回与空间覆盖 & 精确位姿已经确定\tabularnewline
+配准初始化 & 对应一致性与方向性误差 & 地理地点绝对正确\tabularnewline
+候选跟踪 & 序列证据与概率校准 & 局部方差小即无地点歧义\tabularnewline
+输出确认 & 错误确认率与恢复时间 & 轨迹平滑即可靠\tabularnewline
+地理精度评价 & 独立基准与地图误差分离 & 对地图残差小即绝对精度高\tabularnewline
+\bottomrule
+\end{longtable}
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e00-ux4eceux516cux5f00ux65b9ux6848ux5230ux53efux6267ux884cux91cdux5b9aux4f4dux6d41ux7a0b}{%
+\section{深化研究一 从公开方案到可执行重定位流程}\label{ux6df1ux5316ux7814ux7a76ux4e00-ux4eceux516cux5f00ux65b9ux6848ux5230ux53efux6267ux884cux91cdux5b9aux4f4dux6d41ux7a0b}}
+
+\hypertarget{ux4e00ux68c0ux7d22ux914dux51c6ux548cux8ddfux8e2aux662fux4e09ux4e2aux4e0dux540cux4f30ux8ba1ux73afux8282}{%
+\subsection{一、检索、配准和跟踪是三个不同估计环节}\label{ux4e00ux68c0ux7d22ux914dux51c6ux548cux8ddfux8e2aux662fux4e09ux4e2aux4e0dux540cux4f30ux8ba1ux73afux8282}}
+
+未知初始位置的重定位可以分为候选检索、位姿初始化和连续候选检验。检索回答``哪些区域可能相似''，配准回答``观测与其中一个区域怎样对齐''，跟踪回答``连续运动与后续观测是否继续支持该解释''。单次检索成功不能替代连续定位，单次配准残差小也不能排除重复地貌。
+
+Global UTAN正式论文给出了VLAD检索、TEASER++配准、cohort粒子跟踪及无效候选处理的具体规则。\href{https://doi.org/10.1109/TIM.2026.3716492}{［4］} 本节在已有报告框架中进一步提出地图质量、测量相关性、候选间概率和输出合同的研究协议；这些扩展不是原论文已完成的实现或实验结论。
+
+\hypertarget{ux4e8cux5730ux56feux7aefux79bbux7ebfux51c6ux5907}{%
+\subsection{二、地图端离线准备}\label{ux4e8cux5730ux56feux7aefux79bbux7ebfux51c6ux5907}}
+
+第一步整理地图坐标、垂直基准、来源及质量掩膜，并按有效测量区域划分子地图。子地图既要有足够物理覆盖以包含可区分地形，又不能把来源明显不同的区域当成同质观测。保存中心坐标、有效比例、地形频带及地貌重复性，并明确多尺度产品之间的来源关系。
+
+第二步建立检索表示和精配准表示。检索可以采用地形统计、稀疏特征或学习描述子，精配准保留米制点云、坡度和测量不确定性。检索表示允许归一化以降低共同偏差，精配准表示则必须保留实际尺度与坐标。若所有子地图独立删除高程均值，应保留该均值用于物理一致性核验。
+
+第三步建立候选查询索引和空间邻接关系。相邻、重叠子地图命中可能只是同一候选的多个存储单元，不应当被当成多个独立地理假设。聚类应根据地图中的位置、方向和覆盖判断，而不能只按描述子距离。保留原始检索结果，才能解释候选召回和后续淘汰分别发生在哪里。
+
+\hypertarget{ux4e09ux5728ux7ebfux89c2ux6d4bux7aefux51c6ux5907}{%
+\subsection{三、在线观测端准备}\label{ux4e09ux5728ux7ebfux89c2ux6d4bux7aefux51c6ux5907}}
+
+输入包括每个物理ping的时间、波束或样本信息、测深点、有效标志以及IMU、DVL和深度计的相关估计。先按测量时间和外参对齐，再构造有明确起止时间的子帧。运动补偿后的子帧附带构建误差，而非被视作独立准确点云。不同窗口重复使用同一ping时，保留样本身份供相关性管理。
+
+子帧不能仅按固定数量累计。应记录实际沿航向覆盖、侧向覆盖、转弯程度和地形信息；短窗口可能没有足够结构，长窗口则积累更多运动误差。研究时先固定物理覆盖，再比较不同累计方式，避免把更长时间收集的更多信息误归因于某个匹配器。
+
+\hypertarget{ux56dbux5019ux9009ux521dux59cbux5316ux4e0eux7c92ux5b50ux8868ux8fbe}{%
+\subsection{四、候选初始化与粒子表达}\label{ux56dbux5019ux9009ux521dux59cbux5316ux4e0eux7c92ux5b50ux8868ux8fbe}}
+
+每个被检索区域都需要位姿初始化及不确定性，而不仅是区域编号。可先以地形特征关联和鲁棒配准提供初值，再围绕初值生成位置和航向粒子。TTT SLAM为测深特征和鲁棒关联提供直接方法参考；TEASER提供通用鲁棒配准依据。\href{https://www.sciencedirect.com/science/article/pii/S0029801824001148}{［37］}\href{https://arxiv.org/abs/2001.07715}{［14］} 本报告不从这两个来源推导任何通用的候选半径或粒子数量。
+
+当深度、滚转和俯仰具有较强独立观测时，可以主要在水平位置与航向上表达多峰，并把其他变量的不确定性通过采样或边缘化传播。不能把``有传感器测量''理解为这些变量精确已知。若垂直基准偏差与位置明显耦合，应附加共同偏差变量或进行显式消元，否则粒子会通过错误水平移动补偿高程偏差。
+
+\hypertarget{ux4e94ux6bcfux6b21ux66f4ux65b0ux7684ux5b8cux6574ux987aux5e8f}{%
+\subsection{五、每次更新的完整顺序}\label{ux4e94ux6bcfux6b21ux66f4ux65b0ux7684ux5b8cux6574ux987aux5e8f}}
+
+步骤一，根据短时运动及其协方差传播各候选粒子，并加入模型遗漏的过程不确定性。步骤二，在每个粒子对应位置查询地图高程、有效覆盖和质量信息。步骤三，根据测深、地图、姿态及共同偏差构造相关残差似然，必要时同时计算侧扫关联的独立增量证据。步骤四，在候选内部更新粒子权重并计算候选的预测证据。步骤五，更新候选之间的概率，再决定候选内重采样、候选保留及新候选引入。步骤六，输出当前候选分布、质量状态与可用位姿，而非只输出一个平均坐标。
+
+顺序的重要性在于候选证据必须由更新前的预测权重和观测似然计算。若每个候选内部先规范化，再只比较最大粒子权重，不同候选的证据将失去可比性。候选出生和消亡也要保留历史标识，避免将同一个错误峰反复作为``新候选''重新赋予高先验概率。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e8c-ux4fa7ux626bux600eux6837ux53c2ux4e0eux91cdux5b9aux4f4dux800cux4e0dux5236ux9020ux5047ux8bc1ux636e}{%
+\section{深化研究二 侧扫怎样参与重定位而不制造假证据}\label{ux6df1ux5316ux7814ux7a76ux4e8c-ux4fa7ux626bux600eux6837ux53c2ux4e0eux91cdux5b9aux4f4dux800cux4e0dux5236ux9020ux5047ux8bc1ux636e}}
+
+\hypertarget{ux4e00ux5730ux56feux662fux5426ux5177ux5907ux53efux6bd4ux8f83ux7684ux58f0ux5b66ux4fe1ux606f}{%
+\subsection{一、地图是否具备可比较的声学信息}\label{ux4e00ux5730ux56feux662fux5426ux5177ux5907ux53efux6bd4ux8f83ux7684ux58f0ux5b66ux4fe1ux606f}}
+
+只有高程的地图并不包含真实后向散射。由坡度渲染得到的强度只能描述一个规定声学假设下的预期回波，不能覆盖真实底质、系统增益和视角变化。真实强度参与全局匹配至少需要参考强度资料，或能够显式表达底质和声学不确定性的观测模型。GeoHab指南为强度处理和可比性提供专业依据。\href{https://geohab.org/backscatter-working-group/}{［26］}
+
+若采用AusSeabed等门户寻找配套水深与后向散射，必须进一步核查数据是否具有共同地理参考、相同调查范围和可解释的处理链。\href{https://www.ausseabed.gov.au/data/bathymetry}{［38］} 地理配准后的船载后向散射栅格与AUV侧扫图仍不必具有相同响应；应该先研究跨设备及跨入射角可比性，而不是直接使用像素平方差。
+
+\hypertarget{ux4e8cux5019ux9009ux68c0ux7d22ux4e0eux5019ux9009ux9a8cux8bc1ux7684ux4e0dux540cux4f5cux7528}{%
+\subsection{二、候选检索与候选验证的不同作用}\label{ux4e8cux5019ux9009ux68c0ux7d22ux4e0eux5019ux9009ux9a8cux8bc1ux7684ux4e0dux540cux4f5cux7528}}
+
+侧扫可用于扩大候选召回，例如识别某个底质边界或稳定结构；也可用于在已知几何初值附近检查一致性。前者重视鲁棒描述及覆盖，后者重视真实投影和角度条件。即便同一组强度数据先参与检索后参与精化，也只能在概率模型中计入一次完整证据，不能把两次处理结果假设成两次独立测量。
+
+侧扫SLAM文献说明真实条带强度可以通过子帧关联参与定位。\href{https://arxiv.org/abs/2312.13802}{［28］}\href{https://arxiv.org/abs/2304.01854}{［27］} 它们并不意味着任何灰度或伪彩色图都有相同作用。显示配色仅改变可视化；算法应使用校正后的数值、掩膜、斜距和时间信息，不能将截图上的颜色值当作原始回波。
+
+\hypertarget{ux4e09ux9634ux5f71ux4e0eux65e0ux6548ux533aux57dfux7684ux533aux522b}{%
+\subsection{三、阴影与无效区域的区别}\label{ux4e09ux9634ux5f71ux4e0eux65e0ux6548ux533aux57dfux7684ux533aux522b}}
+
+声影通常与地形遮挡及观察方向有关，缺测、饱和和水柱区域则具有不同成因。真实阴影可能提供边界信息，但不能用低强度本身直接解释为某一种地形。正反向航行时，阴影可能换边或消失，应通过预计入射方向判断可比较区域。
+
+对地理位置接近但观察方向不同的候选，匹配模型应允许一部分强度结构不可见，而不是惩罚全部差异。允许不可见也不能无限扩大，否则错误候选总能通过忽略不一致区域获胜。因此应同时报告有效对比面积、关联空间分布和由未知反射性质引入的不确定性。
+
+\hypertarget{ux56dbai4shipwrecksux4e0esubpipeux80fdux63d0ux4f9bux4ec0ux4e48}{%
+\subsection{四、AI4Shipwrecks与SubPipe能提供什么}\label{ux56dbai4shipwrecksux4e0esubpipeux80fdux63d0ux4f9bux4ec0ux4e48}}
+
+AI4Shipwrecks公开了来自真实AUV调查的侧扫图像和沉船分割基准，作者摘要给出28处不同沉船、286幅带标注图像。它适合研究声学结构与语义识别，但分割标签并非连续里程计或海底绝对定位真值。\href{https://arxiv.org/abs/2401.14546}{［39］} SubPipe公开了水下管线检查的多模态资料，包含侧扫和导航相关信息；其参考轨迹来自导航传感器估计，不能被写成独立无误差真值。\href{https://github.com/remaro-network/SubPipe-dataset}{［40］}
+
+由此提出的数据使用边界是：静态标注图像可以评估特征或语义可重复性，连续序列才能研究运动一致性，而独立绝对定位评价还需要对应的参考和误差预算。人工结构数据上的高成功率不能自动推广到自然海底。若使用数据中的相机或其他传感器，应将其作为辅助研究或参考来源，与只使用指定水下传感器的算法输入分开。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux4e09-ux4e3bux52a8ux6d88ux6b67ux4e0eux5b8cux6574ux6027ux7814ux7a76}{%
+\section{深化研究三 主动消歧与完整性研究}\label{ux6df1ux5316ux7814ux7a76ux4e09-ux4e3bux52a8ux6d88ux6b67ux4e0eux5b8cux6574ux6027ux7814ux7a76}}
+
+\hypertarget{ux4e00ux4e3aux4ec0ux4e48ux79fbux52a8ux65b9ux5411ux6bd4ux589eux52a0ux540cux7c7bpingux66f4ux6709ux7528}{%
+\subsection{一、为什么移动方向比增加同类ping更有用}\label{ux4e00ux4e3aux4ec0ux4e48ux79fbux52a8ux65b9ux5411ux6bd4ux589eux52a0ux540cux7c7bpingux66f4ux6709ux7528}}
+
+两个候选在当前条带中可能具有几乎相同的测深轮廓，沿原方向连续采集仍不能区分。若换一个观察方向会遇到不同支脊或底质边界，则少量新观测可能比大量重复观测更有信息。关键是观测对候选之间的差异，而不是观测数量本身。
+
+可用下面的期望信息增益作为理论研究目标：给定已有观测Z，预测动作a产生的新观测z，衡量它在平均意义上如何改变候选假设H的分布。这是本报告提出的主动消歧分析模型，不是Global UTAN论文已经验证的控制算法。
+
+\begin{figure}
+\centering
+\includegraphics{assets/active_information.png}
+\caption{候选假设的期望信息增益}
+\end{figure}
+
+\hypertarget{ux4e8cux4e3bux52a8ux52a8ux4f5cux9700ux8981ux5b89ux5168ux4e0eux8fd0ux52a8ux8befux5deeux7ea6ux675f}{%
+\subsection{二、主动动作需要安全与运动误差约束}\label{ux4e8cux4e3bux52a8ux52a8ux4f5cux9700ux8981ux5b89ux5168ux4e0eux8fd0ux52a8ux8befux5deeux7ea6ux675f}}
+
+可以比较继续直航、短距离横向移动、改变航向或重访局部结构等动作。动作价值应同时考虑地形可区分性、预计声呐覆盖、运动误差增加和安全约束。候选地图中都存在障碍的区域应避开；当真实候选尚未确定时，不能只按最可能地图规划一条可能在其他候选中危险的路线。
+
+改变高度会改变侧扫分辨率、足迹和水柱宽度，未必只带来信息增益；转弯也会增加时间同步和杆臂误差的敏感性。因此主动消歧需联合考虑测量质量，不能把``走到起伏更大处''理解成普适规则。某些起伏大的区域具有周期性，反而持续产生多个候选。
+
+\hypertarget{ux4e09ux65e0ux6548ux5019ux9009ux7684ux6982ux7387ux6a21ux578bux4e0eux8f93ux51faux5408ux540c}{%
+\subsection{三、无效候选的概率模型与输出合同}\label{ux4e09ux65e0ux6548ux5019ux9009ux7684ux6982ux7387ux6a21ux578bux4e0eux8f93ux51faux5408ux540c}}
+
+无效候选表示当前真实位置可能不在已列出的有效候选中，或当前观测无法由地图可靠解释。其概率必须对应明确的观测模型或保守近似；若只给它一个任意常数，概率大小就主要由常数决定。研究时应检查地图缺测、外观变化、传感器异常及检索漏召回对它的影响。
+
+输出建议包括参考时刻、候选标识、位姿、候选内协方差、候选间概率、无效假设概率、有效观测覆盖、最近可靠更新时刻以及地图版本。多模态时协方差应描述候选内误差，并单独保存峰之间的分布，不能用小协方差加一个MAP位置隐藏另一个远处候选。
+
+\hypertarget{ux56dbux6982ux7387ux53efux4fe1ux4e0eux5de5ux7a0bux5b8cux6574ux6027ux4e0dux662fux540cux4e49ux8bcd}{%
+\subsection{四、概率可信与工程完整性不是同义词}\label{ux56dbux6982ux7387ux53efux4fe1ux4e0eux5de5ux7a0bux5b8cux6574ux6027ux4e0dux662fux540cux4e49ux8bcd}}
+
+一个模型内部的高概率只说明在其假设下具有支持，不能自动给出真实世界错误率。如果地图有未知共同偏差，所有粒子都可能集中在错误地点。完整性研究需要独立检查、失效状态、保守误差包络及错误报警统计。高斯置信椭圆、候选间歧义和有界集合分别处理不同问题，不能用同一数值表达全部风险。
+
+\hypertarget{ux6df1ux5316ux7814ux7a76ux56db-ux91cdux5b9aux4f4dux7814ux7a76ux7684ux516cux5e73ux8bc4ux4ef7ux534fux8bae}{%
+\section{深化研究四 重定位研究的公平评价协议}\label{ux6df1ux5316ux7814ux7a76ux56db-ux91cdux5b9aux4f4dux7814ux7a76ux7684ux516cux5e73ux8bc4ux4ef7ux534fux8bae}}
+
+\hypertarget{ux4e00ux5206ux9636ux6bb5ux5b9aux4f4dux6210ux529fux7387}{%
+\subsection{一、分阶段定位成功率}\label{ux4e00ux5206ux9636ux6bb5ux5b9aux4f4dux6210ux529fux7387}}
+
+分别统计候选召回、配准成功、连续跟踪成功和正确恢复。候选召回是正确地点是否进入候选集合；配准成功是位姿是否在规定误差范围；跟踪成功是后续观测是否维持正确解释；恢复成功是在失效后能否重新形成正确可用输出。四项指标可定位问题发生在哪个环节。
+
+初始误差应覆盖小偏差、大偏差和完全无先验三类，且每类使用事先规定的分布。不能把算法内部初始化粒子的范围反过来作为实际初始误差范围。重复运行保留随机种子、地图划分和观测顺序，报告成功率区间而不仅是一次成功案例。
+
+\hypertarget{ux4e8cux5931ux6548ux53caux6062ux590dux7684ux4e13ux95e8ux6d4bux8bd5}{%
+\subsection{二、失效及恢复的专门测试}\label{ux4e8cux5931ux6548ux53caux6062ux590dux7684ux4e13ux95e8ux6d4bux8bd5}}
+
+建议研究重复沙波、近似平面、地图缺测、垂直偏差、DVL掉锁、短时转弯和先验位置突然错误。每类只改变一个主要因素，然后再研究组合。记录错误峰保持时间、首次正确恢复时间、错误高置信度输出的比例，以及恢复过程中是否形成不可解释跳变。
+
+较低总体RMSE可能同时存在偶发大错误，因此需报告分位数、最大持续错误和错误段长度。删去失效段再计算误差会改变算法可用性的含义；应将所有输入时刻纳入状态记录，明确哪些时刻没有有效位置。
+
+\hypertarget{ux4e09ux6bd4ux8f83ux5bf9ux8c61ux4e0eux65b9ux6cd5ux5f52ux56e0}{%
+\subsection{三、比较对象与方法归因}\label{ux4e09ux6bd4ux8f83ux5bf9ux8c61ux4e0eux65b9ux6cd5ux5f52ux56e0}}
+
+可比较局部相关搜索、单群粒子滤波、检索后单候选跟踪、多候选跟踪以及带概率地图的多候选方案。各方案应使用相同运动增量、观测和地图质量。若某方案使用侧扫而另一方案没有使用，其收益属于传感器与算法共同变化，不能仅归因于粒子机制。
+
+建议将纯测深、加入强度、加入质量层、加入无效假设和加入主动消歧分别作为消融。研究结果允许某一模块没有收益，甚至引入负面影响。只有这样才能区分``复杂框架整体成功''与``某个新模块确实提供独立价值''。
+
+\hypertarget{ux56dbux91cdux5b9aux4f4dux4e13ux9898ux7684ux6210ux679cux8fb9ux754c}{%
+\subsection{四、重定位专题的成果边界}\label{ux56dbux91cdux5b9aux4f4dux4e13ux9898ux7684ux6210ux679cux8fb9ux754c}}
+
+完整研究报告应交付可复核模型、候选来源、概率合同、独立评价与失败解释。本文给出的流程用于后续研究执行，不包含自行开展的实验结果，也不把公开论文的成功条件扩展到所有海域。现阶段最合理的结论是：多候选机制适合管理未知初始位置与重复地形歧义，其优势需要通过正确的数据关联、概率一致性和长期失效评价兑现。
+
+\hypertarget{ux7b2cux5341ux4e8cux7ae0-ux65b9ux6cd5ux6bd4ux8f83ux4e0eux7814ux7a76ux7ed3ux8bba}{%
+\section{第十二章 方法比较与研究结论}\label{ux7b2cux5341ux4e8cux7ae0-ux65b9ux6cd5ux6bd4ux8f83ux4e0eux7814ux7a76ux7ed3ux8bba}}
+
+\hypertarget{ux65b9ux6cd5ux9002ux7528ux6027ux6bd4ux8f83}{%
+\subsection{12.1 方法适用性比较}\label{ux65b9ux6cd5ux9002ux7528ux6027ux6bd4ux8f83}}
+
+\begin{longtable}[]{@{}lll@{}}
+\toprule
+方法 & 能解决的主要问题 & 不能独立解决的问题\tabularnewline
+\midrule
+\endhead
+全局相关搜索 & 有限地图中的候选覆盖与多峰发现 & 时序伪峰辨别和持续跟踪\tabularnewline
+点质量滤波 & 低维完整位置概率递推 & 高维状态的规模问题\tabularnewline
+单池粒子滤波 & 非高斯运动和位置跟踪 & 错误峰吞并与粒子遗漏\tabularnewline
+多候选分组跟踪 & 候选竞争和持续序列验证 & 错误似然及缺少地图信息\tabularnewline
+TEASER等配准 & 错误对应下的变换估计 & 候选地点本身是否正确\tabularnewline
+分支定界 & 给定评分中的全局位姿搜索 & 地图偏差与评分模型失配\tabularnewline
+学习地点检索 & 候选快速排序与结构识别 & 物理测量一致性及跨域保证\tabularnewline
+因子图 & 可信关联后的轨迹一致性 & 无条件发现真实全局位置\tabularnewline
+概率地图 & 地图质量与插值不确定性表达 & 错误核模型下的真实性保证\tabularnewline
+\bottomrule
+\end{longtable}
+
+\hypertarget{ux6838ux5fc3ux7814ux7a76ux7ed3ux8bba}{%
+\subsection{12.2 核心研究结论}\label{ux6838ux5fc3ux7814ux7a76ux7ed3ux8bba}}
+
+全局重定位的核心是正确候选发现和多假设证据管理，而非单次残差最小化。成熟水下地形导航提供地图辅助惯性定位的直接工程依据，现代检索和鲁棒配准提高候选生成与初始化能力，多候选概率跟踪提高在重复地貌中延迟决策和失效恢复的可能性。
+
+粒子滤波对非高斯问题具有表示优势，但其可靠性受采样覆盖、观测相关性和似然模型约束。候选分组不是自动消除伪峰，无效假设也不是随意增加一个拒绝分数；它们需要可校准概率和新的独立观测支持。平坦海底时无法立即确认位置，可以是诚实而正确的研究结论。
+
+多波束与侧扫共同参与重定位，需要有与测量匹配的地图和声学模型。高程图不能替代真实声学强度图，同源测量也不能自动当作独立信息。与局部里程计及因子图结合时，还必须处理时间标签、坐标关系和重复信息。
+
+因此，深海全局定位研究应围绕候选召回、歧义保留、可信确认、地图质量和恢复能力建立评价，而不只关注平均位置误差。对Global UTAN现可依据完整论文评价原方法与实验，但仍须区分真实测深数据、模拟DR/KRP和尚未完成的AUV艇载在线验证；对其他只能访问摘要的方法继续保持相应证据边界。
+
+\hypertarget{ux53c2ux8003ux6587ux732e}{%
+\section{参考文献}\label{ux53c2ux8003ux6587ux732e}}
+
+{[}1{]} Paull L, Saeedi S, Seto M, Li H. AUV Navigation and Localization: A Review. IEEE Journal of Oceanic Engineering, 2014, 39(1):131--149. \href{https://people.csail.mit.edu/lpaull/publications/Paull_JOE_2014.pdf}{公开来源}。
+
+{[}2{]} Carreño S, Wilson P, Ridao P, Petillot Y. A survey on terrain based navigation for AUVs. OCEANS, 2010. DOI:10.1109/OCEANS.2010.5664372. \href{https://eprints.soton.ac.uk/153897/1/Carreno_2010_-_A_survey__on_TBN_for_AUVs.pdf}{公开来源}。
+
+{[}3{]} Melo J, Matos A. Survey on advances on terrain based navigation for autonomous underwater vehicles. Ocean Engineering, 2017, 139:250--264. \href{https://doi.org/10.1016/j.oceaneng.2017.04.047}{公开来源}。
+
+{[}4{]} Zhang Q, Kim J. Terrain-Based Global Tracking Without Prior Pose Information Using Multibeam Echosounder Measurements. IEEE Transactions on Instrumentation and Measurement, 2026, 75:7506113. DOI:10.1109/TIM.2026.3716492. \href{https://doi.org/10.1109/TIM.2026.3716492}{出版入口}。本报告已核读用户提供的13页正式论文PDF。
+
+{[}5{]} GEBCO. GEBCO global gridded bathymetry and source Type Identifier Grid. 官方全球海底地形数据说明. \href{https://www.gebco.net/data_and_products/gridded_bathymetry_data/}{公开来源}。
+
+{[}6{]} NOAA NCEI. ETOPO Global Relief Model. 官方全球地形数据说明. \href{https://www.ncei.noaa.gov/products/etopo-global-relief-model}{公开来源}。
+
+{[}7{]} GEBCO. Data set errata and known issues. 官方数据勘误. \href{https://www.gebco.net/data-products/gridded-bathymetry-data/data-set-errata}{公开来源}。
+
+{[}8{]} Pan X, Wu Y. Underwater Doppler Navigation With Self-calibration. The Journal of Navigation, 2016. DOI:10.1017/S0373463315000703. \href{https://arxiv.org/abs/1509.02054}{公开来源}。
+
+{[}9{]} Torroba I, Sprague C I, Folkesson J. Fully-Probabilistic Terrain Modelling and Localization With Stochastic Variational Gaussian Process Maps. IEEE Robotics and Automation Letters, 2022, 7(4):8729--8736. \href{https://arxiv.org/abs/2203.10893}{公开来源}。
+
+{[}10{]} Uy M A, Lee G H. PointNetVLAD: Deep Point Cloud Based Retrieval for Large-Scale Place Recognition. CVPR, 2018. \href{https://arxiv.org/abs/1804.03492}{公开来源}。
+
+{[}11{]} Komorowski J. MinkLoc3D: Point Cloud Based Large-Scale Place Recognition. WACV, 2021. \href{https://arxiv.org/abs/2011.04530}{公开来源}。
+
+{[}12{]} Tan J, Torroba I, Xie Y, Folkesson J. Data-driven Loop Closure Detection in Bathymetric Point Clouds for Underwater SLAM. 作者公开论文, 2022, arXiv:2209.08578; 相关ICRA 2023出版. \href{https://arxiv.org/abs/2209.08578}{公开来源}。
+
+{[}13{]} Segal A V, Haehnel D, Thrun S. Generalized-ICP. Robotics Science and Systems, 2009. \href{https://www.robots.ox.ac.uk/~avsegal/resources/papers/Generalized_ICP.pdf}{公开来源}。
+
+{[}14{]} Yang H, Shi J, Carlone L. TEASER: Fast and Certifiable Point Cloud Registration. IEEE Transactions on Robotics, 2021, 37(2):314--333. \href{https://arxiv.org/abs/2001.07715}{公开来源}。
+
+{[}15{]} Aoki K, Koide K, Oishi S, Yokozuka M, Banno A, Meguro J. 3D-BBS: Global Localization for 3D Point Cloud Scan Matching Using Branch-and-Bound Algorithm. ICRA, 2024; 作者版本arXiv:2310.10023. \href{https://arxiv.org/abs/2310.10023}{公开来源}。
+
+{[}16{]} Torroba I, Sprague C I, Bore N, Folkesson J. PointNetKL: Deep Inference for GICP Covariance Estimation in Bathymetric SLAM. IEEE Robotics and Automation Letters, 2020, 5(3):4078--4085; 作者版本arXiv:2003.10931. \href{https://arxiv.org/abs/2003.10931}{公开来源}。
+
+{[}17{]} Ånonsen K B, Hallingstad O. Terrain Aided Underwater Navigation Using Point Mass and Particle Filters. IEEE/ION PLANS, 2006. DOI:10.1109/\allowbreak PLANS.\allowbreak 2006.\allowbreak 1650705. \href{https://www.navlab.net/Publications/Terrain_Aided_Underwater_Navigation_Using_Point_Mass_And_Particle_Filters.pdf}{公开来源}。
+
+{[}18{]} Ånonsen K B, Hagen O K, Hegrenæs Ø, Hagen P E. The HUGIN AUV Terrain Navigation Module. OCEANS, 2013. \href{https://www.navlab.net/Publications/The_HUGIN_AUV_Terrain_Navigation_Module.pdf}{公开来源}。
+
+{[}19{]} Arulampalam M S, Maskell S, Gordon N, Clapp T. A tutorial on particle filters for online nonlinear/non-Gaussian Bayesian tracking. IEEE Transactions on Signal Processing, 2002, 50(2):174--188. \href{https://doi.org/10.1109/78.978374}{公开来源}。
+
+{[}20{]} Thrun S, Fox D, Burgard W, Dellaert F. Robust Monte Carlo localization for mobile robots. Artificial Intelligence, 2001, 128(1--2):99--141. \href{https://www.borg.cc.gatech.edu/projects/monte-carlo-localization.html}{公开来源}。
+
+{[}21{]} Fox D. KLD-Sampling: Adaptive Particle Filters. Advances in Neural Information Processing Systems 14, 2001. \href{https://papers.neurips.cc/paper_files/paper/2001/hash/c5b2cebf15b205503560c4e8e6d1ea78-Abstract.html}{公开来源}。
+
+{[}22{]} Barkby S, Williams S B, Pizarro O, Jakuba M V. Bathymetric particle filter SLAM using trajectory maps. The International Journal of Robotics Research, 2012, 31(12):1409--1430. \href{https://doi.org/10.1177/0278364912459666}{公开来源}。
+
+{[}23{]} Olson E, Agarwal P. Inference on networks of mixtures for robust robot mapping. Robotics Science and Systems, 2012. \href{https://april.eecs.umich.edu/media/pdfs/olson2012rss.pdf}{公开来源}。
+
+{[}24{]} Salavasidis G 等. Terrain-Aided Navigation With Coarse Maps---Toward an Arctic Crossing With an AUV. IEEE Journal of Oceanic Engineering, 2021, 46(4):1192--1212. \href{https://eprints.soton.ac.uk/480480/1/joe.pdf}{公开来源}。
+
+{[}25{]} Barkby S, Williams S B, Pizarro O, Jakuba M V. Bathymetric SLAM with No Map Overlap using Gaussian Processes. IROS, 2011:1242--1248. \href{https://www-personal.acfr.usyd.edu.au/sbarkby/2011_iros_bpslam.pdf}{公开来源}。
+
+{[}26{]} Lurton X, Lamarche G 主编 GeoHab Backscatter Working Group. Backscatter measurements by seafloor-mapping sonars Guidelines and Recommendations. 专业技术指南, 2015及后续资料. \href{https://geohab.org/backscatter-working-group/}{公开来源}。
+
+{[}27{]} Zhang J, Xie Y, Ling L, Folkesson J. A Fully-automatic Side-scan Sonar SLAM Framework. 作者公开论文, 2023. 相关出版DOI:10.1049/rsn2.12500. \href{https://arxiv.org/abs/2304.01854}{公开来源}。
+
+{[}28{]} Zhang J, Xie Y, Ling L, Folkesson J. A Dense Subframe-Based SLAM Framework With Side-Scan Sonar. IEEE Journal of Oceanic Engineering, 2025, 50(2):1087--1102. DOI:10.1109/JOE.2024.3503663. \href{https://arxiv.org/abs/2312.13802}{公开来源}。
+
+{[}29{]} Xie Y, Zhang J, Bore N, Folkesson J. NeuRSS: Enhancing AUV Localization and Bathymetric Mapping with Neural Rendering for Sidescan SLAM. 作者公开论文, 2024, arXiv:2405.05807. \href{https://arxiv.org/abs/2405.05807}{公开来源}。
+
+{[}30{]} Aubard M, Madureira A, Teixeira L, Pinto J. Sonar-Based Deep Learning in Underwater Robotics: Overview, Robustness, and Challenges. IEEE Journal of Oceanic Engineering, 2025, 50(3):1866--1884. DOI:10.1109/JOE.2025.3531933. \href{https://arxiv.org/abs/2412.11840}{公开来源}。
+
+{[}31{]} Kaess M, Johannsson H, Roberts R, Ila V, Leonard J, Dellaert F. iSAM2: Incremental smoothing and mapping using the Bayes tree. The International Journal of Robotics Research, 2012, 31(2):216--235. \href{https://www.borg.cc.gatech.edu/papers/kaess12ijrr.html}{公开来源}。
+
+{[}32{]} MBARI. Terrain Relative Navigation. 官方技术项目资料. \href{https://www.mbari.org/project/terrain-relative-navigation/}{公开来源}。
+
+{[}33{]} Caress D W 等. MB-System terrain-relative navigation source code. 官方开源软件资料. \href{https://github.com/dwcaress/MB-System}{公开来源}。
+
+{[}34{]} Zhang J, Zhang T, Liu S, Xia M. A robust particle filter for ambiguous updates of underwater terrain-aided navigation. Mechatronics, 2024, 98:103133. \href{https://doi.org/10.1016/j.mechatronics.2023.103133}{公开来源}。
+
+{[}35{]} Roberts D R 等. Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography, 2017, 40:913--929. \href{https://doi.org/10.1111/ecog.02881}{公开来源}。
+
+{[}36{]} Ma D, Ma T, Li Y, Zhang Q, Ling Y, Liao Y. Underwater multizonotope terrain-aided navigation method with coarse map based on set-membership filter. Journal of Field Robotics, 2025, 42(1):242--256. \href{https://onlinelibrary.wiley.com/doi/abs/10.1002/rob.22407}{公开来源}。
+
+{[}37{]} Zhang Q, Kim J. TTT SLAM: A feature-based bathymetric SLAM framework. Ocean Engineering, 2024, 294:116777. DOI:10.1016/j.oceaneng.2024.116777. \href{https://www.sciencedirect.com/science/article/pii/S0029801824001148}{公开来源}。
+
+{[}38{]} AusSeabed. Bathymetry data. 官方澳大利亚海底数据与测量覆盖说明. \href{https://www.ausseabed.gov.au/data/bathymetry}{公开来源}。
+
+{[}39{]} Sethuraman A V, Sheppard A, Bagoren O, Pinnow C, Anderson J, Havens T C, Skinner K A. Machine Learning for Shipwreck Segmentation from Side Scan Sonar Imagery: Dataset and Benchmark. The International Journal of Robotics Research, 2024在线出版. DOI:10.1177/0278364924126685. \href{https://arxiv.org/abs/2401.14546}{公开来源}。
+
+{[}40{]} Álvarez-Tuñón O, Marnet L R, Antal L, Aubard M, Costa M, Brodskiy Y. SubPipe: A Submarine Pipeline Inspection Dataset for Segmentation and Visual-inertial Localization. 作者公开论文与官方数据集, 2024, arXiv:2401.17907. \href{https://github.com/remaro-network/SubPipe-dataset}{公开来源}。
+
+\hypertarget{ux6587ux732eux8bc1ux636eux4e0eux9605ux8bfbux8303ux56f4}{%
+\section{文献证据与阅读范围}\label{ux6587ux732eux8bc1ux636eux4e0eux9605ux8bfbux8303ux56f4}}
+
+以下区分公开全文、可见方法章节、摘要和软件资料。摘要层面的文献只用于陈述其公开问题定义、总体方法和证据类型，不据此补写未公开公式、参数或逐项实验结果。通用视觉和陆地研究仅作为方法来源，不等同于水下有效性证明。
+
+\begin{longtable}[]{@{}p{0.07\linewidth}p{0.29\linewidth}p{0.58\linewidth}@{}}
+\toprule
+编号 & 证据类型 & 本报告使用范围\tabularnewline
+\midrule
+\endhead
+1 & 水下导航综述 & 作者公开全文\tabularnewline
+2 & 水下地形导航综述 & 作者公开全文\tabularnewline
+3 & 水下地形导航综述 & 出版摘要与机构公开全文\tabularnewline
+4 & 全局地形跟踪直接研究 & 用户提供IEEE正式论文PDF，13页全文核读；方法、表I--VI及实验边界已核对\tabularnewline
+5 & 地图来源与质量 & 官方数据说明 历史产品与新版应分别引用\tabularnewline
+6 & 地图来源与质量 & 官方数据说明\tabularnewline
+7 & 地图质量边界 & 官方勘误说明\tabularnewline
+8 & DVL标定与可观性直接研究 & 作者公开全文\tabularnewline
+9 & 概率海底地图直接研究 & 作者公开全文与官方实现\tabularnewline
+10 & 陆地点云检索参考 & 作者摘要与公开论文入口\tabularnewline
+11 & 陆地点云检索参考 & 作者摘要与公开论文入口\tabularnewline
+12 & 测深地点识别直接研究 & 作者公开全文与作者书目核对\tabularnewline
+13 & 概率配准基础 & 作者公开全文\tabularnewline
+14 & 鲁棒全局配准基础 & 作者公开全文\tabularnewline
+15 & 全局搜索参考 & 作者摘要与官方实现说明\tabularnewline
+16 & 测深配准不确定性直接研究 & 作者公开全文与机构出版核对\tabularnewline
+17 & 水下地形导航直接研究 & 作者公开全文\tabularnewline
+18 & 工程系统与海试证据 & 作者公开全文\tabularnewline
+19 & 粒子滤波理论基础 & 公开正文与正式出版入口\tabularnewline
+20 & 全局定位概率基础 & 作者实验室方法与书目说明\tabularnewline
+21 & 粒子数自适应基础 & 官方论文摘要与全文入口\tabularnewline
+22 & 测深SLAM直接研究 & 公开摘要及作者相关方法论文\tabularnewline
+23 & 鲁棒多假设图优化基础 & 作者公开全文\tabularnewline
+24 & 粗地图导航直接研究 & 作者公开全文\tabularnewline
+25 & 测深SLAM直接研究 & 作者公开全文\tabularnewline
+26 & 声学强度物理基础 & 官方指南与相关章节\tabularnewline
+27 & 侧扫SLAM直接研究 & 作者公开全文与官方实现\tabularnewline
+28 & 侧扫SLAM直接研究 & 开放全文与官方实现\tabularnewline
+29 & 侧扫重建与SLAM直接研究 & 作者公开全文\tabularnewline
+30 & 声呐学习综述 & 开放作者全文\tabularnewline
+31 & 增量因子图基础 & 作者实验室书目与方法说明\tabularnewline
+32 & 工程系统证据 & 官方项目说明\tabularnewline
+33 & 可复现软件证据 & 官方仓库与选定TRN源文件\tabularnewline
+34 & 歧义地形跟踪直接研究 & 出版摘要 不是全文核读\tabularnewline
+35 & 空间独立评价基础 & 正式出版方法综述\tabularnewline
+36 & 粗地图集合估计直接研究 & 出版摘要与期刊信息\tabularnewline
+37 & 测深特征与鲁棒SLAM直接研究 & 出版摘要、引言与可见方法片段 不声称全文复现\tabularnewline
+38 & 真实海底地形数据来源 & 官方数据门户说明 不推断每个航次均含开放强度\tabularnewline
+39 & 真实侧扫数据与学习基准 & 作者摘要及作者数据网站 不将分割标签视为里程计真值\tabularnewline
+40 & 真实水下多模态序列数据 & 作者论文摘要与官方数据说明 位姿参考来自导航估计而非无误差真值\tabularnewline
+\bottomrule
+\end{longtable}
