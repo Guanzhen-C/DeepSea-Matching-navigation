@@ -84,8 +84,8 @@ class PureSideScanFeatureNavigator:
         self.scan_plane_registration = scan_plane_registration
         if submap_representation not in ('legacy_strip', 'adaptive_projected'):
             raise ValueError('Explicit received-submap representation required.')
-        if submap_representation != 'legacy_strip' and (loop_closure or image_matcher is None):
-            raise ValueError('First isolate projected-map evidence with LoFTR and loops OFF; historical-image compatibility is not yet validated.')
+        if submap_representation != 'legacy_strip' and image_matcher is None:
+            raise ValueError('Projected received-submap matching requires a local-feature matcher.')
         self.submap_representation = submap_representation
         self.projected_map_attempts = self.projected_map_accepts = 0
         if loop_closure:

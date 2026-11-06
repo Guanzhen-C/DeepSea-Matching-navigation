@@ -113,6 +113,7 @@ def main():
                'SideScanComplexEcho.py', 'SideScanIQHistory.py', 'QiandaoCombTrajectory.py',
                'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py', 'WriteSideScanReport.py']
     if a.loop_closure: sources += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.loop_closure and a.submap_representation != 'legacy_strip': sources += ['SideScanHistoricalMatching.py']
     if a.scan_plane_registration != 'rank2_baseline': sources += ['SideScanPlaneRegistration.py']
     if a.submap_representation != 'legacy_strip':
         sources += ['SideScanProjectedSubmap.py', 'SideScanProjectedMatching.py']

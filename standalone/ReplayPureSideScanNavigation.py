@@ -85,6 +85,7 @@ def main():
     names = ['PureSideScanFeatures.py', 'SideScanFeatureMap.py', 'PureSideScanFeatureNavigation.py',
              'SideScanLearnedFeatures.py', 'SideScanRecordedInputs.py']
     if a.loop_closure: names += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.loop_closure and a.submap_representation != 'legacy_strip': names += ['SideScanHistoricalMatching.py']
     if a.scan_plane_registration != 'rank2_baseline': names += ['SideScanPlaneRegistration.py']
     if a.submap_representation != 'legacy_strip':
         names += ['SideScanProjectedSubmap.py', 'SideScanProjectedMatching.py']

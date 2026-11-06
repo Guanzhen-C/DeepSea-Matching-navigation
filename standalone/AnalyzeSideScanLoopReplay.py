@@ -39,7 +39,6 @@ def validate_comparison(reference, candidate, kind):
     expected = {'loop': 0, 'registration': 1, 'submap_orientation': 2, 'projection': 3}[kind]
     if changed != [expected]: raise ValueError('Comparison must change exactly the declared estimator component.')
     if kind == 'loop' and (old[0] or not new[0]): raise ValueError('Explicit loop off/on required.')
-    if kind != 'loop' and (old[0] or new[0]): raise ValueError('Representation/registration comparison requires loops OFF.')
 
 
 def read_replay(path, truth):

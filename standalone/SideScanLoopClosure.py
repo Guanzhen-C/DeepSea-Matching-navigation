@@ -12,6 +12,10 @@ from SideScanLoopGeometry import fit_range_plane_loop, lift_loop_to_graph_nodes,
 
 
 def feature_observations(query, pixels):
+    if 'source_phase_centre' in query:
+        from SideScanProjectedSubmap import projected_feature_observations
+        observed = projected_feature_observations(query, pixels)
+        return {k: observed[k] for k in ('origins', 'normals', 'ranges', 'sides')}
     row = (pixels[:, 1]+.5)/query['scale']-.5
     normal = np.column_stack([np.interp(row, np.arange(len(query['row_normals'])), query['row_normals'][:, k]) for k in range(2)])
     normal /= np.maximum(np.linalg.norm(normal, axis=1, keepdims=True), 1e-12)
@@ -24,9 +28,15 @@ def feature_observations(query, pixels):
 def overlap_supported(a, ta, b, tb, margin=30.):
     boxes = []
     for q, t in [(a, ta), (b, tb)]:
-        extra = q['max_range_m']*float(np.max(abs(q['row_normals'][:, 1])))
-        x0, x1 = q['x0']-margin-extra, q['x1']+margin+extra
-        local = np.array([[x, y] for x in [x0, x1] for y in [-q['max_range_m'], q['max_range_m']]])
+        if 'source_phase_centre' in q:
+            origin = q['phase_origins']
+            x0, x1 = min(q['x0'], float(origin[:, 0].min()))-margin, max(q['x1'], float(origin[:, 0].max()))+margin
+            y0, y1 = min(q['grid_y_min_m'], float(origin[:, 1].min()))-margin, max(q['grid_y_max_m'], float(origin[:, 1].max()))+margin
+        else:
+            extra = q['max_range_m']*float(np.max(abs(q['row_normals'][:, 1])))
+            x0, x1 = q['x0']-margin-extra, q['x1']+margin+extra
+            y0, y1 = -q['max_range_m'], q['max_range_m']
+        local = np.array([[x, y] for x in [x0, x1] for y in [y0, y1]])
         boxes.append(local@t[:2, :2].T+t[:2, 2])
     for axis in [ta[:2, 0], ta[:2, 1], tb[:2, 0], tb[:2, 1]]:
         aa, bb = boxes[0]@axis, boxes[1]@axis
@@ -78,8 +88,10 @@ class SideScanHistoricalLoops:
                     or query['patch_start_id'] <= old['patch_end_id']): continue
             pose = self.frame_pose(frame, graph)
             if not overlap_supported(old, pose, query, current_pose): continue
-            old_centre = pose@np.array([(old['x0']+old['x1'])/2, 0., 1.])
-            new_centre = current_pose@np.array([(query['x0']+query['x1'])/2, 0., 1.])
+            old_y = (old['grid_y_min_m']+old['grid_y_max_m'])/2 if 'source_phase_centre' in old else 0.
+            new_y = (query['grid_y_min_m']+query['grid_y_max_m'])/2 if 'source_phase_centre' in query else 0.
+            old_centre = pose@np.array([(old['x0']+old['x1'])/2, old_y, 1.])
+            new_centre = current_pose@np.array([(query['x0']+query['x1'])/2, new_y, 1.])
             distance = float(np.linalg.norm(old_centre[:2]-new_centre[:2]))
             score = float(frame['descriptor']@descriptor)-distance/500.
             available.append((score, frame))
@@ -87,23 +99,39 @@ class SideScanHistoricalLoops:
 
     def match_pair(self, old, query, seed):
         a = old['query']; reverse = bool(np.cos(seed[2]) < 0)
-        im = np.flip(query['image'], axis=(0, 1)).copy() if reverse else query['image']
-        mask = np.repeat(query['support'], query['scale'], axis=0).astype(np.uint8)*255
-        if reverse: mask = np.flip(mask, axis=(0, 1)).copy()
-        ma = np.repeat(a['support'], a['scale'], axis=0).astype(np.uint8)*255
-        pa, pb, confidence = self.matcher(a['image'], im, ma, mask)
-        if reverse:
-            pb = np.array([im.shape[1]-1, im.shape[0]-1])-pb
-        if len(pa) < 24: return dict(accepted=False, reason='too_few_historical_feature_matches', matches=len(pa))
+        typed = 'source_phase_centre' in a or 'source_phase_centre' in query
+        tiling = None
+        if typed:
+            from SideScanHistoricalMatching import match_typed_historical
+            pa, pb, confidence, tiling = match_typed_historical(a, query, seed, self.matcher)
+        else:
+            im = np.flip(query['image'], axis=(0, 1)).copy() if reverse else query['image']
+            mask = np.repeat(query['support'], query['scale'], axis=0).astype(np.uint8)*255
+            if reverse: mask = np.flip(mask, axis=(0, 1)).copy()
+            ma = np.repeat(a['support'], a['scale'], axis=0).astype(np.uint8)*255
+            pa, pb, confidence = self.matcher(a['image'], im, ma, mask)
+            if reverse:
+                pb = np.array([im.shape[1]-1, im.shape[0]-1])-pb
+        metadata = dict(typed_source_geometry=typed, historical_tiling=tiling,
+            appearance_warp_is_not_a_loop_pose_measurement=True,
+            association_consensus_model='appearance_affine_pruning_only' if typed else 'legacy_scan_row_consensus')
+        if len(pa) < 24:
+            return dict(accepted=False, reason='too_few_historical_feature_matches', matches=len(pa), **metadata)
         oa, ob = feature_observations(a, pa), feature_observations(query, pb)
-        keep = row_compatible_pairs(oa, ob, seed[2])
+        if typed:
+            from SideScanHistoricalMatching import appearance_consensus
+            keep = appearance_consensus(a, query, pa, pb, seed)
+        else:
+            keep = row_compatible_pairs(oa, ob, seed[2])
         if keep.sum() < 24:
-            return dict(accepted=False, reason='no_historical_row_consensus', matches=len(pa), inliers=int(keep.sum()))
+            return dict(accepted=False, reason='no_historical_appearance_consensus' if typed else 'no_historical_row_consensus',
+                        matches=len(pa), inliers=int(keep.sum()), **metadata)
         fit = fit_range_plane_loop({k: v[keep] for k, v in oa.items()}, {k: v[keep] for k, v in ob.items()}, seed,
             float(query['anchor_vertical_z_m']-a['anchor_vertical_z_m']), minimum_features=24)
         selected = fit.get('selected_feature_indices', np.arange(int(keep.sum())))
         fit.update(matches=len(pa), row_consensus_matches=int(keep.sum()),
                    inliers=fit.get('features', int(keep.sum())), appearance_reversed_for_matching=reverse,
+                   **metadata,
                    old_pixels=pa[keep][selected], new_pixels=pb[keep][selected])
         return fit
 
@@ -178,15 +206,20 @@ class SideScanHistoricalLoops:
                 measurement=selected['measurement'].tolist(), information=selected['information'].tolist())))
         # Store compact historical observation geometry, not the full world
         # raster or every descriptor/float image. No age-based deletion.
-        keys = ['image', 'support', 'row_normals', 'row_scan_origins', 'anchor_vertical_z_m',
+        keys = ['image', 'support', 'anchor_vertical_z_m',
                 'bins', 'scale', 'step', 'x0', 'x1', 'max_range_m', 'timestamp',
                 'patch_start_s', 'patch_start_id', 'patch_end_id']
+        if 'source_phase_centre' in query:
+            keys += ['source_phase_centre', 'source_range_column', 'phase_origins', 'phase_normals', 'phase_side_sign',
+                'phase_packet_ids', 'phase_beam_rows', 'phase_timestamps_s', 'grid_y_min_m', 'grid_y_max_m', 'grid_step_y_m']
+        else: keys += ['row_normals', 'row_scan_origins']
         current['query'] = {k: query[k] for k in keys}
         self.frames.append(current)
         return selected
 
     def diagnostics(self):
         return dict(historical_submaps=len(self.frames), candidate_attempts=self.attempts,
+            historical_projected_submaps=sum('source_phase_centre' in f['query'] for f in self.frames),
             geometric_candidates=self.geometry_accepts, independent_confirmations=self.confirmed,
             actual_loop_edges=self.added_edges, last=self.last,
             measured_heights_used=False, image_homography_used_as_pose=False,

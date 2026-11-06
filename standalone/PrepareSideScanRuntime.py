@@ -14,6 +14,11 @@ from pathlib import Path
 import shutil
 
 
+ENTRYPOINTS = ('RunPureSideScanFeatureShort.py', 'ReplayPureSideScanNavigation.py',
+               'AnalyzePureSideScanShort.py', 'AnalyzeSideScanLoopReplay.py',
+               'FinalizePureSideScanExperiment.py', 'ValidateProjectedSideScanFullRoute.py')
+
+
 def source_closure(source, entries):
     source = Path(source); pending = list(entries); found = set()
     while pending:
@@ -37,7 +42,7 @@ def main():
     a = p.parse_args()
     if a.out.exists(): raise FileExistsError('Never overwrite an existing staged runtime.')
     source = Path(__file__).resolve().parent
-    entries = ['RunPureSideScanFeatureShort.py', 'AnalyzePureSideScanShort.py', 'FinalizePureSideScanExperiment.py']
+    entries = list(ENTRYPOINTS)
     names = source_closure(source, entries)
     target = a.out/'standalone'; target.mkdir(parents=True)
     hashes = {}

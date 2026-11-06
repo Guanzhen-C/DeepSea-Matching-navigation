@@ -89,7 +89,101 @@ Local15.54794m均不变。最大误差发生在新信息到达前，不能后验
  --out output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/NEW_projected_replay \
  --runtime current --submap-representation adaptive_projected
 
-新输出目录必须不存在，勿覆盖上述实验。当前投影开关仅允许回环关闭的
-表示消融，尚未验证历史子图混合类型/分块匹配兼容性，程序会明确拒绝
---loop-closure组合，不能偷偷把它当成当前完整正式版。接下来要补齐这种
-互操作并进行完整同输入/独立种子验证；不能把上述2km视作整个目标完成。
+新输出目录必须不存在，勿覆盖上述实验。上述结果对应提交2ab253e：当时
+投影开关仅允许回环关闭的表示消融，程序明确拒绝--loop-closure组合。
+后续混合历史类型的接入和实测重放结果见第七节；不能把2km视作全程验收。
+
+七、新来源投影与历史回环互操作（追加，2026-11-07）
+SideScanHistoricalMatching.py将旧条带和来源投影的外观坐标统一到历史图
+参考栅格，按256×384原图分块、32px重叠和30m搜索余量匹配。旋转/仿射
+会进行图像双线性、掩码最近邻插值，不缩小整幅图；不能将“原图分块”
+误解为旋转过程中完全没有插值。匹配点先逆变换回各自原图像素，再查
+真实来源的相位中心、斜距、舷侧和扫描平面。二维仿射仅剔除明显错误
+对应，不用于生成回环位姿。最终仍由未知3D地物双视斜距/扫描平面求解，
+Schur消元后只保留数据支持的位姿信息；不引入测深或地物高度先验。
+历史图库保存来源标签/相位中心表和外观栅格范围，查询/历史任一为投影
+类型时走新路径，两个旧条带仍走原路径。保留独立ping窗口确认与共享
+当前观测时的各半信息预算；该预算不是严格的全图相关性一致性证明。
+
+先完成旧模式控制重放replay_typed_history_legacy_control2km_v1，7576帧
+positions/timestamps/yaw/distance与旧replay_shared_historical_loop2km_v3
+全部逐值一致。Global RMSE10.4161248264m，10条真实回环边；兼容接线
+没有暗改原处理路径。
+
+新组合replay_adaptive_projected_with_loops2km_v1已完整处理同一份输入：
+7576声呐、125000 IMU、12500 DVL速度、25000压力。独立比较器重新核验
+输入SHA、源快照、CSV/NPZ全帧、图因子和指标，DR/Local始终逐值相同。
+
+                          旧条带无回环  旧条带有回环  新投影无回环  新投影有回环
+Global RMSE/m                10.31664      10.41612       8.56415       8.57048
+Global P95/m                 18.37482      18.37482      17.53438      17.53438
+Global最大/m                 19.36075      19.36075      19.36075      19.36075
+Global终点/m                  7.87793       7.78973       6.80139       6.45062
+真实回环边数                       0            10             0            10
+
+保持回环启用、仅改变子图表示，Global RMSE降低17.7191%。但新表示中
+单独打开回环使RMSE增加约0.0740%，没有证据声称“回环提升了绝对精度”；
+终点误差下降也不能替代全程评价。新组合第二直线RMSE5.40182m，旧回环
+版11.65042m；Global转弯10/30m RPE仍为2.73568/3.74050m，保留前述
+绝对校正的跳变代价。全程Local/DR不被修改，不用Global差分代替速度。
+
+特别说明：共有3次涉及来源投影类型的历史匹配，2次特征不足、1次只有
+8个外观一致内点，全部被拒。10条实际回环仍是旧条带之间的匹配。
+因此已验证混合类型可安全执行和拒绝坏候选，尚未证明来源投影参与的
+有效历史回环已经成功检测，不能以“支持接口”冒充“已成功新型回环”。
+
+新独立输出（共同前缀同第六节）：
+  replay_typed_history_legacy_control2km_v1/   旧模式逐值复现控制
+  replay_adaptive_projected_with_loops2km_v1/ 新组合完整2km
+  review_projected_loops2km_v1/              新表示内回环off/on单因素对照
+  review_projection_with_loops2km_v1/        回环均on的表示单因素对照与曲线
+
+新组合复现命令与第六节相同，增加--loop-closure并使用全新输出目录。
+代码已允许该组合；当前16.489km隔离长程仍是旧条带＋回环版，未停止、
+未切换、未修改源快照。接入时92项相关测试通过，原去噪95项冻结SHA验证通过。
+仍需独立随机种子和完整航程同输入对照，不能据本2km宣布全目标完成。
+
+八、完整航程与独立随机种子的验证安排（已启动，尚无终态结论）
+新增ValidateProjectedSideScanFullRoute.py，只观察启动时已确认活着的
+原主unit/PID886838。目标进程失败、PID被替换、归档不完整、不是完整
+单圈、源码/输入哈希变化时，保留失败结果并退出，绝不自动重启仿真。
+该观察器不停止或重配原实验，只在原完整输入归档完成后，顺序重放：
+  新来源投影＋历史回环；新来源投影无回环；
+  旧条带＋历史回环控制；旧条带无回环。
+所有重放使用同一份完整导航输入，包含全部转弯/梳形/返回航段，不重新
+生成传感器、不抽稀、不裁到效果较好的短段。四组都结束后独立做四个
+单因素比较（表示×回环），重算全帧指标、逐段RPE并核对真实图因子。
+旧回环控制必须与原全程所有位置/航向/时间/航程逐值一致，不只比终点。
+正负结果均保留。它不是一次新的场景泛化试验，不能写成真实湖试验收。
+
+首次观察器v1在第一次写状态时缺少冻结oceansim导入路径而失败，没有
+启动任何重放、没有停止原主进程；journal保留ModuleNotFoundError证据，
+空validation_projected_full_comb_seed31_v1/和失败runtime_v2也保留。
+补齐启动路径并新增首次状态写入/等待异常回归后，才用全新v2输出启动。
+不能把systemd --collect回收后的MainPID0/默认ExecMainStatus0当作成功；
+必须结合原journal、终态报告和实际产物判断。新观察器不启用--collect，
+使失败退出状态继续可查。相关完整测试集更新为99项，全部通过。
+
+权威活动句柄：
+  原主：oceansim-pure-sss-shared-loop-full16km-20261107-v2.service / PID886838
+  原独立收尾：oceansim-pure-sss-full16km-review-20261107-v2.service / PID887494
+  新全程矩阵：oceansim-pure-sss-full-matrix-20261107-v2.service / PID1000648
+  新矩阵状态：validation_projected_full_comb_seed31_v2/validation_status.json
+  新矩阵源码：runtime_pure_sss_projected_loops_v3/（39文件，299999字节）
+新矩阵初始状态为waiting_for_exact_live_full_source；当前还未完成四组
+完整重放，不能因为调度器启动成功就宣称全程效果通过。
+
+另一个随机种子32的2000m含转弯在线实验也已实际启动：
+  unit oceansim-pure-sss-projected-loops-seed32-2km-20261107-v1.service / PID994841
+  输出 pure_sss_iq_projected_loops2000m_seed32_v1/
+  隔离源码 runtime_pure_sss_projected_loops_v1/（38文件）
+使用新表示＋回环、相同场景/标定/准确初值；改变噪声和散射相位随机流，
+不是真实独立航次或独立地形。结束后需在其记录输入上补旧模式对照，
+不能只拿不同种子的单个RMSE互相比。该实验仍在运行，当前无终态指标。
+
+所有主/观察器/新种子实验都保持MemoryHigh/Max/SwapMax=infinity，
+CPUQuota100%、Nice19、BLAS单线程，不恢复用户已取消的RAM上限。
+原主33文件隔离快照、新种子38文件与新矩阵39文件全部重新核验未改变。
+原湖试204d3e24048a8b515616d9305b7516221bcf8fed、
+海试8b5df53cb57f9de2506d78d90b16e33bf5e96510、
+去噪冻结0f106ba3da57104ae1def55e866c7638ad426936均未变化。

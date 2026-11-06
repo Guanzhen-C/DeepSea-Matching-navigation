@@ -70,6 +70,7 @@ def test_comparison_never_attributes_two_changed_components_to_just_loops_or_geo
     validate_comparison(old, dict(loop_closure=False, scan_plane_registration='observable_subspace'), 'registration')
     validate_comparison(old, dict(loop_closure=False, canonical_submaps=True), 'submap_orientation')
     validate_comparison(old, dict(loop_closure=False, submap_representation='adaptive_projected'), 'projection')
+    validate_comparison(dict(loop_closure=True), dict(loop_closure=True, submap_representation='adaptive_projected'), 'projection')
     with pytest.raises(ValueError, match='exactly the declared'):
         validate_comparison(old, dict(loop_closure=True, canonical_submaps=True), 'loop')
     with pytest.raises(ValueError, match='exactly the declared'):
