@@ -107,7 +107,7 @@ class SideScanHistoricalLoops:
                    old_pixels=pa[keep][selected], new_pixels=pb[keep][selected])
         return fit
 
-    def observe(self, query, raw_pose2, graph, raw_keyframe_poses, timestamp):
+    def observe(self, query, raw_pose2, graph, raw_keyframe_poses, timestamp, *, shared_current_window=False):
         node = len(graph.poses)-1
         offset = np.linalg.inv(raw_keyframe_poses[node])@pose_matrix(raw_pose2)
         current = dict(query=query, node=node, offset=offset, raw_pose=np.asarray(raw_pose2).copy(),
@@ -152,8 +152,15 @@ class SideScanHistoricalLoops:
                 cov = np.diag([1., 1., np.deg2rad(.8)**2])*dt/30.
                 measurement, info = lift_loop_to_graph_nodes(fit['relative_pose2'], fit['information'],
                     old['offset'], offset, offset_covariance=cov)
+                # Relative-loop and map-prior observations may share the SAME
+                # current pixels. Use a split precision budget, not two full
+                # independent likelihoods. This is conservative tempering,
+                # NOT a proof of covariance-intersection consistency for the
+                # complete graph (historical correlations remain approximate).
+                weight = .5 if shared_current_window else 1.
+                info = weight*info
                 selected = dict(source=old['node'], target=node, measurement=measurement, information=info,
-                    score=float(fit['inliers']/fit['matches']))
+                    score=float(fit['inliers']/fit['matches']), current_window_information_weight=weight)
                 if (old['node'], node) not in self.used_pairs and old['node'] != node:
                     graph.add_edge(old['node'], node, measurement, info, kind='loop', score=selected['score'])
                     self.used_pairs.add((old['node'], node)); self.confirmed += 1; self.added_edges += 1

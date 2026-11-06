@@ -85,6 +85,7 @@ class PureSideScanFeatureNavigator:
         else:
             self.historical_loops = None
         self.map_priors_replaced_by_loop = 0
+        self.shared_feature_windows = 0
         self.latest_gyro = np.zeros(3)
         self.latest_acceleration = np.mean(startup_specific_force, axis=0)
         self.window = SideScanFeatureWindow(150)
@@ -240,14 +241,19 @@ class PureSideScanFeatureNavigator:
                 self.ensure_keyframe(packet.timestamp, raw, force=True)
             loop = None
             if query is not None and self.historical_loops is not None:
-                loop = self.historical_loops.observe(query, raw, self.graph, self.raw_keyframe_poses, packet.timestamp)
+                loop = self.historical_loops.observe(query, raw, self.graph, self.raw_keyframe_poses, packet.timestamp,
+                    shared_current_window=bool(graph_ready))
             if loop is not None:
-                # Do not treat the SAME current scan window as two independent
-                # graph observations. A confirmed historical loop replaces its
-                # absolute-map unary factor. Repeated historical observations
-                # still have approximate correlations, reported explicitly.
+                # Preserve new absolute anchoring instead of replacing it by
+                # a relative revisit to a potentially drifted historical pose.
+                # Shared current pixels get HALF information in each factor.
+                if graph_ready:
+                    add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
+                        cohort.last_measurement_information*loop['current_window_information_weight'],
+                        score=matched.get('score', 0))
+                    self.graph_feature_priors += 1
+                    self.shared_feature_windows += 1
                 self.graph.optimize()
-                self.map_priors_replaced_by_loop += int(graph_ready)
             elif graph_ready:
                 add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
                     cohort.last_measurement_information, score=matched.get('score', 0))
@@ -271,7 +277,9 @@ class PureSideScanFeatureNavigator:
             secondary_submap_denoising_used=False,
             loop_closure=dict(enabled=False, actual_loop_edges=0) if self.historical_loops is None else
                 dict(enabled=True, **self.historical_loops.diagnostics(),
-                     map_priors_replaced_by_loop=self.map_priors_replaced_by_loop),
+                     map_priors_replaced_by_loop=self.map_priors_replaced_by_loop,
+                     shared_current_windows=self.shared_feature_windows,
+                     shared_observation_policy='half_information_each_for_loop_and_map_not_independent_full_factors'),
             global_cohort_tracker_updates=self.tracker.updates,
             map_to_odom=self.soft.diagnostics(),
             observation_limit='scan-plane along/yaw; cross-track is not independently measured from slant pixels',

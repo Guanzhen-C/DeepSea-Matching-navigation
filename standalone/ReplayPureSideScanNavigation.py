@@ -42,6 +42,12 @@ def main():
     original = json.loads((a.run/'run_summary.json').read_text())
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
         raise ValueError('Complete executed input archive required; never replay a partial stale running file.')
+    dependencies = {a.experiment/'estimator_bundle/isaacsim/oceansim/slam'/name: expected
+        for name, expected in original['original_core_source_SHA256'].items()}
+    dependencies.update({a.experiment/'scene/reference_baseline'/name: expected
+        for name, expected in original['prior_intensity_inputs_SHA256'].items()})
+    for path, expected in dependencies.items():
+        if sha(path) != expected: raise ValueError('Frozen estimator/prior input changed: '+str(path))
     runtime = a.run/'source_snapshot' if a.runtime == 'recorded' else ROOT/'standalone'
     sys.path[:0] = [str(runtime), str(a.experiment/'estimator_bundle/isaacsim'), str(ROOT/'standalone'), str(ROOT)]
     estimation_finished = False
@@ -80,6 +86,7 @@ def main():
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
         executed_original_report_SHA256=sha(a.run/'run_summary.json'),
         source_SHA256={n: sha(snapshot/n) for n in names}, events={})
+    report['frozen_core_and_prior_dependency_SHA256'] = {str(k): v for k, v in dependencies.items()}
     report['replay_driver_SHA256'] = sha(Path(__file__))
     def save_report():
         clean, _ = sanitize_for_strict_json(report)
@@ -128,6 +135,8 @@ def main():
             if sha(runtime/name) != expected: raise RuntimeError('Replay source changed while running: '+name)
         if sha(Path(__file__)) != report['replay_driver_SHA256']:
             raise RuntimeError('Replay driver changed while running.')
+        for path, expected in dependencies.items():
+            if sha(path) != expected: raise RuntimeError('Frozen dependency changed during replay: '+str(path))
         np.savez_compressed(a.out/'estimated_states.npz', positions=array, timestamps=stamps,
                             yaw_rad=np.asarray(yaws), distance_m=source['distance_m'])
         (a.out/'graph_factors.json').write_text(json.dumps(nav.graph.factor_stream_payload(), indent=2)+'\n')

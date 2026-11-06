@@ -86,10 +86,15 @@ def test_multiple_candidates_from_one_window_cannot_confirm_a_loop(monkeypatch):
     assert loops.added_edges == 0 and len(g.edges) == 0
     assert loops.pending['old_start'] == 1  # best candidate, not the last one
     monkeypatch.setattr(loops, 'candidates', lambda *args: [old2])
-    result = loops.observe(query(451, 600, 900., 949.), np.zeros(3), g, [np.eye(3)]*3, 949.)
+    monkeypatch.setattr(module, 'lift_loop_to_graph_nodes',
+        lambda *args, **kw: (np.zeros(3), np.diag([1., 0., 10.])))
+    result = loops.observe(query(451, 600, 900., 949.), np.zeros(3), g, [np.eye(3)]*3, 949.,
+                           shared_current_window=True)
     assert result is not None and loops.added_edges == 1
     assert g.edges[0][1]['kind'] == 'loop'
     assert np.linalg.matrix_rank(g.edges[0][0][3], tol=1e-8) == 2
+    np.testing.assert_array_equal(g.edges[0][0][3], np.diag([.5, 0., 5.]))
+    assert result['current_window_information_weight'] == .5
     # Exactly the same physical window is not another independent loop.
     assert loops.observe(query(451, 600, 900., 949.), np.zeros(3), g, [np.eye(3)]*3, 949.) is None
 

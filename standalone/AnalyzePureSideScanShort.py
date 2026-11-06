@@ -115,6 +115,22 @@ def main():
     if kinds and set(kinds) != {'side_scan_feature_prior'}:
         raise ValueError('Unexpected absolute observation source in pure side-scan test.')
     diagnostics = r['diagnostics']
+    loop_edges = [e for e in factors['edges'] if e['kind'] == 'loop']
+    if len(loop_edges) != diagnostics.get('loop_closure', {}).get('actual_loop_edges', 0):
+        raise ValueError('Claimed historical loops differ from real GTSAM factors.')
+    if any(e['kind'] not in ('odometry', 'loop') for e in factors['edges']):
+        raise ValueError('Unexpected relative observation source in pure side-scan test.')
+    for edge in loop_edges:
+        info = np.asarray(edge['information'])
+        if (not np.isfinite(info).all() or np.linalg.eigvalsh(info).min() < -1e-8
+                or factors['pose_timestamps_s'][edge['target']]-factors['pose_timestamps_s'][edge['source']] < 180.):
+            raise ValueError('Invalid or non-historical loop factor.')
+    for name, expected in r['original_core_source_SHA256'].items():
+        if digest(experiment/'estimator_bundle/isaacsim/oceansim/slam'/name) != expected:
+            raise ValueError('Frozen estimator core changed: '+name)
+    for name, expected in r['prior_intensity_inputs_SHA256'].items():
+        if digest(experiment/'scene/reference_baseline'/name) != expected:
+            raise ValueError('Prior intensity input changed: '+name)
     for field in ['MBES_points_consumed', 'measured_height_likelihood_terms',
                   'measured_height_graph_factors', 'optical_flow_calls', 'raw_intensity_correlation_calls']:
         if diagnostics[field] != 0: raise ValueError('Forbidden source: '+field)
@@ -129,8 +145,11 @@ def main():
     review = dict(status='independently_verified_complete_executed_scope', distance_m=float(state['distance_m'][-1]),
         source_run_SHA256=digest(a.run/'run_summary.json'), metrics=metrics,
         paired_legacy_DR_bit_exact=paired_legacy_DR, side_scan_absolute_feature_priors=len(kinds),
+        actual_historical_loop_factors=len(loop_edges),
         source_snapshots_independently_rehashed=True, recorded_navigation_inputs_verified=recorded_inputs_verified,
         analytic_trajectory_checked=True, full_closed_loop_requested=bool(r.get('full_closed_loop_requested', False)),
+        complete_planned_route_verified=bool(r.get('full_closed_loop_requested', False)),
+        unseen_map_generalization_validated=False,
         phase_metrics=phase_metrics, planar_relative=planar_relative_metrics(position, state['yaw_rad'], state['distance_m']),
         graph_optimizer=diagnostics['optimizer_backend'], secondary_denoising_used=False,
         Local_RMSE_reduction_vs_DR=1-metrics['Local']['RMSE_m']/metrics['DR']['RMSE_m'],
@@ -154,8 +173,9 @@ def main():
         if 'turn' in route.segments[index].kind:
             keep = segment_index == index
             ax.axvspan(state['distance_m'][keep][0], state['distance_m'][keep][-1], color='#b6bcc4', alpha=.22)
+    scope = '完整单圈梳形' if r.get('full_closed_loop_requested') else '航程前缀'
     ax.set(xlabel='累计航程 / m', ylabel='三维位置误差 / m',
-        title='纯侧扫特征导航短程对照：无二次去噪、无测深约束\n同一传感器流，准确初值；不是全程或独立实测精度验收')
+        title=f'纯侧扫特征导航{scope}：无二次去噪、无测深约束\n同一传感器流，准确初值；不是独立实测精度验收')
     ax.grid(alpha=.2); ax.legend()
     fig.savefig(a.out/'纯侧扫_无二次去噪_完整短程误差.png', dpi=160); plt.close(fig)
     example_files = sorted(a.run.glob('actual_map_feature_matches_*.npz'))
