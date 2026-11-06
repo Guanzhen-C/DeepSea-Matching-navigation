@@ -86,3 +86,21 @@ def test_frame_to_keyframe_lift_preserves_relative_transform_and_information_nul
     measurement, lifted = lift_loop_to_graph_nodes(m, info, a, b)
     np.testing.assert_allclose(pose_matrix(measurement), a@pose_matrix(m)@np.linalg.inv(b), atol=1e-12)
     assert np.linalg.matrix_rank(lifted, tol=1e-8) == 2
+
+
+def test_one_wrong_physical_side_match_is_excluded_not_used_to_reject_or_fake_entire_loop():
+    pose = np.array([-30., 28., np.pi]); _, a, b = synthetic_observations(pose, 30)
+    b['sides'][0] *= -1  # explicit false correspondence; no true pose used by solver
+    result = fit_range_plane_loop(a, b, pose+np.array([1., 3., .01]), minimum_features=24)
+    assert result['accepted'] and result['outlier_refinement_performed']
+    assert 0 not in result['selected_feature_indices']
+    assert result['features'] == 29
+    assert abs(result['relative_pose2'][0]-pose[0]) < .1
+    assert not result['motion_seed_information_added_to_measurement']
+
+
+def test_refinement_never_accepts_less_than_required_physical_support():
+    pose = np.array([-30., 28., np.pi]); _, a, b = synthetic_observations(pose, 24)
+    b['sides'][0] *= -1
+    result = fit_range_plane_loop(a, b, pose+np.array([1., 3., .01]), minimum_features=24)
+    assert not result['accepted']

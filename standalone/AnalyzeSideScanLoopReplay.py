@@ -46,6 +46,7 @@ def read_replay(path, truth):
         raise ValueError('Missing saved estimates.')
     with (path/'estimated_positions.csv').open() as f:
         rows = list(csv.DictReader(f))
+    np.testing.assert_array_equal([float(row['timestamp_s']) for row in rows], state['timestamps'])
     csv_positions = np.array([[float(row[f'{n}_{c}']) for n in ['DR', 'Local', 'Global'] for c in 'xyz']
                               for row in rows]).reshape(-1, 3, 3)
     np.testing.assert_array_equal(csv_positions, state['positions'])
@@ -63,10 +64,20 @@ def read_replay(path, truth):
     for edge in loops:
         separation = graph['pose_timestamps_s'][edge['target']]-graph['pose_timestamps_s'][edge['source']]
         info = np.asarray(edge['information']); values = np.linalg.eigvalsh(info)
-        if separation < 180. or values.min() < -1e-8:
+        if separation < 180. or not np.isfinite(info).all() or values.min() < -1e-8 or values.max() <= 0:
             raise ValueError('Loop is not long-baseline or has invalid information.')
         loop_checks.append(dict(source=edge['source'], target=edge['target'], separation_s=separation,
             rank=int(np.linalg.matrix_rank(info, tol=1e-8)), information_eigenvalues=values.tolist()))
+    if report['loop_closure']:
+        trace = json.loads((path/'historical_loop_trace.json').read_text())
+        if trace and 'actual_loop_edge_added' in trace[0]:
+            actual = [row['factor'] for row in trace if row['actual_loop_edge_added']]
+            if len(actual) != len(loops): raise ValueError('Loop diagnostics do not match actual graph factors.')
+            for a, b in zip(actual, loops):
+                if (a['source'], a['target']) != (b['source'], b['target']):
+                    raise ValueError('Loop endpoint mismatch.')
+                np.testing.assert_array_equal(a['measurement'], b['measurement'])
+                np.testing.assert_allclose(a['information'], b['information'], rtol=0, atol=1e-9)
     positions = np.concatenate([truth['positions'][:, :1], state['positions']], axis=1)
     yaw = np.column_stack([truth['yaw_rad'][:, 0], state['yaw_rad']])
     phases = {}
@@ -90,6 +101,9 @@ def main():
     a = p.parse_args()
     if a.out.exists(): raise FileExistsError('Preserve earlier reviews.')
     truth = np.load(a.source_run/'navigation_states.npz')
+    source_report = json.loads((a.source_run/'run_summary.json').read_text())
+    if sha(a.source_run/'navigation_states.npz') != source_report['navigation_states_SHA256']:
+        raise ValueError('Original evaluation artifact changed.')
     off, off_review, off_state, off_error = read_replay(a.without_loops, truth)
     on, on_review, on_state, on_error = read_replay(a.with_loops, truth)
     if off['loop_closure'] or not on['loop_closure']: raise ValueError('Explicit loop off/on required.')

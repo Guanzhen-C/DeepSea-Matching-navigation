@@ -61,8 +61,9 @@ def test_reverse_view_appearance_transform_is_undone_before_physical_geometry(mo
         return points, points, np.ones(30)
     monkeypatch.setattr(module, 'row_compatible_pairs', lambda *args: np.ones(30, bool))
     captured = {}
-    def fit(a, b, seed, delta_z):
+    def fit(a, b, seed, delta_z, **options):
         captured.update(a=a, b=b, delta_z=delta_z)
+        assert options['minimum_features'] == 24
         return dict(accepted=True)
     monkeypatch.setattr(module, 'fit_range_plane_loop', fit)
     result = SideScanHistoricalLoops(matcher).match_pair(frame(old), new, [0., 28., np.pi])

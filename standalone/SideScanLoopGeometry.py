@@ -74,10 +74,22 @@ def inflate_information(information, extra_covariance):
     return (result+result.T)*.5
 
 
-def fit_range_plane_loop(a, b, seed_pose, delta_z=0., *, maximum_features=48):
+def physical_side_support(a, b, pose, landmarks, delta_z, *, margin_m=3*.7):
+    pb = np.column_stack([(landmarks[:, :2]-pose[:2])@rotation(pose[2]), landmarks[:, 2]-delta_z])
+    valid = np.ones(len(landmarks), bool)
+    for observations, local_points in ((a, landmarks), (b, pb)):
+        tangent = np.column_stack([-observations['normals'][:, 1], observations['normals'][:, 0]])
+        signed = np.einsum('ij,ij->i', tangent, local_points[:, :2]-observations['origins'][:, :2])*observations['sides']
+        valid &= signed >= -margin_m
+    return valid
+
+
+def fit_range_plane_loop(a, b, seed_pose, delta_z=0., *, maximum_features=48, minimum_features=6,
+                         outlier_refinement_steps=2, solution_diagnostics=None):
     n = len(a['ranges'])
-    if n < 6 or len(b['ranges']) != n:
+    if n < max(6, minimum_features) or len(b['ranges']) != n:
         return dict(accepted=False, reason='not_enough_independent_feature_correspondences')
+    selected_indices = np.arange(n)
     for observation in (a, b):
         if (np.asarray(observation['origins']).shape != (n, 3)
                 or np.asarray(observation['normals']).shape != (n, 2)
@@ -89,6 +101,7 @@ def fit_range_plane_loop(a, b, seed_pose, delta_z=0., *, maximum_features=48):
         # Deterministic spread over observed ranges, never truth/geological labels.
         order = np.argsort(a['ranges'])
         keep = order[np.linspace(0, n-1, maximum_features).round().astype(int)]
+        selected_indices = selected_indices[keep]
         a = {k: np.asarray(v)[keep] for k, v in a.items()}
         b = {k: np.asarray(v)[keep] for k, v in b.items()}
         n = len(keep)
@@ -119,15 +132,32 @@ def fit_range_plane_loop(a, b, seed_pose, delta_z=0., *, maximum_features=48):
         # Selection is data residual with the weak seed solely breaking ties;
         # no true pose/height is available to this solver.
         cost = float(np.mean(np.log1p(residual**2)))+.001*float(np.sum(((fit.x[:3]-seed)/std_seed)**2))
+        if solution_diagnostics is not None:
+            supported = physical_side_support(a, b, fit.x[:3], fit.x[3:].reshape(n, 3), delta_z)
+            solution_diagnostics.append(dict(height_initialization_fraction=fraction, cost=cost,
+                standardized_rmse=float(np.sqrt(np.mean(residual**2))), features=n,
+                wrong_side_features=int(np.count_nonzero(~supported)), pose2=fit.x[:3].tolist(),
+                nfev=fit.nfev))
         solutions.append((cost, fit, residual, raw_jac))
     cost, fit, residual, jac = min(solutions, key=lambda x: x[0])
     landmarks = fit.x[3:].reshape(n, 3)
-    pb = np.column_stack([(landmarks[:, :2]-fit.x[:2])@rotation(fit.x[2]), landmarks[:, 2]-delta_z])
-    for observations, local_points in ((a, landmarks), (b, pb)):
-        tangent = np.column_stack([-observations['normals'][:, 1], observations['normals'][:, 0]])
-        signed = np.einsum('ij,ij->i', tangent, local_points[:, :2]-observations['origins'][:, :2])*observations['sides']
-        if np.any(signed < -3*.7):
-            return dict(accepted=False, reason='historical_feature_on_wrong_physical_sonar_side')
+    side_support = physical_side_support(a, b, fit.x[:3], landmarks, delta_z)
+    supported = side_support & (np.max(abs(residual.reshape(n, 4)), axis=1) <= 3.)
+    if not supported.all():
+        # A single false correspondence must not discard an otherwise valid
+        # 48-feature loop. Remove it as an OUTLIER, then re-estimate and recheck
+        # every retained correspondence. Do not relax the physical side test.
+        if outlier_refinement_steps and supported.sum() >= max(6, minimum_features):
+            result = fit_range_plane_loop({k: v[supported] for k, v in a.items()},
+                {k: v[supported] for k, v in b.items()}, seed, delta_z,
+                maximum_features=maximum_features, minimum_features=minimum_features,
+                outlier_refinement_steps=outlier_refinement_steps-1, solution_diagnostics=solution_diagnostics)
+            if result['accepted']:
+                result['selected_feature_indices'] = selected_indices[supported][result['selected_feature_indices']]
+                result['outlier_refinement_performed'] = True
+            return result
+        return dict(accepted=False, reason='historical_feature_on_wrong_physical_sonar_side' if not side_support.all()
+                    else 'historical_range_plane_residual_outliers', supported_features=int(supported.sum()))
     robust_weight = (1+residual**2)**(-.25)
     info = data_only_schur_information(jac*robust_weight[:, None], n)*min(24, n)/n
     info = inflate_information(info, np.diag([2.5**2, 2.5**2, np.deg2rad(1.5)**2]))
@@ -141,6 +171,7 @@ def fit_range_plane_loop(a, b, seed_pose, delta_z=0., *, maximum_features=48):
     return dict(accepted=True, relative_pose2=pose, information=info,
         observable_rank=rank, information_eigenvalues=values, standardized_rmse=standardized_rmse,
         features=n, landmark_depth_prior_used=False, motion_seed_information_added_to_measurement=False,
+        selected_feature_indices=selected_indices, outlier_refinement_performed=False,
         measured_height_or_DEM_used=False, estimator='unknown_landmark_range_plane_Schur',
         caveat='Planar, pressure-assisted local geometry; landmark depth ambiguities remain.')
 

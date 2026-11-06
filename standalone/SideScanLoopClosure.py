@@ -100,9 +100,11 @@ class SideScanHistoricalLoops:
         if keep.sum() < 24:
             return dict(accepted=False, reason='no_historical_row_consensus', matches=len(pa), inliers=int(keep.sum()))
         fit = fit_range_plane_loop({k: v[keep] for k, v in oa.items()}, {k: v[keep] for k, v in ob.items()}, seed,
-            float(query['anchor_vertical_z_m']-a['anchor_vertical_z_m']))
-        fit.update(matches=len(pa), inliers=int(keep.sum()), appearance_reversed_for_matching=reverse,
-                   old_pixels=pa[keep], new_pixels=pb[keep])
+            float(query['anchor_vertical_z_m']-a['anchor_vertical_z_m']), minimum_features=24)
+        selected = fit.get('selected_feature_indices', np.arange(int(keep.sum())))
+        fit.update(matches=len(pa), row_consensus_matches=int(keep.sum()),
+                   inliers=fit.get('features', int(keep.sum())), appearance_reversed_for_matching=reverse,
+                   old_pixels=pa[keep][selected], new_pixels=pb[keep][selected])
         return fit
 
     def observe(self, query, raw_pose2, graph, raw_keyframe_poses, timestamp):
@@ -163,7 +165,10 @@ class SideScanHistoricalLoops:
                     selected = None
         elif not attempts:
             self.last = dict(status='no_time_separated_overlapping_historical_submap')
-        self.trace.append(dict(timestamp_s=float(timestamp), candidates=attempts, decision=self.last.copy()))
+        self.trace.append(dict(timestamp_s=float(timestamp), candidates=attempts, decision=self.last.copy(),
+            actual_loop_edge_added=selected is not None,
+            factor=None if selected is None else dict(source=selected['source'], target=selected['target'],
+                measurement=selected['measurement'].tolist(), information=selected['information'].tolist())))
         # Store compact historical observation geometry, not the full world
         # raster or every descriptor/float image. No age-based deletion.
         keys = ['image', 'support', 'row_normals', 'row_scan_origins', 'anchor_vertical_z_m',
