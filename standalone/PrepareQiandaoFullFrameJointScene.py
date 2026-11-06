@@ -22,8 +22,9 @@ import h5py
 import numpy as np
 
 from BathymetrySideScanDrawing import PingFile
-from QiandaoLocalScene import bottom_points, sample_native_profiles, bounded_interpolation, reject_gps_file
+from QiandaoLocalScene import bounded_interpolation, reject_gps_file
 from QiandaoCombTrajectory import CombSurveyTrajectory, CombSurveyParameters
+from QiandaoNativeBottomProjection import native_bottom_samples
 
 
 def sha(path):
@@ -86,7 +87,7 @@ def main():
     with (scene/'全2020物理ping索引.csv').open('x', newline='') as stream:
         writer = csv.writer(stream)
         writer.writerow(['record_index', 'part', 'part_record_index', 'PingNum', 'PingS', 'PingUs',
-            'relative_time_s', 'nominal_X_m', 'partition', 'port_retained_soundings', 'starboard_retained_soundings',
+            'relative_time_s', 'nominal_X_m', 'partition', 'port_native_bottom_bins', 'starboard_native_bottom_bins',
             'native_rows_each_side', 'native_range_samples', 'raw_cache', 'frozen_gain'])
         for part in ledger['parts']:
             folder = a.source/part['name']
@@ -115,15 +116,11 @@ def main():
                     retained = []
                     for side, reader in enumerate(readers):
                         angle, delay = reader.depth(local)
-                        xyz, ranges, beam, _ = bottom_points(angle, delay, side=side,
-                            sound_speed=p['c'], installation_deg=p['InstallAngle'],
+                        xyz, values, beam, native_bin = native_bottom_samples(angle, delay,
+                            np.asarray(raw[side, :, index]), np.asarray(gain[side, :, index]), side=side,
+                            sound_speed=p['c'], sampling_frequency=p['BeamSigFs'], installation_deg=p['InstallAngle'],
                             beam_spacing_m=p['BeamSpacingAlongTrackDisRes'],
                             vehicle_along_m=speed*times[index]-extent/2, platform_depth_m=source_depth)
-                        amplitude = np.asarray(raw[side, :, index])*np.exp(np.asarray(gain[side, :, index], float))
-                        values, valid = sample_native_profiles(amplitude, beam, ranges,
-                            sound_speed=p['c'], sampling_frequency=p['BeamSigFs'])
-                        valid &= np.isfinite(values) & (values > 0)
-                        xyz, values = xyz[valid], values[valid]
                         ix = np.rint(xyz[:, 0]/resolution+(shape[1]-1)/2).astype(int)
                         iy = np.rint(xyz[:, 1]/resolution+(shape[0]-1)/2).astype(int)
                         inside = (ix >= 0)&(ix < shape[1])&(iy >= 0)&(iy < shape[0])
@@ -176,6 +173,8 @@ def main():
             GPS_read_or_used=False, actual_vessel_trajectory_or_attitude_recovered=False,
             physical_record_partition=name, all2020_used_in_complete_scene=True,
             depth_and_backscatter_share_original_raw_return_geometry=True,
+            native_intensity_bins_preserved_before_grid_averaging=True,
+            native_geometry_interpolated_only_between_adjacent_valid_DOA_nodes=True,
             measured_absolute_bathymetry_accuracy_unknown=True,
             elevation_smoothing_sigma_m=.6, maximum_local_interpolation_distance_m=1.5,
             reference_and_query_depth_are_not_identical_by_construction=True,
@@ -203,6 +202,8 @@ def main():
         full_display_record_count=2020, all_depth_side_identities_exact=True,
         all_physical_records_retained_in_index=True, original_native_array_shape=list(raw.shape),
         per_side_retained_soundings=np.asarray(diagnostics).sum(axis=0).tolist(),
+        retained_counts_are_native_bins_with_interpolated_geometry_not_independent_soundings=True,
+        every_retained_intensity_is_an_actual_native_bin_after_frozen_gain=True,
         records_with_no_supported_soundings=int(np.count_nonzero(np.sum(diagnostics, axis=1)==0)),
         common_appearance_cells=int(common.sum()), scene_valid_cells=int(common.sum()),
         reference_query_elevation_shared=False, nominal_layout_not_recovered_survey_pose=True,
@@ -212,7 +213,8 @@ def main():
         source_index_SHA256=sha(a.raw_cache/'PingNum_PingS_PingUs.npy'),
         per_ping_index_SHA256=sha(scene/'全2020物理ping索引.csv'),
         source_code_SHA256={n: sha(Path(__file__).parent/n) for n in
-            ('PrepareQiandaoFullFrameJointScene.py', 'QiandaoLocalScene.py', 'QiandaoCombTrajectory.py')},
+            ('PrepareQiandaoFullFrameJointScene.py', 'QiandaoLocalScene.py', 'QiandaoCombTrajectory.py',
+             'QiandaoNativeBottomProjection.py')},
         old_denoising_weights_or_algorithm_changed=False, raw_MAT_modified=False,
         elapsed_s=time.monotonic()-started)
     write(scene/'scene_report.json', report)
