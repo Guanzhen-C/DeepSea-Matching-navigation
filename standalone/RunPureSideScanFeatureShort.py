@@ -54,11 +54,14 @@ def main():
     p.add_argument('--seed', type=int, default=31)
     p.add_argument('--observations', choices=('ray_echo_baseline', 'complex_IQ'), default='ray_echo_baseline')
     p.add_argument('--feature-matcher', choices=('RootSIFT_baseline', 'LoFTR'), default='RootSIFT_baseline')
+    p.add_argument('--loop-closure', action='store_true', help='Historical SSS feature loops; requires LoFTR.')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
     if a.out.exists() or a.seed < 0:
         raise ValueError('New separately named output and nonnegative seed required.')
+    if a.loop_closure and a.feature_matcher != 'LoFTR':
+        raise ValueError('Historical SSS loops require the configured LoFTR local-feature matcher.')
     sys.path.insert(0, str(a.experiment/'estimator_bundle/isaacsim'))
     from oceansim.slam import MeasuredBathymetryGrid, sanitize_for_strict_json
     from SideScanFeatureMap import IntensityFeatureMap
@@ -97,12 +100,13 @@ def main():
         from SideScanIQHistory import packet_from_compressed_IQ
         iq_simulator = PointScattererIQSimulator(world, ComplexEchoParameters(
             thermal_noise_rms=.004, interference_rms=.008, seed=a.seed))
-    nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher)
+    nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
                'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
                'SideScanComplexEcho.py', 'SideScanIQHistory.py', 'QiandaoCombTrajectory.py',
                'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py']
+    if a.loop_closure: sources += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for source in sources: shutil.copy2(Path(__file__).parent/source, snapshot/source)
     report = dict(status='running', **route_scope_metadata(distance, a.full_route, route), seed=a.seed,
@@ -114,7 +118,7 @@ def main():
             'causal_historical_received_ping_alignment_using_Local', 'ordinary_overlap_assembly_NO_extra_denoising',
             'local_intensity_submap', 'descriptor_features'],
         observation_source=a.observations, requested_feature_matcher=a.feature_matcher,
-        secondary_denoising_used=False,
+        secondary_denoising_used=False, historical_side_scan_loops_requested=a.loop_closure,
         complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',
@@ -240,6 +244,11 @@ def main():
         clean, _ = sanitize_for_strict_json(diagnostic)
         dump(a.out/'final_diagnostics.json', clean)
         dump(a.out/'feature_graph_factors.json', nav.graph.factor_stream_payload())
+        if a.loop_closure:
+            loop_trace, _ = sanitize_for_strict_json(nav.historical_loops.trace)
+            dump(a.out/'historical_loop_trace.json', loop_trace)
+            for k, example in enumerate(nav.historical_loops.examples):
+                np.savez_compressed(a.out/f'actual_historical_loop_{k}.npz', **example)
         for k, example in enumerate(nav.correspondence_examples):
             np.savez_compressed(a.out/f'actual_feature_matches_{k}.npz', **example)
         for k, example in enumerate(nav.map_correspondence_examples):

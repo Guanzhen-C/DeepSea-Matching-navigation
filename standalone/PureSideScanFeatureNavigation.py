@@ -56,7 +56,7 @@ class FeatureScanPlaneLikelihood:
 
 
 class PureSideScanFeatureNavigator:
-    def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None):
+    def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -77,6 +77,14 @@ class PureSideScanFeatureNavigator:
         self.soft = MapOdomSoftCorrector()
         self.map = intensity_map
         self.image_matcher = image_matcher
+        if loop_closure:
+            if image_matcher is None:
+                raise ValueError('Historical side-scan loops require a local-feature matcher.')
+            from SideScanLoopClosure import SideScanHistoricalLoops
+            self.historical_loops = SideScanHistoricalLoops(image_matcher)
+        else:
+            self.historical_loops = None
+        self.map_priors_replaced_by_loop = 0
         self.latest_gyro = np.zeros(3)
         self.latest_acceleration = np.mean(startup_specific_force, axis=0)
         self.window = SideScanFeatureWindow(150)
@@ -176,7 +184,7 @@ class PureSideScanFeatureNavigator:
         self.frontend(packet)
         raw = state_pose2(self.local.state)
         self.observation_id += 1
-        self.window.add(packet, raw, self.observation_id)
+        self.window.add(packet, raw, self.observation_id, vertical_position_m=self.local.state.position[2])
         self.ensure_keyframe(packet.timestamp, raw)
         target = self.raw_graph_pose(raw)
         if self.observation_id % 150 == 0:
@@ -226,13 +234,24 @@ class PureSideScanFeatureNavigator:
                 cohorts=len(decision.cohorts), feature_likelihood_only=True,
                 measured_depth_likelihood_terms=0, measured_depth_graph_factors=0,
                 DVL_altitude_used=False, optical_flow_used=False)
-            if decision.confirmed_with_new_independent_evidence:
-                cohort = decision.confirmed_cohort
-                if cohort.last_measurement_is_graph_ready:
-                    self.ensure_keyframe(packet.timestamp, raw, force=True)
-                    add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
-                        cohort.last_measurement_information, score=matched.get('score', 0))
-                    self.graph.optimize(); self.graph_feature_priors += 1
+            cohort = decision.confirmed_cohort if decision.confirmed_with_new_independent_evidence else None
+            graph_ready = cohort is not None and cohort.last_measurement_is_graph_ready
+            if graph_ready:
+                self.ensure_keyframe(packet.timestamp, raw, force=True)
+            loop = None
+            if query is not None and self.historical_loops is not None:
+                loop = self.historical_loops.observe(query, raw, self.graph, self.raw_keyframe_poses, packet.timestamp)
+            if loop is not None:
+                # Do not treat the SAME current scan window as two independent
+                # graph observations. A confirmed historical loop replaces its
+                # absolute-map unary factor. Repeated historical observations
+                # still have approximate correlations, reported explicitly.
+                self.graph.optimize()
+                self.map_priors_replaced_by_loop += int(graph_ready)
+            elif graph_ready:
+                add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
+                    cohort.last_measurement_information, score=matched.get('score', 0))
+                self.graph.optimize(); self.graph_feature_priors += 1
             target = self.raw_graph_pose(raw)
         published = self.soft.update(packet.timestamp, raw, target)
         position = self.local.state.position.copy(); position[:2] = published[:2]
@@ -250,6 +269,9 @@ class PureSideScanFeatureNavigator:
             optimizer_backend=self.graph.backend_name,
             backend_feature_matcher=None if self.image_matcher is None else self.image_matcher.provenance,
             secondary_submap_denoising_used=False,
+            loop_closure=dict(enabled=False, actual_loop_edges=0) if self.historical_loops is None else
+                dict(enabled=True, **self.historical_loops.diagnostics(),
+                     map_priors_replaced_by_loop=self.map_priors_replaced_by_loop),
             global_cohort_tracker_updates=self.tracker.updates,
             map_to_odom=self.soft.diagnostics(),
             observation_limit='scan-plane along/yaw; cross-track is not independently measured from slant pixels',

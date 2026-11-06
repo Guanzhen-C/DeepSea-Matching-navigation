@@ -77,18 +77,20 @@ class IntensityFeatureMap:
 class SideScanFeatureWindow:
     def __init__(self, pings=150):
         self.scans = deque(maxlen=pings)
+        self.vertical_positions = deque(maxlen=pings)
         self.pings = int(pings)
 
-    def add(self, packet, local_pose2, observation_id):
+    def add(self, packet, local_pose2, observation_id, vertical_position_m=0.):
         if self.scans and (packet.timestamp <= self.scans[-1][0].timestamp
                           or observation_id <= self.scans[-1][2]):
             raise ValueError('Historical side-scan packets must be strictly causal and ordered.')
         self.scans.append((packet, np.asarray(local_pose2).copy(), int(observation_id)))
+        self.vertical_positions.append(float(vertical_position_m))
 
     def build(self, current_pose2, bins=512, step=.5, scale=1):
         current_inverse = np.linalg.inv(pose_matrix(current_pose2))
         entries = []
-        for packet, local_pose, identifier in self.scans:
+        for (packet, local_pose, identifier), z in zip(self.scans, self.vertical_positions):
             relative = current_inverse@pose_matrix(local_pose)
             normal = relative[:2, 0]
             # A single rectified strip cannot represent scan planes nearly
@@ -97,7 +99,7 @@ class SideScanFeatureWindow:
             if abs(normal[0]) < .5:
                 continue
             intercept = (normal@relative[:2, 2]+packet.row_centres_m)/normal[0]
-            entries.append((packet, intercept, normal, identifier))
+            entries.append((packet, intercept, normal, identifier, relative, z))
         if not entries:
             raise ValueError('No common strip scan-plane support.')
         x0 = min(float(x[1].min()) for x in entries)-step
@@ -106,11 +108,15 @@ class SideScanFeatureWindow:
         image = np.zeros((height, 2*bins), float)
         weight = np.zeros_like(image, np.uint32)
         normal_sum = np.zeros((height, 2)); normal_count = np.zeros(height)
-        for packet, intercept, normal, identifier in entries:
+        origin_sum = np.zeros((height, 3)); origin_count = np.zeros(height)
+        for packet, intercept, normal, identifier, relative, z in entries:
             row = np.rint((intercept-x0)/step).astype(int)
             uniform = resample_supported_echoes(packet, bins)
             np.add.at(image, row, uniform)
             np.add.at(weight, row, uniform > 0)
+            origins = np.column_stack([relative[:2, 2]+packet.row_centres_m[:, None]*normal[None],
+                                      np.full(8, z-self.vertical_positions[-1])])
+            np.add.at(origin_sum, row, origins); np.add.at(origin_count, row, 1.)
             for r in np.unique(row):
                 normal_sum[r] += normal; normal_count[r] += 1
         # User explicitly cancelled the extra denoiser. This is ordinary
@@ -120,6 +126,9 @@ class SideScanFeatureWindow:
         known = normal_count > 0
         normals = np.column_stack([np.interp(np.arange(height), np.flatnonzero(known),
             normal_sum[known, k]/normal_count[known]) for k in range(2)])
+        origin_known = origin_count > 0
+        origins = np.column_stack([np.interp(np.arange(height), np.flatnonzero(origin_known),
+            origin_sum[origin_known, k]/origin_count[origin_known]) for k in range(3)])
         u8, mask = normalize_feature_image(image, image > 0, scale)
         pixel, descriptor = extract_features(u8, mask)
         row_float = (pixel[:, 1]+.5)/scale-.5
@@ -129,6 +138,7 @@ class SideScanFeatureWindow:
         return dict(image=u8, raw_amplitude=image,
             assembled_amplitude=image, observation_count=weight, support=weight > 0,
             row_normals=normals,
+            row_scan_origins=origins, anchor_vertical_z_m=self.vertical_positions[-1],
             assembly_json=json.dumps(dict(secondary_denoising_used=False,
                 assembly='ordinary_overlap_average_of_received_scans', unknown_cells_filled=False), sort_keys=True),
             current_ping_amplitude=resample_supported_echoes(self.scans[-1][0], bins),
