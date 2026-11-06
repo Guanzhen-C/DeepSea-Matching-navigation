@@ -21,6 +21,7 @@ def test_native_complex_packet_preserves_sides_rows_and_exports_no_clean_or_geom
     assert set(packet.rows[packet.sides == 0]) == {3}
     assert set(packet.rows[packet.sides == 1]) == {5}
     assert np.all((packet.ranges_m > 0)&(packet.ranges_m < p.max_range_m))
+    np.testing.assert_allclose(packet.row_centres_m, p.row_centres_m+.1)
     np.testing.assert_array_equal(z, original)
     for forbidden in ['clean_IQ', 'world_pose', 'height', 'points_sensor', 'beam_directions']:
         assert not hasattr(packet, forbidden)
@@ -38,3 +39,14 @@ def test_envelope_adapter_rejects_real_image_disguised_as_complex():
     p = ComplexEchoParameters(max_range_m=20.)
     with pytest.raises(ValueError, match='complex'):
         packet_from_compressed_IQ(0., np.ones((2, 8, p.range_bins)), p)
+
+
+def test_declared_receiver_lever_arm_is_in_body_frame_scan_planes():
+    p = ComplexEchoParameters(max_range_m=20., receiver_forward_m=.37,
+                              receiver_left_m=.2, receiver_up_m=-.4)
+    z = np.ones((2, 8, p.range_bins), np.complex64)
+    packet = packet_from_compressed_IQ(1., z, p, bins=64)
+    np.testing.assert_allclose(packet.row_centres_m, p.row_centres_m+.37)
+    # Known calibration only. The sideways/vertical extrinsics are not
+    # fabricated ground-distance or bottom-height observations.
+    assert not hasattr(packet, 'bottom_height')

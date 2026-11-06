@@ -181,24 +181,33 @@ class PureSideScanFeatureNavigator:
         target = self.raw_graph_pose(raw)
         if self.observation_id % 150 == 0:
             self.map_attempts += 1
+            # Observation-only diagnostics: retain periodic/turn examples
+            # using ESTIMATED history, never programmed route labels/truth.
+            historical_yaw = np.unwrap([entry[1][2] for entry in self.window.scans])
+            turning_window = float(np.ptp(historical_yaw)) > np.deg2rad(15.)
+            sample_debug = self.observation_id % 1500 == 0 or turning_window
             try:
                 query = self.window.build(raw)
                 matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher)
-                if len(self.backend_query_examples) < 3:
+                if len(self.backend_query_examples) < 3 or (sample_debug and len(self.backend_query_examples) < 32):
                     self.backend_query_examples.append(dict(query, seed_pose2=target.copy()))
             except ValueError as exc:
                 matched = dict(accepted=False, reason=str(exc), matches=0)
                 query = None
             evidence, observation = [], None
-            if not matched['accepted'] and 'map_image' in matched and len(self.map_failure_examples) < 3:
-                self.map_failure_examples.append({k: matched[k] for k in
+            if not matched['accepted'] and 'map_image' in matched and (len(self.map_failure_examples) < 3
+                    or (sample_debug and len(self.map_failure_examples) < 32)):
+                example = {k: matched[k] for k in
                     ('query_image', 'map_image', 'query_pixels', 'map_pixels',
-                     'query_feature_count', 'map_feature_count', 'reason')})
+                     'query_feature_count', 'map_feature_count', 'reason')}
+                example.update(timestamp_s=packet.timestamp, observation_id=self.observation_id)
+                self.map_failure_examples.append(example)
             if matched['accepted']:
                 self.map_accepts += 1
-                if len(self.map_correspondence_examples) < 3:
-                    self.map_correspondence_examples.append({k: matched[k].copy() for k in
-                        ('query_image', 'map_image', 'query_pixels', 'map_pixels')})
+                if len(self.map_correspondence_examples) < 3 or (sample_debug and len(self.map_correspondence_examples) < 64):
+                    example = {k: matched[k].copy() for k in ('query_image', 'map_image', 'query_pixels', 'map_pixels')}
+                    example.update(timestamp_s=packet.timestamp, observation_id=self.observation_id)
+                    self.map_correspondence_examples.append(example)
                 evidence = [GlobalPoseEvidence(map_pose2=matched['matched_pose2'], bathymetry_score=0.,
                     bathymetry_observability=0., backscatter_score=float(matched['score']),
                     backscatter_observability=1., covariance_matrix=matched['proposal_covariance'],

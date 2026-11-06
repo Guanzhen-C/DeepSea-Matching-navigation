@@ -231,6 +231,7 @@ def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matc
     covariance = np.linalg.pinv(info)+np.outer(np.r_[observed_basis[:2, 1], 0.], np.r_[observed_basis[:2, 1], 0.])*20.**2
     world_landmarks = points@seed[:2, :2].T+seed[:2, 2]
     return dict(accepted=True, matches=len(pairs), inliers=best[0], matched_pose2=pose,
+        query_feature_count=len(qp), map_feature_count=len(mp),
         information=info, proposal_covariance=covariance, observable_rank=2,
         score=best[0]/len(pairs), scan_plane_rmse_m=float(np.sqrt(np.mean(residual(fit.x)**2))),
         landmark_xy=world_landmarks, scan_normals=normal, scan_offsets=offset,

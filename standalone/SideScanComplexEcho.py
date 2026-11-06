@@ -32,6 +32,9 @@ class ComplexEchoParameters:
     thermal_noise_rms: float = 0.
     interference_rms: float = 0.
     seed: int = 31
+    receiver_forward_m: float = .10
+    receiver_left_m: float = 0.
+    receiver_up_m: float = -.15
 
     def __post_init__(self):
         if self.along_rows != 8 or not 0 < self.half_swath_deg < 90:
@@ -56,6 +59,50 @@ class ComplexEchoParameters:
     @property
     def row_centres_m(self):
         return (np.arange(self.along_rows)-3.5)*self.row_spacing_m
+
+    @property
+    def receiver_translation_body(self):
+        return np.array([self.receiver_forward_m, self.receiver_left_m, self.receiver_up_m])
+
+    @property
+    def navigation_row_centres_m(self):
+        """Scan-plane offsets in the IMU/body frame, not array-local frame."""
+        return self.row_centres_m+self.receiver_forward_m
+
+
+def lattice_in_projected_strip(position, rotation, half_width, max_range, spacing):
+    """Fixed WORLD lattice in a rotated fan footprint, without a huge AABB.
+
+    Scanline bounds are the intersection of four projected half-planes.
+    Vertical terms are conservatively bounded by max_range for a tilted
+    sonar. No sampling density or world phase changes during a turn.
+    """
+    axis = np.asarray(rotation)[:2, :2].T
+    limits = np.array([half_width, max_range])+max_range*abs(np.asarray(rotation)[2, :2])
+    if abs(np.linalg.det(axis)) < 1e-6:
+        raise ValueError('Near-vertical footprint requires a 3-D spatial index, not silent clipping.')
+    corners = np.array([[x, y] for x in [-limits[0], limits[0]] for y in [-limits[1], limits[1]]])
+    xy = corners@np.linalg.inv(axis).T+np.asarray(position)[:2]
+    ix = np.arange(int(np.floor(xy[:, 0].min()/spacing)), int(np.ceil(xy[:, 0].max()/spacing))+1)
+    x = ix*spacing
+    ymin, ymax = np.full(len(x), -np.inf), np.full(len(x), np.inf)
+    alive = np.ones(len(x), bool)
+    for (a, b), limit in zip(axis, limits):
+        v = a*(x-position[0])
+        if abs(b) < 1e-12:
+            alive &= abs(v) <= limit+1e-9
+        else:
+            low, high = position[1]+(-limit-v)/b, position[1]+(limit-v)/b
+            ymin = np.maximum(ymin, np.minimum(low, high))
+            ymax = np.minimum(ymax, np.maximum(low, high))
+    lo = np.ceil((ymin-1e-9)/spacing).astype(np.int64)
+    hi = np.floor((ymax+1e-9)/spacing).astype(np.int64)
+    count = np.where(alive, np.maximum(hi-lo+1, 0), 0)
+    total = int(count.sum())
+    if total > 3000000:
+        raise ValueError('Actual footprint needs spatial tiling; never silently decimate echoes.')
+    prefix = np.r_[0, np.cumsum(count)[:-1]]
+    return np.repeat(ix, count), np.repeat(lo, count)+np.arange(total)-np.repeat(prefix, count)
 
 
 def fixed_scatterer_phase(ix, iy, seed):
@@ -108,17 +155,9 @@ class PointScattererIQSimulator:
 
     def sample_scatterers(self, position, rotation):
         p = self.parameters
-        # A bounding box in world XY; height, not a fake flat surface, is
-        # sampled only here. Beam steering/weighting is applied below.
         width = max(abs(p.row_centres_m))+4*p.along_footprint_sigma_m
-        corners = np.array([[x, y, 0.] for x in [-width, width] for y in [-p.max_range_m, p.max_range_m]])
-        corners = corners@rotation.T+position
-        lo = np.floor(corners[:, :2].min(axis=0)/p.scatter_spacing_m).astype(int)
-        hi = np.ceil(corners[:, :2].max(axis=0)/p.scatter_spacing_m).astype(int)
-        if np.prod(hi-lo+1) > 3000000:
-            raise ValueError('Requested scatterer footprint too large; use spatial tiling, not silent decimation.')
-        ix, iy = np.meshgrid(np.arange(lo[0], hi[0]+1), np.arange(lo[1], hi[1]+1), indexing='ij')
-        x, y = ix.ravel()*p.scatter_spacing_m, iy.ravel()*p.scatter_spacing_m
+        ix, iy = lattice_in_projected_strip(position, rotation, width, p.max_range_m, p.scatter_spacing_m)
+        x, y = ix*p.scatter_spacing_m, iy*p.scatter_spacing_m
         z = self.world.seabed_height(x, y)
         amplitude = self.world.reflectivity(x, y, measured_only=True)
         keep = np.isfinite(z)&np.isfinite(amplitude)&(amplitude > 0)
@@ -126,10 +165,10 @@ class PointScattererIQSimulator:
         body = (xyz-position)@rotation
         keep_body = (abs(body[:, 0]) <= width)&(body[:, 2] < 0)
         xyz, body, amplitude = xyz[keep_body], body[keep_body], amplitude[keep][keep_body]
-        phases = fixed_scatterer_phase(ix.ravel()[keep][keep_body], iy.ravel()[keep][keep_body], p.seed)
+        phases = fixed_scatterer_phase(ix[keep][keep_body], iy[keep][keep_body], p.seed)
         return body, amplitude*np.exp(1j*phases)
 
-    def ping(self, timestamp, position, rotation, *, receiver_translation_body=(.10, 0., -.15)):
+    def ping(self, timestamp, position, rotation):
         p = self.parameters
         position, rotation = np.asarray(position, float), np.asarray(rotation, float)
         if position.shape != (3,) or rotation.shape != (3, 3):
@@ -137,7 +176,7 @@ class PointScattererIQSimulator:
         if (not np.isfinite(timestamp) or not np.isfinite(position).all() or not np.isfinite(rotation).all()
                 or not np.allclose(rotation.T@rotation, np.eye(3), atol=1e-7) or np.linalg.det(rotation) < 0):
             raise ValueError('Finite timestamp/position and a proper rotation required.')
-        origin = position+rotation@np.asarray(receiver_translation_body)
+        origin = position+rotation@p.receiver_translation_body
         points, coefficients = self.sample_scatterers(origin, rotation)
         clean = np.zeros((2, 8, p.range_bins), np.complex64)
         for beam, centre in enumerate(p.row_centres_m):

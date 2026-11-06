@@ -6,7 +6,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'standalone'))
 from SideScanComplexEcho import (ComplexEchoParameters, PointScattererIQSimulator,
-                                fixed_scatterer_phase, fractional_impulse)
+                                fixed_scatterer_phase, fractional_impulse, lattice_in_projected_strip)
 
 
 class FlatAmplitudeWorld:
@@ -89,3 +89,43 @@ def test_received_IQ_matches_direct_RF_delay_then_LO_demodulation():
         -p.carrier_hz*delay+.5*p.chirp_rate_hz_s*(fast_time-delay)**2))
     expected *= active/np.sqrt(np.count_nonzero(abs(sim.pulse) > 0))
     np.testing.assert_allclose(received, expected, atol=2e-7)
+
+
+@pytest.mark.parametrize('heading', [0., 17., 45., 90., 135., 180., 270.])
+def test_rotated_scanline_footprint_matches_brute_force_without_undersampling(heading):
+    angle = np.deg2rad(heading); c, s = np.cos(angle), np.sin(angle)
+    rotation = np.array([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]])
+    position = np.array([.11, -.07, -2.]); width, maximum, step = 1.125, 6., .15
+    ix, iy = lattice_in_projected_strip(position, rotation, width, maximum, step)
+    actual = set(zip(ix.tolist(), iy.tolist()))
+    x, y = np.meshgrid(np.arange(-60, 61), np.arange(-60, 61))
+    xy = np.column_stack([x.ravel()*step-position[0], y.ravel()*step-position[1]])
+    body = xy@rotation[:2, :2]
+    keep = (abs(body[:, 0]) <= width+1e-9)&(abs(body[:, 1]) <= maximum+1e-9)
+    expected = set(zip(x.ravel()[keep].tolist(), y.ravel()[keep].tolist()))
+    assert actual == expected
+    assert 1000 < len(actual) < 1400  # footprint area / cell area is 1200.
+
+
+def test_45_degree_long_range_does_not_allocate_the_rotated_AABB():
+    c = np.sqrt(.5)
+    rotation = np.array([[c, -c, 0.], [c, c, 0.], [0., 0., 1.]])
+    ix, iy = lattice_in_projected_strip(np.zeros(3), rotation, 1.125, 250., .15)
+    assert 40000 < len(ix) < 60000  # All fixed-density strip cells, not 5.6 million AABB cells.
+    assert len(set(zip(ix.tolist(), iy.tolist()))) == len(ix)
+
+
+def test_tilted_footprint_conservatively_contains_every_eligible_fixed_world_cell():
+    heading, pitch = np.deg2rad(37.), np.deg2rad(12.)
+    ch, sh, cp, sp = np.cos(heading), np.sin(heading), np.cos(pitch), np.sin(pitch)
+    rotation = np.array([[ch, -sh, 0.], [sh, ch, 0.], [0., 0., 1.]])@np.array(
+        [[cp, 0., sp], [0., 1., 0.], [-sp, 0., cp]])
+    position = np.array([.11, -.07, -2.]); width, maximum, step = 1.125, 6., .15
+    ix, iy = lattice_in_projected_strip(position, rotation, width, maximum, step)
+    actual = set(zip(ix.tolist(), iy.tolist()))
+    x, y = np.meshgrid(np.arange(-70, 71), np.arange(-70, 71))
+    delta = np.column_stack([x.ravel()*step-position[0], y.ravel()*step-position[1], np.full(x.size, -2.)])
+    body = delta@rotation
+    keep = (abs(body[:, 0]) <= width)&(np.linalg.norm(body, axis=1) <= maximum)
+    expected = set(zip(x.ravel()[keep].tolist(), y.ravel()[keep].tolist()))
+    assert expected and expected <= actual

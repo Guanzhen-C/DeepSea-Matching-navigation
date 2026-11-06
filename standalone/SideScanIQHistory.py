@@ -85,4 +85,4 @@ def packet_from_compressed_IQ(timestamp, compressed_IQ, parameters, *, bins=512)
     ranges = (index+.5)/bins*parameters.max_range_m
     return SideScanFeaturePacket(timestamp=float(timestamp), ranges_m=ranges,
         amplitudes=amplitude[good], rows=row, sides=side, sample_sequence=index,
-        row_centres_m=parameters.row_centres_m, max_range_m=parameters.max_range_m)
+        row_centres_m=parameters.navigation_row_centres_m, max_range_m=parameters.max_range_m)
