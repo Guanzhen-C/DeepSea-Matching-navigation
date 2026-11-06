@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import sys
 
 import numpy as np
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'standalone'))
 from SideScanHistoricalMatching import (appearance_grid, appearance_seed_transform, match_typed_historical,
@@ -103,3 +104,54 @@ def test_typed_match_dispatch_never_uses_legacy_row_consensus_as_a_pose_model(mo
     np.testing.assert_array_equal(captured['b']['origins'], np.tile([1., 2., 0.], (30, 1)))
     np.testing.assert_array_equal(result['relative_pose2'], [2., 3., .4])
     assert result['typed_source_geometry'] and result['appearance_warp_is_not_a_loop_pose_measurement']
+
+
+@pytest.mark.parametrize('curved', [False, True])
+def test_projected_correspondences_use_real_range_plane_solve_not_appearance_affine(monkeypatch, curved):
+    """Known image associations only are mocked; all physical fitting is real.
+
+    This is a controlled geometry regression, not a LoFTR/field-navigation
+    success claim. Unknown landmark heights are never passed to the fitter.
+    """
+    import SideScanHistoricalMatching as matching
+    from SideScanLoopGeometry import rotation
+    rng = np.random.default_rng(58); n = 30
+    pose = np.array([-30., 28., np.pi])
+    landmark = np.column_stack([rng.uniform(-35, -5, n), rng.uniform(40, 100, n), rng.uniform(-40, -15, n)])
+    local = np.column_stack([(landmark[:, :2]-pose[:2])@rotation(pose[2]), landmark[:, 2]])
+    pa = np.array([[8.+7*(k%6), 8.+8*(k//6)] for k in range(n)])
+    pb = pa+np.array([3., 2.])  # image transform is intentionally NOT the physical pose
+    queries = []
+    for view, (points, physical) in enumerate([(pa, landmark), (pb, local)]):
+        angles = np.linspace(-.3, .3, n) if curved else np.zeros(n)
+        if view: angles = angles[::-1]
+        normals = np.column_stack([np.cos(angles), np.sin(angles)])
+        plane_offset = np.einsum('ij,ij->i', normals, physical[:, :2])
+        q = projected(); origins = np.column_stack([normals*plane_offset[:, None], np.zeros(n)])
+        ranges = np.linalg.norm(physical-origins, axis=1)
+        bins, maximum = 512, 160.
+        radial_bin = np.floor(ranges/maximum*bins).astype(int)
+        tangent = np.column_stack([-normals[:, 1], normals[:, 0]])
+        positive_side = np.einsum('ij,ij->i', tangent, physical[:, :2]-origins[:, :2]) > 0
+        columns = np.where(positive_side, bins-1-radial_bin, bins+radial_bin)
+        q.update(bins=bins, max_range_m=maximum, phase_origins=origins,
+            phase_normals=normals, phase_side_sign=np.ones(n),
+            phase_packet_ids=np.arange(n), phase_beam_rows=np.arange(n)%8,
+            phase_timestamps_s=np.arange(n, dtype=float))
+        q['source_phase_centre'].fill(-1)
+        for k, (x, y) in enumerate(points.astype(int)):
+            q['source_phase_centre'][y, x] = k; q['source_range_column'][y, x] = columns[k]
+        queries.append(q)
+    monkeypatch.setattr(matching, 'match_typed_historical', lambda *args: (pa, pb, np.ones(n), {}))
+    result = SideScanHistoricalLoops(None).match_pair(dict(query=queries[0]), queries[1], pose+[1., 3., .01])
+    assert result['accepted'] and result['features'] >= 24
+    assert result['observable_rank'] == (3 if curved else 2)
+    if curved:
+        assert np.linalg.norm(result['relative_pose2'][:2]-pose[:2]) < 1.
+    else:
+        assert abs(result['relative_pose2'][0]-pose[0]) < .1
+    angle = result['relative_pose2'][2]-pose[2]
+    assert abs(np.arctan2(np.sin(angle), np.cos(angle))) < (.01 if curved else .002)
+    assert not result['landmark_depth_prior_used']
+    assert not result['motion_seed_information_added_to_measurement']
+    assert result['appearance_warp_is_not_a_loop_pose_measurement']
