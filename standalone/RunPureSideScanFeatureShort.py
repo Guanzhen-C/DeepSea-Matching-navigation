@@ -32,6 +32,9 @@ def main():
     p.add_argument('--experiment', required=True, type=Path)
     p.add_argument('--out', required=True, type=Path)
     p.add_argument('--distance-m', type=float, default=400.)
+    p.add_argument('--observations', choices=('ray_echo_baseline', 'complex_IQ'), default='ray_echo_baseline')
+    p.add_argument('--feature-matcher', choices=('RootSIFT_baseline', 'LoFTR'), default='RootSIFT_baseline')
+    p.add_argument('--device', default='cuda')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
     if a.out.exists() or not 0 < a.distance_m <= 1300:
@@ -62,10 +65,22 @@ def main():
     startup = np.array([sensor.imu(first)[1] for _ in range(32)])
     # Only scalar image/mask paths are loaded by this estimator map.
     prior = IntensityFeatureMap.from_path(a.experiment/'scene/reference_baseline')
-    nav = PureSideScanFeatureNavigator(prior, first, startup)
+    matcher, iq_simulator = None, None
+    if a.feature_matcher == 'LoFTR':
+        import torch
+        torch.set_num_threads(1)
+        from SideScanLearnedFeatures import LoFTRSideScanMatcher
+        matcher = LoFTRSideScanMatcher(a.device)
+    if a.observations == 'complex_IQ':
+        from SideScanComplexEcho import PointScattererIQSimulator, ComplexEchoParameters
+        from SideScanIQHistory import packet_from_compressed_IQ
+        iq_simulator = PointScattererIQSimulator(world, ComplexEchoParameters(
+            thermal_noise_rms=.004, interference_rms=.008))
+    nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
-               'PureSideScanFeatureNavigation.py', 'SideScanSubmapDenoising.py']
+               'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
+               'SideScanComplexEcho.py', 'SideScanIQHistory.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for source in sources: shutil.copy2(Path(__file__).parent/source, snapshot/source)
     report = dict(status='running', requested_distance_m=a.distance_m,
@@ -73,8 +88,11 @@ def main():
         simulator_world_bathymetry_retained_only_for_fair_same_world_observations=True,
         estimator_map_inputs=['backscatter.npy', 'backscatter_valid_mask.npy', 'resolution_m'],
         observation_pipeline=['denoised_measured_intensity_world', 'pose_dependent_side_scan_returns',
-            'causal_historical_received_ping_alignment_using_Local', 'robust_overlap_fusion_denoising',
+            'causal_historical_received_ping_alignment_using_Local', 'ordinary_overlap_assembly_NO_extra_denoising',
             'local_intensity_submap', 'descriptor_features'],
+        observation_source=a.observations, requested_feature_matcher=a.feature_matcher,
+        secondary_denoising_used=False,
+        complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',
         backend='feature-landmark scan-plane candidates + original cohort tracker + original GTSAM fixed lag',
@@ -96,6 +114,12 @@ def main():
     dump(a.out/'run_summary.json', report)
     started = time.monotonic()
     errors, rows, yaw_history = [], [], []
+    native_archive = None
+    archived_native_pings = 0
+    if iq_simulator is not None:
+        archive_count = min(150, report['expected_events']['sonar'])
+        native_archive = np.lib.format.open_memmap(a.out/'first_native_received_IQ.npy', mode='w+',
+            dtype=np.complex64, shape=(archive_count, 2, 8, iq_simulator.parameters.range_bins))
     try:
         with (a.out/'trajectory.csv').open('x', newline='') as f, (a.out/'feature_diagnostics.jsonl').open('x') as detail:
             writer = csv.writer(f)
@@ -111,7 +135,20 @@ def main():
                 elif kind == 'dvl': nav.dvl(sensor.dvl(truth))
                 elif kind == 'depth': nav.depth(sensor.depth(truth))
                 else:
-                    packet = packet_from_simulated_side_scan(sensor.bathymetric_sidescan_ping(truth))
+                    # Consume the identical legacy sensor RNG sequence so
+                    # IMU/DVL/depth streams remain exactly paired. The legacy
+                    # geometry/XYZ is not given to the IQ navigation branch.
+                    legacy_ping = sensor.bathymetric_sidescan_ping(truth)
+                    if iq_simulator is None:
+                        packet = packet_from_simulated_side_scan(legacy_ping)
+                    else:
+                        echo = iq_simulator.ping(stamp, truth.position, truth.rotation)
+                        received = echo['observed_IQ']
+                        if archived_native_pings < len(native_archive):
+                            native_archive[archived_native_pings] = received
+                            archived_native_pings += 1
+                        packet = packet_from_compressed_IQ(stamp, iq_simulator.pulse_compress(received),
+                                                          iq_simulator.parameters)
                     result = nav.side_scan(packet)
                     e = [float(np.linalg.norm(result[n]-truth.position)) for n in ('DR', 'Local', 'Global')]
                     row = [stamp, stamp*route.speed_mps, *truth.position,
@@ -143,6 +180,10 @@ def main():
             if sha(Path(__file__).parent/source) != report['source_code_SHA256'][source]:
                 raise RuntimeError('Executed side-scan adapter source changed during the test.')
         diagnostic = nav.diagnostics()
+        if native_archive is not None:
+            native_archive.flush()
+            report['first_native_IQ_archive'] = dict(physical_pings=archived_native_pings,
+                all_samples_preserved=True, SHA256=sha(a.out/'first_native_received_IQ.npy'))
         clean, _ = sanitize_for_strict_json(diagnostic)
         dump(a.out/'final_diagnostics.json', clean)
         dump(a.out/'feature_graph_factors.json', nav.graph.factor_stream_payload())

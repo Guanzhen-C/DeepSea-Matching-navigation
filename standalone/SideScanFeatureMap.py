@@ -15,7 +15,6 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from PureSideScanFeatures import normalize_feature_image, descriptor_pairs, resample_supported_echoes
-from SideScanSubmapDenoising import fuse_aligned_rows
 
 
 def extract_features(image, mask, maximum=2400):
@@ -104,16 +103,20 @@ class SideScanFeatureWindow:
         x0 = min(float(x[1].min()) for x in entries)-step
         x1 = max(float(x[1].max()) for x in entries)+step
         height = int(np.ceil((x1-x0)/step))+1
-        observations = []
+        image = np.zeros((height, 2*bins), float)
+        weight = np.zeros_like(image, np.uint32)
         normal_sum = np.zeros((height, 2)); normal_count = np.zeros(height)
         for packet, intercept, normal, identifier in entries:
             row = np.rint((intercept-x0)/step).astype(int)
             uniform = resample_supported_echoes(packet, bins)
-            observations.extend(zip(row, uniform))
+            np.add.at(image, row, uniform)
+            np.add.at(weight, row, uniform > 0)
             for r in np.unique(row):
                 normal_sum[r] += normal; normal_count[r] += 1
-        fused = fuse_aligned_rows(observations, height, 2*bins)
-        image = fused['denoised_amplitude']
+        # User explicitly cancelled the extra denoiser. This is ordinary
+        # overlap averaging for assembling received scans, not Huber/neural
+        # restoration and not an additional smoothing/filtering operation.
+        np.divide(image, weight, out=image, where=weight > 0)
         known = normal_count > 0
         normals = np.column_stack([np.interp(np.arange(height), np.flatnonzero(known),
             normal_sum[known, k]/normal_count[known]) for k in range(2)])
@@ -123,9 +126,11 @@ class SideScanFeatureWindow:
         along = x0+row_float*step
         feature_normal = np.column_stack([np.interp(row_float, np.arange(height), normals[:, k]) for k in range(2)])
         feature_normal /= np.linalg.norm(feature_normal, axis=1, keepdims=True)
-        return dict(image=u8, raw_amplitude=fused['before_denoising_amplitude'],
-            denoised_amplitude=image, observation_count=fused['observation_count'], support=fused['support'],
-            denoising_json=json.dumps(fused['denoising'], sort_keys=True),
+        return dict(image=u8, raw_amplitude=image,
+            assembled_amplitude=image, observation_count=weight, support=weight > 0,
+            row_normals=normals,
+            assembly_json=json.dumps(dict(secondary_denoising_used=False,
+                assembly='ordinary_overlap_average_of_received_scans', unknown_cells_filled=False), sort_keys=True),
             current_ping_amplitude=resample_supported_echoes(self.scans[-1][0], bins),
             physical_ping_timestamps_s=np.array([entry[0].timestamp for entry in entries]),
             physical_ping_observation_ids=np.array([entry[3] for entry in entries]),
@@ -137,7 +142,7 @@ class SideScanFeatureWindow:
             patch_start_s=self.scans[0][0].timestamp, patch_start_id=self.scans[0][2], patch_end_id=self.scans[-1][2])
 
 
-def match_feature_prior(feature_map, query, seed_pose2, margin_m=30.):
+def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matcher=None):
     step, scale, bins = query['step'], query['scale'], query['bins']
     max_range = query['max_range_m']
     x0, x1 = query['x0']-margin_m, query['x1']+margin_m
@@ -154,19 +159,33 @@ def match_feature_prior(feature_map, query, seed_pose2, margin_m=30.):
         image, mask = normalize_feature_image(np.where(valid, amplitude, 0), valid, scale)
     except ValueError as exc:
         return dict(accepted=False, reason=str(exc), matches=0)
-    mp, md = extract_features(image, mask, maximum=2400)
-    map_frame = dict(image=image, pixels=mp, descriptors=md, bins=bins)
-    pairs = descriptor_pairs(query, map_frame)
+    if image_matcher is None:
+        mp, md = extract_features(image, mask, maximum=2400)
+        map_frame = dict(image=image, pixels=mp, descriptors=md, bins=bins)
+        pairs = descriptor_pairs(query, map_frame)
+        qp = query['pixels']
+        normals = query['normals'][pairs[:, 0]]
+        offsets = query['plane_offset_m'][pairs[:, 0]]
+    else:
+        qm = np.repeat(query['support'], scale, axis=0).astype(np.uint8)*255
+        qp, mp, confidence = image_matcher(query['image'], image, qm, mask)
+        same_side = (qp[:, 0] < bins) == (mp[:, 0] < bins)
+        qp, mp, confidence = qp[same_side], mp[same_side], confidence[same_side]
+        pairs = np.column_stack([np.arange(len(qp))]*2)
+        row_float = (qp[:, 1]+.5)/scale-.5
+        normals = np.column_stack([np.interp(row_float, np.arange(len(query['row_normals'])),
+            query['row_normals'][:, k]) for k in range(2)])
+        normals /= np.maximum(np.linalg.norm(normals, axis=1, keepdims=True), 1e-30)
+        offsets = (query['x0']+row_float*step)*normals[:, 0]
     debug = dict(query_image=query['image'], map_image=image,
-        query_pixels=query['pixels'][pairs[:, 0]], map_pixels=mp[pairs[:, 1]],
-        query_feature_count=len(query['pixels']), map_feature_count=len(mp))
+        query_pixels=qp[pairs[:, 0]], map_pixels=mp[pairs[:, 1]],
+        query_feature_count=len(qp), map_feature_count=len(mp))
     if len(pairs) < 24:
         return dict(accepted=False, reason='insufficient_mutual_feature_matches', matches=len(pairs), **debug)
     qi, mi = pairs.T
     mx = x0+((mp[mi, 1]+.5)/scale-.5)*step
     my = np.where(mp[mi, 0] < bins, bins-.5-mp[mi, 0], -(mp[mi, 0]-bins+.5))*max_range/bins
     landmarks_body = np.column_stack([mx, my])
-    normals = query['normals'][qi]; offsets = query['plane_offset_m'][qi]
     # For near-parallel scan planes the data support along-track/yaw, not an
     # independent cross-track fix. Keep the unsupported component at its
     # motion-prior seed and preserve a rank-deficient information matrix.
@@ -216,6 +235,6 @@ def match_feature_prior(feature_map, query, seed_pose2, margin_m=30.):
         score=best[0]/len(pairs), scan_plane_rmse_m=float(np.sqrt(np.mean(residual(fit.x)**2))),
         landmark_xy=world_landmarks, scan_normals=normal, scan_offsets=offset,
         local_reference_pose2=None, seed_pose2=np.asarray(seed_pose2).copy(),
-        query_pixels=query['pixels'][qi[keep]], map_pixels=mp[mi[keep]],
+        query_pixels=qp[qi[keep]], map_pixels=mp[mi[keep]],
         query_image=query['image'], map_image=image, measured_height_used=False,
         raw_intensity_correlation_used=False, optical_flow_used=False)

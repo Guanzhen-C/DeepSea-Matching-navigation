@@ -75,3 +75,50 @@ def test_feature_scan_plane_fit_and_returned_pose_use_same_translation_frame(mon
     assert likelihood(expected[None])[0] == pytest.approx(50.)
     shifted = expected.copy(); shifted[:2] += pose_matrix(expected)[:2, 0]*8.
     assert likelihood(shifted[None])[0] < likelihood(expected[None])[0]
+
+
+def test_learned_local_features_share_physical_scan_plane_verification_without_depth():
+    rng = np.random.default_rng(72)
+    points = np.column_stack([rng.uniform(-35, -5, 80), rng.uniform(-80, 80, 80)])
+    dx, angle = 2., np.deg2rad(1.)
+    c, s = np.cos(angle), np.sin(angle)
+    offsets = (points@np.array([[c, -s], [s, c]]))[:, 0]-dx
+    bins, step = 512, .5
+    query = dict(step=step, scale=1, bins=bins, max_range_m=250., x0=-40., x1=0., patch_end_id=150,
+        support=np.ones((81, 1024), bool), image=np.ones((81, 1024), np.uint8),
+        row_normals=np.tile([1., 0.], (81, 1)))
+    map_pixels = np.column_stack([bins-.5-points[:, 1]*bins/250, (points[:, 0]+70)/step])
+    query_pixels = np.column_stack([map_pixels[:, 0], (offsets+40)/step])
+    class TexturedMap:
+        def sample(self, x, y):
+            return 1+.2*np.sin(x*2)+.1*np.cos(y)
+    def matches(a, b, qm, mm):
+        assert qm.shape == query['image'].shape
+        return query_pixels.copy(), map_pixels.copy(), np.ones(80)
+    seed = np.array([10., 20., .3])
+    result = match_feature_prior(TexturedMap(), query, seed, image_matcher=matches)
+    assert result['accepted'] and result['observable_rank'] == 2
+    expected = seed.copy(); expected[2] += angle
+    expected[:2] += pose_matrix(expected)[:2, 0]*dx
+    np.testing.assert_allclose(result['matched_pose2'], expected, atol=1e-7)
+
+
+def test_user_cancelled_secondary_denoising_window_uses_only_overlap_average(monkeypatch):
+    import SideScanFeatureMap as module
+    from PureSideScanFeatures import SideScanFeaturePacket
+    from SideScanSubmapDenoising import fuse_aligned_rows
+    window = module.SideScanFeatureWindow()
+    for stamp, value in enumerate([1., 1., 100.]):
+        packet = SideScanFeaturePacket(timestamp=float(stamp), ranges_m=np.array([2., 4.]),
+            amplitudes=np.full(2, value), rows=np.zeros(2, int), sides=np.ones(2, int),
+            row_centres_m=(np.arange(8)-3.5)*.15, sample_sequence=np.arange(2))
+        window.add(packet, np.zeros(3), stamp+1)
+    monkeypatch.setattr(module, 'resample_supported_echoes',
+        lambda packet, bins: np.full((8, 2*bins), packet.amplitudes[0]))
+    monkeypatch.setattr(module, 'normalize_feature_image',
+        lambda image, support, scale: (np.zeros(image.shape, np.uint8), support.astype(np.uint8)))
+    monkeypatch.setattr(module, 'extract_features',
+        lambda *a: (np.empty((0, 2)), np.empty((0, 128), np.float32)))
+    q = window.build(np.zeros(3), bins=32)
+    np.testing.assert_allclose(q['assembled_amplitude'][q['support']], 34.)
+    assert not json.loads(q['assembly_json'])['secondary_denoising_used']

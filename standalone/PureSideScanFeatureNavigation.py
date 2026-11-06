@@ -8,6 +8,7 @@ here is XY-indexed intensity only; its geocoding assumptions remain relevant.
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import replace
 import json
 import numpy as np
 
@@ -17,6 +18,18 @@ from SideScanFeatureMap import pose_matrix, matrix_pose, SideScanFeatureWindow, 
 
 def state_pose2(state):
     return np.r_[state.position[:2], np.arctan2(state.rotation[1, 0], state.rotation[0, 0])]
+
+
+def add_side_scan_feature_prior(graph, target, pose2, information, *, score):
+    """Reuse the original validated unary-Pose2 math with truthful labeling.
+
+    The frozen graph's public add_prior accepts only the historic name
+    terrain_prior, although its math is a generic planar absolute constraint.
+    Validate through that API, then relabel the NEW, not-yet-synchronized
+    immutable factor. No frozen source or existing factor is changed.
+    """
+    graph.add_prior(target, pose2, information, kind='terrain_prior', score=score, robust=True)
+    graph.priors[-1] = replace(graph.priors[-1], kind='side_scan_feature_prior')
 
 
 class FeatureScanPlaneLikelihood:
@@ -43,7 +56,7 @@ class FeatureScanPlaneLikelihood:
 
 
 class PureSideScanFeatureNavigator:
-    def __init__(self, intensity_map, initial, startup_specific_force):
+    def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -63,6 +76,7 @@ class PureSideScanFeatureNavigator:
         self.tracker = GlobalCohortTracker(GlobalCohortTrackerConfig())
         self.soft = MapOdomSoftCorrector()
         self.map = intensity_map
+        self.image_matcher = image_matcher
         self.latest_gyro = np.zeros(3)
         self.latest_acceleration = np.mean(startup_specific_force, axis=0)
         self.window = SideScanFeatureWindow(150)
@@ -169,7 +183,7 @@ class PureSideScanFeatureNavigator:
             self.map_attempts += 1
             try:
                 query = self.window.build(raw)
-                matched = match_feature_prior(self.map, query, target)
+                matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher)
                 if len(self.backend_query_examples) < 3:
                     self.backend_query_examples.append(dict(query, seed_pose2=target.copy()))
             except ValueError as exc:
@@ -198,7 +212,7 @@ class PureSideScanFeatureNavigator:
             self.last_backend = dict(accepted=matched['accepted'], reason=matched.get('reason'),
                 matches=matched['matches'], inliers=matched.get('inliers', 0),
                 query_features=matched.get('query_feature_count'), map_features=matched.get('map_feature_count'),
-                submap_denoising=None if query is None else json.loads(query['denoising_json']),
+                submap_assembly=None if query is None else json.loads(query['assembly_json']),
                 status=decision.status, null_probability=decision.null_probability,
                 cohorts=len(decision.cohorts), feature_likelihood_only=True,
                 measured_depth_likelihood_terms=0, measured_depth_graph_factors=0,
@@ -207,9 +221,8 @@ class PureSideScanFeatureNavigator:
                 cohort = decision.confirmed_cohort
                 if cohort.last_measurement_is_graph_ready:
                     self.ensure_keyframe(packet.timestamp, raw, force=True)
-                    self.graph.add_prior(len(self.graph.poses)-1, cohort.last_measurement_pose2,
-                        cohort.last_measurement_information, kind='side_scan_feature_prior',
-                        score=matched.get('score', 0), robust=True)
+                    add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
+                        cohort.last_measurement_information, score=matched.get('score', 0))
                     self.graph.optimize(); self.graph_feature_priors += 1
             target = self.raw_graph_pose(raw)
         published = self.soft.update(packet.timestamp, raw, target)
@@ -226,6 +239,8 @@ class PureSideScanFeatureNavigator:
             feature_map=dict(attempts=self.map_attempts, accepts=self.map_accepts,
                              graph_feature_priors=self.graph_feature_priors, last=self.last_backend),
             optimizer_backend=self.graph.backend_name,
+            backend_feature_matcher=None if self.image_matcher is None else self.image_matcher.provenance,
+            secondary_submap_denoising_used=False,
             global_cohort_tracker_updates=self.tracker.updates,
             map_to_odom=self.soft.diagnostics(),
             observation_limit='scan-plane along/yaw; cross-track is not independently measured from slant pixels',
