@@ -29,6 +29,20 @@ def sha(path):
     return h.hexdigest()
 
 
+def same_executed_configuration(original, *, loop_closure=False, scan_plane_registration='rank2_baseline',
+                                canonical_submaps=False, submap_representation='legacy_strip'):
+    """Only the EXECUTED protocol is a reproduction; other settings are ablations.
+
+    In particular, loop-off is not always the original baseline: a full source
+    archive may have been produced with loops or projected submaps enabled.
+    """
+    return (bool(original.get('historical_side_scan_loops_requested', False)) == bool(loop_closure)
+        and original.get('scan_plane_registration', 'rank2_baseline') == scan_plane_registration
+        and bool(original.get('canonical_submaps', False)) == bool(canonical_submaps)
+        and original.get('submap_representation', 'legacy_strip') == submap_representation
+        and original.get('requested_feature_matcher') == 'LoFTR')
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--run', required=True, type=Path)
@@ -47,6 +61,9 @@ def main():
     original = json.loads((a.run/'run_summary.json').read_text())
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
         raise ValueError('Complete executed input archive required; never replay a partial stale running file.')
+    reproduce_executed = same_executed_configuration(original, loop_closure=a.loop_closure,
+        scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps,
+        submap_representation=a.submap_representation)
     dependencies = {a.experiment/'estimator_bundle/isaacsim/oceansim/slam'/name: expected
         for name, expected in original['original_core_source_SHA256'].items()}
     dependencies.update({a.experiment/'scene/reference_baseline'/name: expected
@@ -100,6 +117,7 @@ def main():
         scan_plane_registration=a.scan_plane_registration,
         canonical_submaps=a.canonical_submaps,
         submap_representation=a.submap_representation,
+        configuration_matches_executed_run=reproduce_executed,
         all_navigation_observations_reused_losslessly=True, estimated_frames=0,
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
         executed_original_report_SHA256=sha(a.run/'run_summary.json'),
@@ -143,9 +161,8 @@ def main():
         np.testing.assert_array_equal(stamps, source['timestamps'])
         np.testing.assert_array_equal(array[:, :2], source['positions'][:, 1:3])
         difference = float(np.max(abs(array-source['positions'][:, 1:])))
-        if (not a.loop_closure and not a.canonical_submaps and a.submap_representation == 'legacy_strip'
-                and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7):
-            raise RuntimeError(f'Baseline replay failed reproducibility check: maximum state difference {difference}')
+        if reproduce_executed and difference > 1e-7:
+            raise RuntimeError(f'Executed-configuration replay failed reproducibility check: maximum state difference {difference}')
         error = np.linalg.norm(array-source['positions'][:, :1], axis=2)
         report['metrics'] = {n: dict(RMSE_m=float(np.sqrt(np.mean(error[:, k]**2))),
             P95_m=float(np.percentile(error[:, k], 95)), max_m=float(error[:, k].max()), final_m=float(error[-1, k]))

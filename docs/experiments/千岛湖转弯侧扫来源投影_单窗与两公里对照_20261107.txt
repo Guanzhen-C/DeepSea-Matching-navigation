@@ -159,17 +159,26 @@ Global终点/m                  7.87793       7.78973       6.80139       6.4506
 首次观察器v1在第一次写状态时缺少冻结oceansim导入路径而失败，没有
 启动任何重放、没有停止原主进程；journal保留ModuleNotFoundError证据，
 空validation_projected_full_comb_seed31_v1/和失败runtime_v2也保留。
-补齐启动路径并新增首次状态写入/等待异常回归后，才用全新v2输出启动。
+补齐启动路径并新增首次状态写入/等待异常回归后，用全新v2输出启动。
 不能把systemd --collect回收后的MainPID0/默认ExecMainStatus0当作成功；
 必须结合原journal、终态报告和实际产物判断。新观察器不启用--collect，
-使失败退出状态继续可查。相关完整测试集更新为99项，全部通过。
+使失败退出状态继续可查。此时相关完整测试集99项全部通过。
+
+在v2仍等待、未启动任何重放时，进一步检查发现Replay原校验把无回环
+硬编码为原始配置。这会把“从有回环输入归档做无回环消融”的正常差异
+误判为复现失败。修复为显式比较归档真正执行的回环/子图/配准/方向/
+匹配器配置：配置相同仍严格要求Global复现，配置改变只允许Global变化；
+任何配置下DR/Local仍必须逐值相同。新增三项协议回归，完整相关测试集
+更新为102项，全部通过。只主动停止了新等待器PID1000648，未停止两场
+仿真或原收尾；旧状态和runtime_v3原样保留，输出内有主动取消说明。
+随后用全新runtime_v4、unit v3及输出v3继续，不能再等待已取消的v2。
 
 权威活动句柄：
   原主：oceansim-pure-sss-shared-loop-full16km-20261107-v2.service / PID886838
   原独立收尾：oceansim-pure-sss-full16km-review-20261107-v2.service / PID887494
-  新全程矩阵：oceansim-pure-sss-full-matrix-20261107-v2.service / PID1000648
-  新矩阵状态：validation_projected_full_comb_seed31_v2/validation_status.json
-  新矩阵源码：runtime_pure_sss_projected_loops_v3/（39文件，299999字节）
+  新全程矩阵：oceansim-pure-sss-full-matrix-20261107-v3.service / PID1005915
+  新矩阵状态：validation_projected_full_comb_seed31_v3/validation_status.json
+  新矩阵源码：runtime_pure_sss_projected_loops_v4/（39文件，301071字节）
 新矩阵初始状态为waiting_for_exact_live_full_source；当前还未完成四组
 完整重放，不能因为调度器启动成功就宣称全程效果通过。
 
