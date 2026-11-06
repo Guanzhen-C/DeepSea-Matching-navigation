@@ -428,3 +428,45 @@ review_directional_projected_full_loops_v1/；完整回环off/on误差和轨迹�
 当前原执行基线旧条带＋回环RMSE17.04991m已经完成，但严格的同输入
 legacy_loops_control逐帧复现和legacy_no_loops两阶段尚未结束，最终
 2×2矩阵及全因素判断仍待原批处理完成；不启动重复任务，不更改冻结源。
+
+十四、受完整证据校验的PC启动入口（已实现，当前仍等待最终正向验证）
+新增RunValidatedSideScanNavigation.py，不改已有湖试/海试启动器，也不改
+正在跑的39文件冻结运行时。它明确选择complex_IQ、LoFTR、
+adaptive_projected和历史回环，默认完整单圈，不再依赖通用研究脚本中
+400m、ray_echo_baseline/RootSIFT等不同的默认选项。
+
+启动前要求完整2×2和4个独立审计全部终态、旧版全帧位姿/航向/时间/
+航程逐值复现；重新核实际完整输出和比较结果的绑定、全部导航输入、
+53个原bundle文件、冻结39文件、外部core/参考强度依赖和场景报告SHA。
+固定候选还须以此次全程Global RMSE计优于DR、不差于其余控制；否则不自动
+选另一个模式或伪称已验证。要求本地LoFTR权重和torch/kornia版本一致、
+CUDA可用，没有隐式更换模型或退回CPU。旧输出目录始终拒绝覆盖。
+
+这些是对已结束实验的离线证据检查，不是新的在线真值误差门限。
+验证真值只用于审查已完成实验，启动的是独立新进程，不把任何真值或
+历史误差标签传给在线估计器。不恢复RAM上限；子进程只沿用BLAS单线程
+等既定环境。这里只是PC受控仿真入口，不宣称Jetson/HIL或真实湖试通过。
+
+四组最终结束并正向核验后，可先检查命令而不启动：
+.venv-sonar-denoise/bin/python standalone/RunValidatedSideScanNavigation.py \
+ --validation output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/validation_projected_full_comb_seed31_v3 \
+ --mode replay \
+ --out output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/NEW_verified_replay \
+ --dry-run
+
+去掉--dry-run才真正执行；--mode replay固定重放全部原输入，拒绝seed/
+distance覆盖。--mode simulate重新按AUV位姿生成复数回波，默认完整航程，
+可显式--seed和--distance-m做新实验/前缀，但不把它们自动视为已经验证。
+同一种算法配置已验证，不等于新随机实现/新生成输入已经得到相同精度。
+原始实测信号和冻结去噪算法均不改，新的导航子图不加二次去噪。
+
+当前真实矩阵还没结束，实际试调用入口已正确拒绝，未创建输出或启动
+任何估计器；8项入口协议测试通过。尚未进行基于真实完整矩阵的正向
+dry-run和短程接口冒烟，必须等最终完整证据后再做，不能以负向拒绝
+或mock协议测试冒充正式可用状态。
+入口也对原完整62458样本实际重算程序航线和各传感器事件数量，不只
+相信complete标签；该真实数据正向子检查已通过。原bundle的全部53项
+实际hash及当前CUDA/特征库版本/本地checkpoint检查也已分别通过。
+完整入口的正向测试仍必须等待四组最终状态，不把这些子检查当作全入口通过。
+加入入口后全部相关测试116项通过（6.71s），这是协议/几何/数学回归，
+不是最终实测精度验收。入口不自动启动UI，运行数据仍由原脚本完整记录。
