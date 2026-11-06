@@ -28,6 +28,7 @@ from standalone.hil.protocol import acoustic_payload, EventOrder, pack
 from QiandaoLocalScene import reject_gps_file
 from QiandaoVirtualNavigation import (VirtualAUVTrajectory, measured_field_sensor_class,
                                       deterministic_schedule)
+from QiandaoLocalRaycaster import intersect_local_grid
 
 
 def sha(path):
@@ -88,6 +89,8 @@ def main():
     p.add_argument('--distance-m', type=float, default=250.)
     p.add_argument('--initial-offset-m', type=float, default=0.)
     p.add_argument('--initial-yaw-deg', type=float, default=0.)
+    p.add_argument('--swath-width-deg', type=float, default=160.,
+        help='160 derives from the retained raw grazing angle 10..90deg on both sides; 120 was only a pilot.')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
     experiment, out = a.experiment.resolve(), a.out.resolve()
@@ -105,6 +108,8 @@ def main():
     namespace, extraction = load_engine(bundle/'standalone/large_scale_slam_isaac_demo.py', 'lake', bundle)
     from oceansim.slam import MeasuredBathymetryGrid, NavigationInitialization, sanitize_for_strict_json
     from oceansim.slam.math3d import rotation_from_rpy, rpy_from_rotation
+    from oceansim.slam.feature_sonar_odometry import FeatureSonarOdometry
+    from scipy.ndimage import binary_erosion
     scene_report = json.loads((experiment/'scene/scene_report.json').read_text())
     if scene_report['GPS_file_opened'] or scene_report['shared_record_IDs']:
         raise ValueError('Forbidden GPS or reused map/query records.')
@@ -113,9 +118,15 @@ def main():
     # Same geometry AND valid observation support for all three input variants.
     folder = experiment/'scene'/('query_'+a.variant)
     q = MeasuredBathymetryGrid.from_path(folder)
-    query = MeasuredBathymetryGrid(q.elevation_m, resolution_m=q.resolution_m,
+    class LocalQueryGrid(MeasuredBathymetryGrid):
+        def intersect_rays(self, origin_world, directions_world, *, min_range, max_range, iterations=24):
+            return intersect_local_grid(self, origin_world, directions_world,
+                min_range=min_range, max_range=max_range, iterations=iterations)
+
+    query = LocalQueryGrid(q.elevation_m, resolution_m=q.resolution_m,
         valid_mask=q.backscatter_valid_mask, backscatter=q.backscatter,
         backscatter_valid_mask=q.backscatter_valid_mask, metadata=q.metadata)
+    query.ray_support_mask = binary_erosion(q.backscatter_valid_mask, iterations=2)
     reference = MeasuredBathymetryGrid.from_path(bundle/'map')
     trajectory = VirtualAUVTrajectory()
     duration = a.distance_m/trajectory.speed_mps
@@ -125,7 +136,7 @@ def main():
         if not np.isfinite(bottom) or state.position[2]-bottom < 5:
             raise ValueError('Programmed virtual route leaves observed support or bottom clearance.')
     Sensor = measured_field_sensor_class()
-    sensor = Sensor(query, trajectory, num_beams=96, swath_width_deg=120,
+    sensor = Sensor(query, trajectory, num_beams=96, swath_width_deg=a.swath_width_deg,
         min_range=0., max_range=250., sidescan_range_bins=4096,
         imaging_rays_per_side=256, along_track_rows_per_side=8,
         along_track_sample_spacing_m=.15, subgrid_reflectivity_amplitude=0., seed=a.seed)
@@ -138,15 +149,43 @@ def main():
     engine = namespace['create_engine'](args, reference, initial, startup)
     next(engine)
     out.mkdir(parents=True)
+    (out/'feature_correspondences').mkdir()
+    # Read-only observer around the original method, returning its original
+    # list unchanged. It records the ACTUAL correspondences used by RANSAC,
+    # not a retrospectively recomputed favourable set. No random draws here.
+    original_klt = FeatureSonarOdometry._klt_pairs
+    correspondence_records = []
+
+    def record_klt(self, previous, current, predicted_transform):
+        pairs = original_klt(self, previous, current, predicted_transform)
+        frame_index = int(round(current.timestamp/ping_period))
+        if frame_index in (80, 300, 700):
+            file = out/'feature_correspondences'/f'ping_{frame_index:04d}.npz'
+            np.savez_compressed(file, previous_image=previous.image, current_image=current.image,
+                previous_keypoints=previous.keypoint_pixels, current_keypoints=current.keypoint_pixels,
+                pairs_current_previous=np.asarray(pairs, dtype=np.int64).reshape(-1, 2),
+                predicted_transform=np.asarray(predicted_transform) if predicted_transform is not None else np.empty(0),
+                timestamps=np.array([previous.timestamp, current.timestamp]))
+            correspondence_records.append(dict(file=str(file), SHA256=sha(file), matches=len(pairs)))
+        return pairs
+
+    FeatureSonarOdometry._klt_pairs = record_klt
     snapshot = out/'source_snapshot'
     snapshot.mkdir()
-    source_names = ('RunQiandaoNoGPSNavigation.py', 'QiandaoVirtualNavigation.py', 'QiandaoLocalScene.py')
+    source_names = ('RunQiandaoNoGPSNavigation.py', 'QiandaoVirtualNavigation.py', 'QiandaoLocalScene.py',
+                    'QiandaoLocalRaycaster.py')
     for n in source_names:
         shutil.copy2(Path(__file__).parent/n, snapshot/n)
     started = time.monotonic()
     report = dict(status='running', variant=a.variant, seed=a.seed, requested_distance_m=a.distance_m,
         source_commit=manifest['source_commit'], full_frozen_estimator=True, extraction=extraction,
         native_bbs_SHA256=sha(native_bbs),
+        experiment_revision='wide_swath_and_readonly_pose_correspondence_recording_v2',
+        swath_width_deg=a.swath_width_deg,
+        swath_derivation='retained raw angle [-60,20], installation30 -> grazing[10,90], both-side fan160',
+        small_map_raycaster='finite local crossing bracket, no missing-map extrapolation',
+        range_noise_boundary_margin_m=.6,
+        original_estimator_KLT_returns_unchanged=True,
         configuration=configuration, reference_map_same_across_groups=True,
         reference_source='even physical records, baseline variant',
         query_source='odd physical records, selected scalar variant',
@@ -171,7 +210,9 @@ def main():
     header = ['time_s', 'truth_x', 'truth_y', 'truth_z', 'DR_x', 'DR_y', 'DR_z',
         'Local_x', 'Local_y', 'Local_z', 'Global_x', 'Global_y', 'Global_z',
         'DR_error_m', 'Local_error_m', 'Global_error_m', 'terrain_accepts', 'terrain_attempts',
-        'feature_filter_updates', 'graph_keyframes']
+        'feature_filter_updates', 'graph_keyframes',
+        'truth_roll', 'truth_pitch', 'truth_yaw', 'DR_roll', 'DR_pitch', 'DR_yaw',
+        'Local_roll', 'Local_pitch', 'Local_yaw', 'Global_roll', 'Global_pitch', 'Global_yaw']
     dump(out/'run_summary.json', report)
     try:
         with (out/'trajectory.csv').open('x', newline='') as f, (out/'ping_diagnostics.jsonl').open('x') as detail:
@@ -211,9 +252,12 @@ def main():
                        *result['local_position'], *result['global_position']]
                 error = [float(np.linalg.norm(result[n]-truth.position)) for n in
                          ('dr_position', 'local_position', 'global_position')]
+                rotations = [truth.rotation, result['dr_rotation'], result['local_rotation'], result['global_rotation']]
+                rpy = np.concatenate([rpy_from_rotation(r) for r in rotations])
                 writer.writerow([*row, *error, result['terrain_prior_accepts'], result['terrain_match_attempts'],
-                                 diagnostic.feature_filter_updates, result['keyframes']])
+                                 diagnostic.feature_filter_updates, result['keyframes'], *rpy])
                 rows.append(row)
+                history.append(np.asarray(rotations))
                 entry = dict(timestamp=stamp, error_m=error, processing_s=elapsed,
                     terrain_accepts=result['terrain_prior_accepts'], terrain_attempts=result['terrain_match_attempts'],
                     last_feature=asdict(diagnostic.last_feature_odometry) if diagnostic.last_feature_odometry is not None else None,
@@ -233,6 +277,13 @@ def main():
                         pings=report['processed_pings'], DR_local_global_m=error,
                         terrain=result['terrain_prior_accepts'], wall_s=report['elapsed_wall_s'])), flush=True)
             finish = dict(schema=1, sequence=sequence+1, kind='finish', timestamp=duration+.001, payload={})
+            frame = engine.gi_frame.f_locals
+            trace = {n: frame[n] for n in ('terrain_backend_particle_records', 'terrain_match_truth_evaluation_records',
+                'terrain_recovery_invocation_records', 'terrain_consistency_records', 'backscatter_match_stats',
+                'terrain_gauge_state') if n in frame}
+            trace['no_evaluation_truth_in_backend_frame'] = True
+            clean_trace, _ = sanitize_for_strict_json(trace)
+            dump(out/'frozen_backend_trace.json', clean_trace)
             order.accept(finish)
             try:
                 engine.send(finish)
@@ -245,10 +296,15 @@ def main():
                 raise ValueError('Executed source changed during experiment.')
         diagnostics, _ = sanitize_for_strict_json(final_diagnostics)
         dump(out/'estimator_diagnostics.json', diagnostics)
+        states = np.asarray(rows)
+        np.savez_compressed(out/'navigation_states.npz', timestamps=states[:, 0],
+            positions=states[:, 1:].reshape(-1, 4, 3), rotations=np.asarray(history))
         report.update(status='completed_full_frozen_estimator_GPS_free_virtual_AUV_experiment',
             metrics=summarize(rows, latencies), elapsed_wall_s=time.monotonic()-started,
             simulated_duration_s=duration, input_hashes={n: h.hexdigest() for n, h in digest.items()},
-            trajectory_SHA256=sha(out/'trajectory.csv'), original_sources_and_algorithm_unchanged=True)
+            trajectory_SHA256=sha(out/'trajectory.csv'), original_sources_and_algorithm_unchanged=True,
+            recorded_actual_feature_correspondences=correspondence_records,
+            navigation_states_SHA256=sha(out/'navigation_states.npz'))
         dump(out/'run_summary.json', report)
         print(json.dumps(report, ensure_ascii=False), flush=True)
     except BaseException as exc:
