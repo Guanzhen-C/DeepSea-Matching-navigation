@@ -57,6 +57,7 @@ def main():
     p.add_argument('--feature-matcher', choices=('RootSIFT_baseline', 'LoFTR'), default='RootSIFT_baseline')
     p.add_argument('--loop-closure', action='store_true', help='Historical SSS feature loops; requires LoFTR.')
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
+    p.add_argument('--canonical-submaps', action='store_true')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
@@ -103,7 +104,7 @@ def main():
         iq_simulator = PointScattererIQSimulator(world, ComplexEchoParameters(
             thermal_noise_rms=.004, interference_rms=.008, seed=a.seed))
     nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure,
-                                       scan_plane_registration=a.scan_plane_registration)
+                                       scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
                'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
@@ -124,6 +125,7 @@ def main():
         observation_source=a.observations, requested_feature_matcher=a.feature_matcher,
         secondary_denoising_used=False, historical_side_scan_loops_requested=a.loop_closure,
         scan_plane_registration=a.scan_plane_registration,
+        canonical_submaps=a.canonical_submaps,
         complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',

@@ -124,3 +124,30 @@ def test_user_cancelled_secondary_denoising_window_uses_only_overlap_average(mon
     q = window.build(np.zeros(3), bins=32)
     np.testing.assert_allclose(q['assembled_amplitude'][q['support']], 34.)
     assert not json.loads(q['assembly_json'])['secondary_denoising_used']
+
+
+def test_opposite_heading_requires_both_port_starboard_reversal_and_normal_sign_alignment(monkeypatch):
+    import SideScanFeatureMap as module
+    from PureSideScanFeatures import SideScanFeaturePacket
+    monkeypatch.setattr(module, 'resample_supported_echoes', lambda packet, bins:
+        np.tile(np.r_[np.full(bins, packet.amplitudes[0]), np.full(bins, packet.amplitudes[1])], (8, 1)))
+    monkeypatch.setattr(module, 'normalize_feature_image',
+        lambda image, support, scale: (np.zeros(image.shape, np.uint8), support.astype(np.uint8)))
+    monkeypatch.setattr(module, 'extract_features',
+        lambda *a: (np.empty((0, 2)), np.empty((0, 128), np.float32)))
+    old = module.SideScanFeatureWindow()
+    new = module.SideScanFeatureWindow(canonical_orientation=True)
+    for stamp, heading, amplitudes in [(0., 0., [10., 1.]), (1., np.pi, [1., 10.])]:
+        packet = SideScanFeaturePacket(timestamp=stamp, ranges_m=np.array([50., 50.]),
+            amplitudes=np.array(amplitudes), rows=np.zeros(2, int), sides=np.array([0, 1]),
+            row_centres_m=(np.arange(8)-3.5)*.15, sample_sequence=np.zeros(2, int))
+        for window in (old, new): window.add(packet, np.array([0., 0., heading]), int(stamp)+1)
+    old_q, new_q = old.build(np.zeros(3), bins=32), new.build(np.zeros(3), bins=32)
+    valid = new_q['support'].any(axis=1)
+    np.testing.assert_allclose(new_q['assembled_amplitude'][valid, :32], 10.)
+    np.testing.assert_allclose(new_q['assembled_amplitude'][valid, 32:], 1.)
+    np.testing.assert_allclose(new_q['row_normals'][valid, 0], 1.)
+    assert np.max(np.linalg.norm(old_q['row_normals'][valid], axis=1)) < 1e-10
+    assert not np.array_equal(old_q['assembled_amplitude'], new_q['assembled_amplitude'])
+    assert json.loads(new_q['assembly_json'])['canonical_port_starboard_and_plane_orientation']
+    assert not json.loads(new_q['assembly_json'])['secondary_denoising_used']

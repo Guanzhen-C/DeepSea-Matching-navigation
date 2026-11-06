@@ -59,3 +59,20 @@ def test_world_precision_transform_matches_numerical_mapping_and_preserves_null(
                           -fit_to_world_pose(seed, beta-np.eye(3)[k]*1e-6, info)[0])/2e-6 for k in range(3)])
     np.testing.assert_allclose(jac.T@world_info@jac, info, atol=2e-7)
     assert np.linalg.matrix_rank(world_info, tol=1e-8) == 2
+
+
+def test_tiny_noisy_heading_variations_do_not_qualify_as_a_lateral_measurement():
+    angles = np.linspace(-1e-5, 1e-5, 80)
+    n = np.column_stack([np.cos(angles), np.sin(angles)])
+    p, o = make_case(n); result = fit_observed_scan_planes(p, n, o)
+    assert result['accepted'] and result['observable_rank'] == 2
+    assert abs(result['parameters'][1]) < .01
+    assert np.linalg.matrix_rank(result['information'], tol=1e-8) == 2
+
+
+def test_arbitrary_parallel_scan_direction_has_its_physical_translation_null():
+    angle = .4; normal = np.array([np.cos(angle), np.sin(angle)])
+    n = np.tile(normal, (80, 1)); p, o = make_case(n)
+    result = fit_observed_scan_planes(p, n, o)
+    assert result['accepted'] and result['observable_rank'] == 2
+    np.testing.assert_allclose(result['information']@np.r_[-normal[1], normal[0], 0.], 0., atol=1e-8)

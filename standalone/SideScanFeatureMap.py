@@ -75,10 +75,11 @@ class IntensityFeatureMap:
 
 
 class SideScanFeatureWindow:
-    def __init__(self, pings=150):
+    def __init__(self, pings=150, *, canonical_orientation=False):
         self.scans = deque(maxlen=pings)
         self.vertical_positions = deque(maxlen=pings)
         self.pings = int(pings)
+        self.canonical_orientation = bool(canonical_orientation)
 
     def add(self, packet, local_pose2, observation_id, vertical_position_m=0.):
         if self.scans and (packet.timestamp <= self.scans[-1][0].timestamp
@@ -112,13 +113,21 @@ class SideScanFeatureWindow:
         for packet, intercept, normal, identifier, relative, z in entries:
             row = np.rint((intercept-x0)/step).astype(int)
             uniform = resample_supported_echoes(packet, bins)
+            assembled_normal = normal
+            if self.canonical_orientation and normal[0] < 0:
+                # Intercept/row indexing already reverses the along axis.
+                # Opposite heading ALSO reverses port/starboard in this frame.
+                # Plane normals are sign-equivalent, so align their signs
+                # before averaging; n and -n must never cancel to a fake plane.
+                uniform = uniform[:, ::-1]
+                assembled_normal = -normal
             np.add.at(image, row, uniform)
             np.add.at(weight, row, uniform > 0)
             origins = np.column_stack([relative[:2, 2]+packet.row_centres_m[:, None]*normal[None],
                                       np.full(8, z-self.vertical_positions[-1])])
             np.add.at(origin_sum, row, origins); np.add.at(origin_count, row, 1.)
             for r in np.unique(row):
-                normal_sum[r] += normal; normal_count[r] += 1
+                normal_sum[r] += assembled_normal; normal_count[r] += 1
         # User explicitly cancelled the extra denoiser. This is ordinary
         # overlap averaging for assembling received scans, not Huber/neural
         # restoration and not an additional smoothing/filtering operation.
@@ -140,6 +149,7 @@ class SideScanFeatureWindow:
             row_normals=normals,
             row_scan_origins=origins, anchor_vertical_z_m=self.vertical_positions[-1],
             assembly_json=json.dumps(dict(secondary_denoising_used=False,
+                canonical_port_starboard_and_plane_orientation=self.canonical_orientation,
                 assembly='ordinary_overlap_average_of_received_scans', unknown_cells_filled=False), sort_keys=True),
             current_ping_amplitude=resample_supported_echoes(self.scans[-1][0], bins),
             physical_ping_timestamps_s=np.array([entry[0].timestamp for entry in entries]),

@@ -37,9 +37,10 @@ def main():
     p.add_argument('--runtime', choices=('recorded', 'current'), default='recorded')
     p.add_argument('--loop-closure', action='store_true')
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
+    p.add_argument('--canonical-submaps', action='store_true')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
-    if a.out.exists() or ((a.loop_closure or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
+    if a.out.exists() or ((a.loop_closure or a.canonical_submaps or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
         raise ValueError('New output required; new loop module is only available in the current runtime.')
     original = json.loads((a.run/'run_summary.json').read_text())
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
@@ -74,6 +75,7 @@ def main():
                               velocity=np.array(init['velocity']))
     options = dict(loop_closure=True) if a.loop_closure else {}
     if a.scan_plane_registration != 'rank2_baseline': options['scan_plane_registration'] = a.scan_plane_registration
+    if a.canonical_submaps: options['canonical_submaps'] = True
     nav = PureSideScanFeatureNavigator(IntensityFeatureMap.from_path(a.experiment/'scene/reference_baseline'),
         initial, np.array(init['startup_specific_force']), image_matcher=LoFTRSideScanMatcher(a.device), **options)
     a.out.mkdir()
@@ -89,6 +91,7 @@ def main():
     report = dict(status='running_lossless_navigation_input_replay', runtime=a.runtime,
         loop_closure=a.loop_closure, secondary_denoising_used=False, sonar_resimulated=False,
         scan_plane_registration=a.scan_plane_registration,
+        canonical_submaps=a.canonical_submaps,
         all_navigation_observations_reused_losslessly=True, estimated_frames=0,
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
         executed_original_report_SHA256=sha(a.run/'run_summary.json'),
@@ -132,7 +135,7 @@ def main():
         np.testing.assert_array_equal(stamps, source['timestamps'])
         np.testing.assert_array_equal(array[:, :2], source['positions'][:, 1:3])
         difference = float(np.max(abs(array-source['positions'][:, 1:])))
-        if not a.loop_closure and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7:
+        if not a.loop_closure and not a.canonical_submaps and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7:
             raise RuntimeError(f'Baseline replay failed reproducibility check: maximum state difference {difference}')
         error = np.linalg.norm(array-source['positions'][:, :1], axis=2)
         report['metrics'] = {n: dict(RMSE_m=float(np.sqrt(np.mean(error[:, k]**2))),

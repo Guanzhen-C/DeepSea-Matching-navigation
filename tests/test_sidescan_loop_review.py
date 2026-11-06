@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'standalone'))
-from AnalyzeSideScanLoopReplay import read_replay, metrics, sha
+from AnalyzeSideScanLoopReplay import read_replay, metrics, sha, validate_comparison
 
 
 def write_replay(tmp_path):
@@ -62,3 +62,15 @@ def test_review_rejects_saved_metric_that_differs_from_complete_states(tmp_path)
 def test_review_rejects_modified_runtime_snapshot(tmp_path):
     truth, _ = write_replay(tmp_path); (tmp_path/'source_snapshot/sensor.py').write_text('changed')
     with pytest.raises(ValueError, match='Snapshot changed'): read_replay(tmp_path, truth)
+
+
+def test_comparison_never_attributes_two_changed_components_to_just_loops_or_geometry():
+    old = dict(loop_closure=False)
+    validate_comparison(old, dict(loop_closure=True), 'loop')
+    validate_comparison(old, dict(loop_closure=False, scan_plane_registration='observable_subspace'), 'registration')
+    validate_comparison(old, dict(loop_closure=False, canonical_submaps=True), 'submap_orientation')
+    with pytest.raises(ValueError, match='exactly the declared'):
+        validate_comparison(old, dict(loop_closure=True, canonical_submaps=True), 'loop')
+    with pytest.raises(ValueError, match='exactly the declared'):
+        validate_comparison(old, dict(loop_closure=False, canonical_submaps=True,
+                                     scan_plane_registration='observable_subspace'), 'registration')

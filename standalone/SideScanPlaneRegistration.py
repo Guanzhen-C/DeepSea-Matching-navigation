@@ -9,6 +9,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import least_squares
 
+PARAMETER_SCALES = np.array([20., 20., np.deg2rad(5.)])
+
 
 def plane_residual_jacobian(parameters, points, normals, offsets):
     """Translation is in candidate body frame, heading relative to map seed."""
@@ -20,16 +22,22 @@ def plane_residual_jacobian(parameters, points, normals, offsets):
     return residual, jac
 
 
-def observed_basis(jac, lever, minimum_effective_support=0.):
+def observed_basis(jac, minimum_effective_support=0.):
     # Balance angle/translation units for a numerical rank test, not a prior
     # or invented measurement. A 180-degree normal sign change adds no rank.
-    scale = np.diag([1., 1., 1./lever])
-    u, values, vh = np.linalg.svd(jac@scale, full_matrices=False)
+    scale = np.diag(PARAMETER_SCALES)
+    effective_count = min(24, len(jac))
+    whitened = jac@scale/.7*np.sqrt(effective_count/len(jac))
+    u, values, vh = np.linalg.svd(whitened, full_matrices=False)
     # An otherwise missing DOF can be fitted by ONE false correspondence.
     # Require distributed measurement support, using Kish effective sample
     # size of each singular direction, not true pose/error thresholds.
     effective_support = 1./np.maximum(np.sum(u**4, axis=0), 1e-30)
-    supported = (values > max(float(values.max()), 1.)*1e-7) & (effective_support >= minimum_effective_support)
+    # Numerical full rank is not statistical observability. If motion across
+    # the whole proposal scale cannot change a residual above its noise, do
+    # not invert that weak singular direction. This is a measurement-SNR test,
+    # never a true-position error gate or a new measurement prior.
+    supported = (values >= 1.) & (values > max(float(values.max()), 1.)*1e-7) & (effective_support >= minimum_effective_support)
     rank = int(np.count_nonzero(supported))
     return scale@vh[supported].T, rank
 
@@ -48,10 +56,9 @@ def fit_observed_scan_planes(points, normals, offsets, *, seed=31, minimum_inlie
             or not all(np.isfinite(x).all() for x in (points, normals, offsets))):
         raise ValueError('Finite matched XY landmarks and measured scan planes required.')
     if n < minimum_inliers: return dict(accepted=False, reason='not_enough_scan_plane_correspondences', inliers=0)
-    lever = max(1., float(np.sqrt(np.mean(np.sum((points-points.mean(axis=0))**2, axis=1)))))
     base, jac = plane_residual_jacobian(np.zeros(3), points, normals, offsets)
     minimum_directional_support = max(3., minimum_inliers/4.)
-    basis, rank = observed_basis(jac, lever, minimum_directional_support)
+    basis, rank = observed_basis(jac, minimum_directional_support)
     if rank < 2: return dict(accepted=False, reason='insufficient_scan_plane_observability', inliers=0)
     linear = jac@basis; rng = np.random.default_rng(seed); best = None
     for _ in range(256):
@@ -71,9 +78,9 @@ def fit_observed_scan_planes(points, normals, offsets, *, seed=31, minimum_inlie
     # a missing DOF. Unsupported components remain at the original motion seed.
     for _ in range(2):
         _, j = plane_residual_jacobian(initial, points[good], normals[good], offsets[good])
-        basis, rank = observed_basis(j, lever, minimum_directional_support)
+        basis, rank = observed_basis(j, minimum_directional_support)
         if rank < 2: return dict(accepted=False, reason='inlier_geometry_unobservable', inliers=int(good.sum()))
-        normalization = np.diag([1., 1., lever])
+        normalization = np.diag(1./PARAMETER_SCALES)
         eta0 = np.linalg.pinv(normalization@basis)@(normalization@initial)
         fit = least_squares(lambda eta: plane_residual_jacobian(basis@eta, points[good], normals[good], offsets[good])[0],
             eta0,
@@ -90,7 +97,8 @@ def fit_observed_scan_planes(points, normals, offsets, *, seed=31, minimum_inlie
     # Information from data ONLY; no optimizer seed rows. Effective feature
     # count is capped at 24 to avoid treating dense image points as independent.
     weight = np.minimum(1., .3/np.maximum(abs(residual), 1e-12))
-    projection = basis@np.linalg.pinv(basis)
+    normalization = np.diag(1./PARAMETER_SCALES)
+    projection = basis@np.linalg.pinv(normalization@basis)@normalization
     j = jac@projection
     information = (j.T*weight)@j/.7**2*min(24, len(j))/len(j)
     information = shrink_information(information, np.diag([2.5**2, 2.5**2, np.deg2rad(1.5)**2]))

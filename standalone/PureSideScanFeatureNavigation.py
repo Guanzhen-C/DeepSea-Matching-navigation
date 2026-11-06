@@ -57,7 +57,7 @@ class FeatureScanPlaneLikelihood:
 
 class PureSideScanFeatureNavigator:
     def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False,
-                 scan_plane_registration='rank2_baseline'):
+                 scan_plane_registration='rank2_baseline', canonical_submaps=False):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -92,7 +92,7 @@ class PureSideScanFeatureNavigator:
         self.shared_feature_windows = 0
         self.latest_gyro = np.zeros(3)
         self.latest_acceleration = np.mean(startup_specific_force, axis=0)
-        self.window = SideScanFeatureWindow(150)
+        self.window = SideScanFeatureWindow(150, canonical_orientation=canonical_submaps)
         self.previous_frame = None
         self.previous_local_pose = None
         self.anchor_pose = None
@@ -282,6 +282,7 @@ class PureSideScanFeatureNavigator:
             backend_feature_matcher=None if self.image_matcher is None else self.image_matcher.provenance,
             secondary_submap_denoising_used=False,
             scan_plane_registration=self.scan_plane_registration,
+            canonical_submap_orientation=self.window.canonical_orientation,
             loop_closure=dict(enabled=False, actual_loop_edges=0) if self.historical_loops is None else
                 dict(enabled=True, **self.historical_loops.diagnostics(),
                      map_priors_replaced_by_loop=self.map_priors_replaced_by_loop,
