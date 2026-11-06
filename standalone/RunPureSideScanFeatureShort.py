@@ -19,7 +19,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from RunQiandaoNoGPSNavigation import dump, sha
+from RunQiandaoNoGPSNavigation import sha
+from WriteSideScanReport import dump
 from RunQiandaoFullFrameCombNavigation import iter_sensor_schedule
 from QiandaoCombTrajectory import CombSurveyTrajectory, CombSurveyParameters
 from QiandaoVirtualNavigation import measured_field_sensor_class
@@ -55,6 +56,7 @@ def main():
     p.add_argument('--observations', choices=('ray_echo_baseline', 'complex_IQ'), default='ray_echo_baseline')
     p.add_argument('--feature-matcher', choices=('RootSIFT_baseline', 'LoFTR'), default='RootSIFT_baseline')
     p.add_argument('--loop-closure', action='store_true', help='Historical SSS feature loops; requires LoFTR.')
+    p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
@@ -100,13 +102,15 @@ def main():
         from SideScanIQHistory import packet_from_compressed_IQ
         iq_simulator = PointScattererIQSimulator(world, ComplexEchoParameters(
             thermal_noise_rms=.004, interference_rms=.008, seed=a.seed))
-    nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure)
+    nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure,
+                                       scan_plane_registration=a.scan_plane_registration)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
                'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
                'SideScanComplexEcho.py', 'SideScanIQHistory.py', 'QiandaoCombTrajectory.py',
-               'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py']
+               'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py', 'WriteSideScanReport.py']
     if a.loop_closure: sources += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.scan_plane_registration != 'rank2_baseline': sources += ['SideScanPlaneRegistration.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for source in sources: shutil.copy2(Path(__file__).parent/source, snapshot/source)
     report = dict(status='running', **route_scope_metadata(distance, a.full_route, route), seed=a.seed,
@@ -119,6 +123,7 @@ def main():
             'local_intensity_submap', 'descriptor_features'],
         observation_source=a.observations, requested_feature_matcher=a.feature_matcher,
         secondary_denoising_used=False, historical_side_scan_loops_requested=a.loop_closure,
+        scan_plane_registration=a.scan_plane_registration,
         complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',
@@ -204,6 +209,8 @@ def main():
                                                           iq_simulator.parameters)
                     if input_recorder: input_recorder.add_side_scan(packet)
                     result = nav.side_scan(packet)
+                    if not all(np.isfinite(result[n]).all() for n in ('DR', 'Local', 'Global')):
+                        raise FloatingPointError('Non-finite navigation output; never hide divergence as JSON null.')
                     e = [float(np.linalg.norm(result[n]-truth.position)) for n in ('DR', 'Local', 'Global')]
                     row = [stamp, stamp*route.speed_mps, *truth.position,
                            *result['DR'], *result['Local'], *result['Global'], *e]

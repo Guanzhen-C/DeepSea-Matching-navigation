@@ -86,7 +86,7 @@ class SideScanHistoricalLoops:
         return [frame for _, frame in sorted(available, key=lambda x: x[0], reverse=True)[:3]]
 
     def match_pair(self, old, query, seed):
-        a = old['query']; reverse = np.cos(seed[2]) < 0
+        a = old['query']; reverse = bool(np.cos(seed[2]) < 0)
         im = np.flip(query['image'], axis=(0, 1)).copy() if reverse else query['image']
         mask = np.repeat(query['support'], query['scale'], axis=0).astype(np.uint8)*255
         if reverse: mask = np.flip(mask, axis=(0, 1)).copy()

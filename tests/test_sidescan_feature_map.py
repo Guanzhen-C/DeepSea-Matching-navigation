@@ -40,7 +40,8 @@ def test_feature_particle_likelihood_is_scan_plane_only_with_a_true_null_directi
     assert not hasattr(likelihood, 'measured_height')
 
 
-def test_feature_scan_plane_fit_and_returned_pose_use_same_translation_frame(monkeypatch):
+@pytest.mark.parametrize('registration_mode', ['rank2_baseline', 'observable_subspace'])
+def test_feature_scan_plane_fit_and_returned_pose_use_same_translation_frame(monkeypatch, registration_mode):
     """Synthetic known correspondences test geometry, not descriptor success."""
     import SideScanFeatureMap as module
     rng = np.random.default_rng(57)
@@ -63,7 +64,7 @@ def test_feature_scan_plane_fit_and_returned_pose_use_same_translation_frame(mon
     monkeypatch.setattr(module, 'extract_features', lambda *a, **k: (pixels, query['descriptors']))
     monkeypatch.setattr(module, 'descriptor_pairs', lambda *a: np.column_stack([np.arange(80)]*2))
     seed = np.array([7., -5., np.deg2rad(17.)])
-    matched = match_feature_prior(DummyMap(), query, seed)
+    matched = match_feature_prior(DummyMap(), query, seed, registration_mode=registration_mode)
     assert matched['accepted']
     expected = seed.copy(); expected[2] += dyaw
     expected[:2] += pose_matrix(expected)[:2, 0]*dx
@@ -77,7 +78,8 @@ def test_feature_scan_plane_fit_and_returned_pose_use_same_translation_frame(mon
     assert likelihood(shifted[None])[0] < likelihood(expected[None])[0]
 
 
-def test_learned_local_features_share_physical_scan_plane_verification_without_depth():
+@pytest.mark.parametrize('registration_mode', ['rank2_baseline', 'observable_subspace'])
+def test_learned_local_features_share_physical_scan_plane_verification_without_depth(registration_mode):
     rng = np.random.default_rng(72)
     points = np.column_stack([rng.uniform(-35, -5, 80), rng.uniform(-80, 80, 80)])
     dx, angle = 2., np.deg2rad(1.)
@@ -96,7 +98,7 @@ def test_learned_local_features_share_physical_scan_plane_verification_without_d
         assert qm.shape == query['image'].shape
         return query_pixels.copy(), map_pixels.copy(), np.ones(80)
     seed = np.array([10., 20., .3])
-    result = match_feature_prior(TexturedMap(), query, seed, image_matcher=matches)
+    result = match_feature_prior(TexturedMap(), query, seed, image_matcher=matches, registration_mode=registration_mode)
     assert result['accepted'] and result['observable_rank'] == 2
     expected = seed.copy(); expected[2] += angle
     expected[:2] += pose_matrix(expected)[:2, 0]*dx

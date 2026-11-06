@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+from WriteSideScanReport import dump as dump_report
 
 
 def sha(path):
@@ -35,9 +36,10 @@ def main():
     p.add_argument('--out', required=True, type=Path)
     p.add_argument('--runtime', choices=('recorded', 'current'), default='recorded')
     p.add_argument('--loop-closure', action='store_true')
+    p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
-    if a.out.exists() or (a.loop_closure and a.runtime != 'current'):
+    if a.out.exists() or ((a.loop_closure or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
         raise ValueError('New output required; new loop module is only available in the current runtime.')
     original = json.loads((a.run/'run_summary.json').read_text())
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
@@ -71,26 +73,31 @@ def main():
     initial = SimpleNamespace(position=np.array(init['position']), rotation=np.array(init['rotation']),
                               velocity=np.array(init['velocity']))
     options = dict(loop_closure=True) if a.loop_closure else {}
+    if a.scan_plane_registration != 'rank2_baseline': options['scan_plane_registration'] = a.scan_plane_registration
     nav = PureSideScanFeatureNavigator(IntensityFeatureMap.from_path(a.experiment/'scene/reference_baseline'),
         initial, np.array(init['startup_specific_force']), image_matcher=LoFTRSideScanMatcher(a.device), **options)
     a.out.mkdir()
     names = ['PureSideScanFeatures.py', 'SideScanFeatureMap.py', 'PureSideScanFeatureNavigation.py',
              'SideScanLearnedFeatures.py', 'SideScanRecordedInputs.py']
     if a.loop_closure: names += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.scan_plane_registration != 'rank2_baseline': names += ['SideScanPlaneRegistration.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for name in names: shutil.copy2(runtime/name, snapshot/name)
     shutil.copy2(Path(__file__), snapshot/Path(__file__).name)
+    writer_path = Path(__file__).with_name('WriteSideScanReport.py')
+    shutil.copy2(writer_path, snapshot/writer_path.name)
     report = dict(status='running_lossless_navigation_input_replay', runtime=a.runtime,
         loop_closure=a.loop_closure, secondary_denoising_used=False, sonar_resimulated=False,
+        scan_plane_registration=a.scan_plane_registration,
         all_navigation_observations_reused_losslessly=True, estimated_frames=0,
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
         executed_original_report_SHA256=sha(a.run/'run_summary.json'),
         source_SHA256={n: sha(snapshot/n) for n in names}, events={})
     report['frozen_core_and_prior_dependency_SHA256'] = {str(k): v for k, v in dependencies.items()}
     report['replay_driver_SHA256'] = sha(Path(__file__))
+    report['strict_report_writer_SHA256'] = sha(writer_path)
     def save_report():
-        clean, _ = sanitize_for_strict_json(report)
-        (a.out/'run_summary.json').write_text(json.dumps(clean, ensure_ascii=False, indent=2, allow_nan=False)+'\n')
+        dump_report(a.out/'run_summary.json', report)
     save_report()
     started = time.monotonic(); positions, stamps, yaws = [], [], []
     try:
@@ -125,7 +132,7 @@ def main():
         np.testing.assert_array_equal(stamps, source['timestamps'])
         np.testing.assert_array_equal(array[:, :2], source['positions'][:, 1:3])
         difference = float(np.max(abs(array-source['positions'][:, 1:])))
-        if not a.loop_closure and difference > 1e-7:
+        if not a.loop_closure and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7:
             raise RuntimeError(f'Baseline replay failed reproducibility check: maximum state difference {difference}')
         error = np.linalg.norm(array-source['positions'][:, :1], axis=2)
         report['metrics'] = {n: dict(RMSE_m=float(np.sqrt(np.mean(error[:, k]**2))),
@@ -135,6 +142,8 @@ def main():
             if sha(runtime/name) != expected: raise RuntimeError('Replay source changed while running: '+name)
         if sha(Path(__file__)) != report['replay_driver_SHA256']:
             raise RuntimeError('Replay driver changed while running.')
+        if sha(writer_path) != report['strict_report_writer_SHA256']:
+            raise RuntimeError('Strict report writer changed while running.')
         for path, expected in dependencies.items():
             if sha(path) != expected: raise RuntimeError('Frozen dependency changed during replay: '+str(path))
         np.savez_compressed(a.out/'estimated_states.npz', positions=array, timestamps=stamps,

@@ -152,7 +152,10 @@ class SideScanFeatureWindow:
             patch_start_s=self.scans[0][0].timestamp, patch_start_id=self.scans[0][2], patch_end_id=self.scans[-1][2])
 
 
-def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matcher=None):
+def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matcher=None,
+                        registration_mode='rank2_baseline'):
+    if registration_mode not in ('rank2_baseline', 'observable_subspace'):
+        raise ValueError('Explicit scan-plane registration mode required.')
     step, scale, bins = query['step'], query['scale'], query['bins']
     max_range = query['max_range_m']
     x0, x1 = query['x0']-margin_m, query['x1']+margin_m
@@ -196,6 +199,31 @@ def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matc
     mx = x0+((mp[mi, 1]+.5)/scale-.5)*step
     my = np.where(mp[mi, 0] < bins, bins-.5-mp[mi, 0], -(mp[mi, 0]-bins+.5))*max_range/bins
     landmarks_body = np.column_stack([mx, my])
+    if registration_mode == 'observable_subspace':
+        from SideScanPlaneRegistration import fit_observed_scan_planes, fit_to_world_pose
+        fitted = fit_observed_scan_planes(landmarks_body, normals, offsets, seed=query['patch_end_id'])
+        if not fitted['accepted']:
+            return dict(accepted=False, reason=fitted['reason'], matches=len(pairs), inliers=fitted['inliers'], **debug)
+        beta = fitted['parameters']
+        if np.linalg.norm(beta[:2]) > margin_m or abs(beta[2]) > np.deg2rad(8):
+            return dict(accepted=False, reason='feature_solution_outside_search_support', matches=len(pairs), **debug)
+        pose, information = fit_to_world_pose(seed_pose2, beta, fitted['information'])
+        keep = fitted['inlier_mask']
+        # A finite proposal spread is ONLY a particle-initialization aid; the
+        # added search precision never enters the measurement/graph factor.
+        proposal_covariance = np.linalg.inv(information+np.diag([1/20.**2, 1/20.**2, 1/np.deg2rad(5.)**2]))
+        result = dict(debug)
+        result.update(accepted=True, matches=len(pairs), inliers=fitted['inliers'],
+            matched_pose2=pose, information=information, proposal_covariance=proposal_covariance,
+            observable_rank=fitted['observable_rank'], score=fitted['inliers']/len(pairs),
+            scan_plane_rmse_m=fitted['scan_plane_rmse_m'],
+            landmark_xy=landmarks_body[keep]@seed[:2, :2].T+seed[:2, 2],
+            scan_normals=normals[keep], scan_offsets=offsets[keep],
+            local_reference_pose2=None, seed_pose2=np.asarray(seed_pose2).copy(),
+            query_pixels=qp[qi[keep]], map_pixels=mp[mi[keep]], registration_mode=registration_mode,
+            measured_height_used=False, raw_intensity_correlation_used=False, optical_flow_used=False,
+            proposal_search_precision_used_as_measurement=False)
+        return result
     # For near-parallel scan planes the data support along-track/yaw, not an
     # independent cross-track fix. Keep the unsupported component at its
     # motion-prior seed and preserve a rank-deficient information matrix.

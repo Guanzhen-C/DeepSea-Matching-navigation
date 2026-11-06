@@ -114,3 +114,29 @@ FinalizePureSideScanExperiment.py仅观察确认存活的指定unit/PID，完整
 
 当前相关功能/独立审计/源码隔离共61项测试通过。原冻结实测去噪95文件、
 湖试和海试基线refs均再次验证未变。无私有数据上传或新branch推送。
+
+九、长程v1日志失败与修复（不是完成或定位发散）
+unit oceansim-pure-sss-shared-loop-full16km-20261106-v1.service 已经确认
+MainPID0、ExecMainStatus1、Result=exit-code。最后CSV6000行、1583.73563m，
+三路位置全前缀与已完成v3的2km重放逐值相同。最后DR/Local/Global误差
+20.13435/19.07690/12.31633m；不是误差发散或OOM退出。
+原因是阶段进度报告把回环诊断中的np.bool_直接交给严格JSON编码器，
+异常处理再次保存同一未清理对象也失败，原run_summary因而残留running。
+原文件不改写，另存 pure_sss_full_comb_shared_loop_v1_failure_audit.json
+说明权威进程终态，禁止把残留运行文件或不完整输入记录当成完成结果。
+
+新WriteSideScanReport.py在所有报告边界统一做NumPy类型转换和原子写入，
+非有限诊断明确标null并计数，导航位置本身非有限则直接失败，不静默隐藏。
+在舷侧诊断生产处也显式转换为原生bool。三项测试覆盖真实故障字段、
+异常处理能保存failed、不可序列化对象不破坏旧文件。7576点完整控制重放
+replay_logging_control2km_v4 三路位置与v3逐值完全相同，修复未改变估计结果。
+全程必须以新输出目录重新开始，保留旧失败现场，不覆盖旧源码快照。
+
+十、独立配准研究接口（不默认替换正在验证的长程算法）
+SideScanPlaneRegistration.py新增按实际数据支撑求解的可观子空间配准。
+直线或反向平行扫描平面仍为rank2；扫描方向真正多样且对应点足够时可rank3。
+只用强度图特征、扫描平面和地图XY，不用侧扫斜距冒充水平距离、不读地物高度。
+使用解析雅可比、纯数据精度及坐标变换，并检查各方向的分布式支持，避免
+一个错误匹配凭空补出一个自由度。初始运动只作求解seed，不当测量信息。
+通过--scan-plane-registration observable_subspace显式开启，默认仍rank2_baseline。
+目前数学与接口测试通过，效果尚需同输入实测对照，不能先称改进有效。

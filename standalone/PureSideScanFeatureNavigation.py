@@ -56,7 +56,8 @@ class FeatureScanPlaneLikelihood:
 
 
 class PureSideScanFeatureNavigator:
-    def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False):
+    def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False,
+                 scan_plane_registration='rank2_baseline'):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -77,6 +78,9 @@ class PureSideScanFeatureNavigator:
         self.soft = MapOdomSoftCorrector()
         self.map = intensity_map
         self.image_matcher = image_matcher
+        if scan_plane_registration not in ('rank2_baseline', 'observable_subspace'):
+            raise ValueError('Explicit scan-plane registration mode required.')
+        self.scan_plane_registration = scan_plane_registration
         if loop_closure:
             if image_matcher is None:
                 raise ValueError('Historical side-scan loops require a local-feature matcher.')
@@ -197,7 +201,8 @@ class PureSideScanFeatureNavigator:
             sample_debug = self.observation_id % 1500 == 0 or turning_window
             try:
                 query = self.window.build(raw)
-                matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher)
+                matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher,
+                                               registration_mode=self.scan_plane_registration)
                 if len(self.backend_query_examples) < 3 or (sample_debug and len(self.backend_query_examples) < 32):
                     self.backend_query_examples.append(dict(query, seed_pose2=target.copy()))
             except ValueError as exc:
@@ -230,6 +235,7 @@ class PureSideScanFeatureNavigator:
             self.last_backend = dict(accepted=matched['accepted'], reason=matched.get('reason'),
                 matches=matched['matches'], inliers=matched.get('inliers', 0),
                 query_features=matched.get('query_feature_count'), map_features=matched.get('map_feature_count'),
+                observable_rank=matched.get('observable_rank'),
                 submap_assembly=None if query is None else json.loads(query['assembly_json']),
                 status=decision.status, null_probability=decision.null_probability,
                 cohorts=len(decision.cohorts), feature_likelihood_only=True,
@@ -275,6 +281,7 @@ class PureSideScanFeatureNavigator:
             optimizer_backend=self.graph.backend_name,
             backend_feature_matcher=None if self.image_matcher is None else self.image_matcher.provenance,
             secondary_submap_denoising_used=False,
+            scan_plane_registration=self.scan_plane_registration,
             loop_closure=dict(enabled=False, actual_loop_edges=0) if self.historical_loops is None else
                 dict(enabled=True, **self.historical_loops.diagnostics(),
                      map_priors_replaced_by_loop=self.map_priors_replaced_by_loop,
@@ -282,5 +289,5 @@ class PureSideScanFeatureNavigator:
                      shared_observation_policy='half_information_each_for_loop_and_map_not_independent_full_factors'),
             global_cohort_tracker_updates=self.tracker.updates,
             map_to_odom=self.soft.diagnostics(),
-            observation_limit='scan-plane along/yaw; cross-track is not independently measured from slant pixels',
+            observation_limit='Scan-plane geometry only; actual null directions retained. Slant pixels are not horizontal observations.',
             short_test_is_not_validated_whole_map_unknown_pose_relocalization=True)
