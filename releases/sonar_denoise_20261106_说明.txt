@@ -1,0 +1,37 @@
+声呐去噪停止点归档：2026-11-06
+
+用户决定：去噪暂进行到本次边缘修复，后续进入PC小区域地形地貌匹配导航验证。
+本归档不继续训练/调参，不覆盖原已认可算法，也不更改海试/湖试导航算法。
+
+固定主基线：fusion_wide_front（融合／宽带／前级）。
+对照基线：fusion_limited_front（融合／限带／前级）。
+最新边缘候选：gain_and_commonmode，在主基线后处理增益背景连续及边缘差分相干项。
+这三者分别保留；“后续实验使用”不等于已经证明完全保真或自动覆盖原基线。
+
+release_manifest.json 列出全部本地源码依赖闭包、指定回归测试及两个小权重的SHA。
+源码位于仓库standalone/，测试位于tests/；Git提交本身就是不可变源码快照。
+权重位于releases/sonar_denoise_20261106/weights/。
+原MAT/GPS、完整浮点缓存、原始审计恢复包和高清图仍保存在本机/已有172存储，
+不上传GitHub。本次代码备份不是声学所私有数据公开授权。
+
+环境：隔离Python环境，numpy/scipy/torch/Pillow；MAT提取另需h5py，绘图需matplotlib。
+不要更改Isaac Sim或现有导航环境。requirements-sonar-replica.txt是MAT复刻环境，
+不包含完整神经网络环境；本次另存requirements-sonar-denoise-frozen.txt作为直接依赖说明。
+
+完整复现分为两层：
+1. 源码/权重校验（不需私有原始数据）：
+   python standalone/FreezeSonarDenoisingRelease.py --release releases/sonar_denoise_20261106 --verify
+2. 全原生数据处理（需已有私有数据及原恢复审计证书，未上传GitHub）：
+   PrepareMeasuredSonarPhaseCache.py：原MAT物理记录/复数场准备；
+   ExportMeasuredSonarVoyage172.py、ReceiveMeasuredSonarVoyage172.py：原生传输协议；
+   RecoveredMatchedSonarModels.py：严格证书/模型加载，不能跳过旧完整审计验证；
+   InferFullMeasuredSonar172.py：原完整推理协议（历史多GPU入口仍原样保留）；
+   RenderFullMeasuredSonar172.py、AuditFullMeasuredSonar172.py：原生拼接与审计；
+   TrialRangeGainContinuity172.py：本次两个末端候选的全记录处理与主体逐像素验证；
+   PackageBoundaryCandidatePortraitPDF.py：完整原生像素高清竖版，不是处理数据入口。
+   所有输出路径都应使用新目录，脚本故意拒绝覆盖既有结果。
+
+导航必须使用原浮点幅度/测深/时间戳及记录对应关系，不把琥珀PNG/PDF当定量观测。
+8束来自一次物理记录，不是8个连续时间ping；原4+4瀑布拼接行不等于真实航程米。
+既有末端384列修正是统计辐射修正，改变边缘增益背景，可能影响真实边缘专有特征。
+没有同帧干净真值，不宣称无损恢复；弱残余条纹仍存在，不再继续优化。
