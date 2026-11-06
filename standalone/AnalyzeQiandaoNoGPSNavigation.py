@@ -6,6 +6,7 @@ must never be presented as original-vessel GPS/ground-truth field accuracy.
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 from pathlib import Path
@@ -53,6 +54,13 @@ def verify_run(folder):
         raise ValueError('Only completed wide-swath, GPS-free experiments are eligible.')
     if sha(folder/'navigation_states.npz') != report['navigation_states_SHA256']:
         raise ValueError('Saved native pose arrays changed.')
+    for name, digest in report['source_code_SHA256'].items():
+        if sha(folder/'source_snapshot'/name) != digest:
+            raise ValueError('Executed source snapshot differs from the captured source hash.')
+    if report['source_commit'] != '204d3e24048a8b515616d9305b7516221bcf8fed':
+        raise ValueError('Not the unchanged lake estimator source baseline.')
+    if report['event_counts'] != dict(sonar=947, imu=15625, depth=3125, dvl=1562):
+        raise ValueError('Missing or extra sensor events in the 250m experiment.')
     with np.load(folder/'navigation_states.npz') as data:
         positions = data['positions'].copy()
         rotations = data['rotations'].copy()
@@ -62,6 +70,12 @@ def verify_run(folder):
     if not np.isfinite(positions).all() or not np.isfinite(rotations).all() or np.any(np.diff(timestamps) <= 0):
         raise ValueError('Finite ordered full pose history required.')
     errors = np.linalg.norm(positions[:, 1:]-positions[:, 0, None], axis=2)
+    if sha(folder/'trajectory.csv') != report['trajectory_SHA256']:
+        raise ValueError('CSV trajectory changed.')
+    data = np.genfromtxt(folder/'trajectory.csv', delimiter=',', names=True)
+    csv_positions = np.stack([np.column_stack([data[f'{name}_{axis}'] for axis in ('x', 'y', 'z')])
+                              for name in ('truth', 'DR', 'Local', 'Global')], axis=1)
+    np.testing.assert_array_equal(csv_positions, positions)
     independently_measured = {}
     for k, name in enumerate(('DR', 'Local', 'Global')):
         e = errors[:, k]
@@ -78,7 +92,17 @@ def verify_run(folder):
         raise ValueError('Not the requested existing CUDA feature consensus.')
     distance = np.r_[0, np.cumsum(np.linalg.norm(np.diff(positions[:, 0], axis=0), axis=1))]
     rpe = {str(d): relative_errors(positions, rotations, distance, d) for d in (10., 30.)}
+    yaw = np.arctan2(rotations[..., 1, 0], rotations[..., 0, 0])
+    yaw_error = np.rad2deg((yaw[:, 1:]-yaw[:, :1]+np.pi)%(2*np.pi)-np.pi)
+    yaw_metrics = {name: dict(RMSE_deg=float(np.sqrt(np.mean(yaw_error[:, k]**2))),
+        P95_abs_deg=float(np.percentile(abs(yaw_error[:, k]), 95)), final_deg=float(yaw_error[-1, k]))
+        for k, name in enumerate(('DR', 'Local', 'Global'))}
+    accepted = np.flatnonzero(data['terrain_accepts'] > 0)
+    first_fix = (dict(timestamp_s=float(timestamps[accepted[0]]),
+                      distance_m=float(distance[accepted[0]]),
+                      Global_error_m=float(errors[accepted[0], 2])) if len(accepted) else None)
     return dict(folder=str(folder), report=report, metrics=independently_measured, rpe=rpe,
+        yaw=yaw_metrics, first_accepted_terrain_factor=first_fix,
         terrain_accepts=diagnostic['terrain_prior_accepts'], terrain_attempts=diagnostic['terrain_match_attempts'],
         feature=diagnostic['feature_diagnostics'], actual_distance_m=float(distance[-1]),
         report_SHA256=sha(folder/'run_summary.json')), (positions, rotations, timestamps, distance, errors)
@@ -129,13 +153,13 @@ def plot_first_case(runs, arrays, experiment, out):
     for variant, r in selected.items():
         positions = arrays[r['folder']][0]
         fig = plt.figure(figsize=(12, 9), constrained_layout=True)
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection='3d', computed_zorder=False)
         ax.plot_surface(xx, yy, z, cmap='terrain', alpha=.62, linewidth=0,
-                        rcount=len(row), ccount=len(col), antialiased=False)
+                        rcount=len(row), ccount=len(col), antialiased=False, zorder=1)
         for index, label, colour, style, width in ((0, '虚拟真值', '#202020', '-', 2.2),
                 (2, 'Local', '#e86a10', '-', 2.5), (3, '在线Global', '#0072bd', '--', 1.7)):
             xyz = positions[:, index]
-            ax.plot(xyz[:, 0], xyz[:, 1], xyz[:, 2], style, color=colour, linewidth=width, label=label)
+            ax.plot(xyz[:, 0], xyz[:, 1], xyz[:, 2], style, color=colour, linewidth=width, label=label, zorder=10+index)
         ax.set(xlabel='局部沿航向 / m', ylabel='局部横航向 / m', zlabel='Z / m')
         ax.set_title(LABELS[variant]+'：重建局部地形与三条轨迹\n地形布局采用名义直线航速；无GPS，不是地理定位海图', fontsize=13)
         ax.view_init(elev=32, azim=-70)
@@ -201,17 +225,76 @@ def main():
             first = arrays[group[0]['folder']][0]
             for r in group[1:]:
                 np.testing.assert_array_equal(first[:, :2], arrays[r['folder']][0][:, :2])
+    # Initialisation errors must not change sensor streams either.
+    if not a.first_case_only:
+        for seed in (31, 32, 33):
+            group = [r for r in runs if r['report']['seed'] == seed]
+            for key in ('navigation_measurements', 'sonar_geometry'):
+                if len({r['report']['input_hashes'][key] for r in group}) != 1:
+                    raise ValueError('Initialisation cases did not receive the same sensor streams.')
     a.out.mkdir(parents=True)
+    aggregates = []
+    for offset in (0.,) if a.first_case_only else (0., 20.):
+        for variant in LABELS:
+            group = [r for r in runs if r['report']['variant'] == variant
+                     and r['report']['initial_offset_m'] == offset]
+            record = dict(variant=variant, initial_offset_m=offset, independent_noise_seeds=len(group), metrics={})
+            for channel in ('DR', 'Local', 'Global'):
+                rmse = np.array([r['metrics'][channel]['RMSE_m'] for r in group])
+                record['metrics'][channel] = dict(mean_run_RMSE_m=float(rmse.mean()),
+                    sample_std_run_RMSE_m=float(rmse.std(ddof=1)) if len(group) > 1 else None,
+                    pooled_RMSE_m=float(np.sqrt(np.mean(rmse**2))),
+                    mean_run_P95_m=float(np.mean([r['metrics'][channel]['P95_m'] for r in group])),
+                    mean_final_m=float(np.mean([r['metrics'][channel]['final_m'] for r in group])))
+            record['runs_with_accepted_terrain_factor'] = sum(r['terrain_accepts'] > 0 for r in group)
+            aggregates.append(record)
     summary = dict(status='completed_independent_first_case_review' if a.first_case_only else 'completed_independent_all18_review',
         GPS_used=False, truth='synthetic programmed AUV trajectory, NOT original vessel truth',
         source_scene_layout_assumed=True, independent_cross_survey_validation=False,
         reference_map='same even-record baseline-processed field for all query groups',
         this_reference_choice_is_NOT_proof_of_universal_denoiser_superiority=True,
+        aggregate_mean_std_and_pooled_RMSE_are_distinct=True, aggregates=aggregates,
         records=[{k: v for k, v in r.items() if k != 'report'}|dict(variant=r['report']['variant'],
             seed=r['report']['seed'], initial_offset_m=r['report']['initial_offset_m'],
             initial_yaw_deg=r['report']['initial_yaw_deg']) for r in runs],
         fairness_and_full_stream_metrics_independently_verified=True, analysis_code_SHA256=sha(Path(__file__)))
     (a.out/'独立核验与定位指标.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2)+'\n')
+    table_columns = ['variant', 'seed', 'initial_offset_m', 'initial_yaw_deg', 'actual_distance_m',
+        'terrain_attempts', 'terrain_accepts', 'accepted_feature_pairs', 'feature_pair_attempts']
+    table_columns += [f'{c}_{m}' for c in ('DR', 'Local', 'Global') for m in ('RMSE_m', 'P95_m', 'max_m', 'final_m')]
+    with (a.out/'各次实验定位指标.csv').open('x', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=table_columns)
+        writer.writeheader()
+        for r in runs:
+            record = {n: r['report'][n] for n in ('variant', 'seed', 'initial_offset_m', 'initial_yaw_deg')}
+            record.update(actual_distance_m=r['actual_distance_m'], terrain_attempts=r['terrain_attempts'],
+                          terrain_accepts=r['terrain_accepts'], accepted_feature_pairs=r['feature']['accepted_pairs'],
+                          feature_pair_attempts=r['feature']['pair_attempts'])
+            record.update({f'{c}_{m}': r['metrics'][c][m] for c in ('DR', 'Local', 'Global')
+                           for m in ('RMSE_m', 'P95_m', 'max_m', 'final_m')})
+            writer.writerow(record)
+    lines = ['PC局部导航仿真结果与适用边界', '',
+        '真值：设定的虚拟AUV运动；没有使用或读取GPS。不是原采集船的真实轨迹定位精度。',
+        '场景：实测角度/时延/幅度与冻结增益构景；名义直线航速布局，不是标定海图。',
+        '参考/查询使用不同物理记录，但同一测线邻近观测不构成独立航次或独立场景验证。',
+        '各组共用偶记录固定去噪参考图，不代表任意去噪都能普遍改善导航。',
+        '定位器保持原湖试特征前端、cohort粒子地形匹配、GTSAM固定滞后及map→odom。',
+        '严格核对同种子传感器/声呐几何全流一致、三个强度输入均不同，未放宽导航门限。',
+        '', '以下为各次全段RMSE的均值（不是将所有误差直接算术平均）：']
+    for r in aggregates:
+        values = r['metrics']
+        lines.append(f"初值偏差{r['initial_offset_m']:g}m · {LABELS[r['variant']]} · n={r['independent_noise_seeds']}："
+            f"DR/Local/Global平均RMSE {values['DR']['mean_run_RMSE_m']:.3f}/"
+            f"{values['Local']['mean_run_RMSE_m']:.3f}/{values['Global']['mean_run_RMSE_m']:.3f}m；"
+            f"产生地形确认的实验{r['runs_with_accepted_terrain_factor']}次。")
+    lines += ['', '完整样本标准差、合并RMSE、各次P95/末值、10m/30m SE3相对误差、航向误差，',
+        '以及首个接受地形因子的时刻/里程保存在JSON；逐次简表见CSV。',
+        '初值偏差对照包含20m位置和5度航向误差，不能把初始误差主导的RMSE等同于稳态精度。',
+        'Local如果不如DR应保留负面结论；边缘视觉改善也不能自动当作导航改善。',
+        '三维图的地形LOD和图像规范化只用于显示，不改变数值输入、轨迹或场景数组。',
+        '首次120度扇面和宽扇面NoData失败结果另存，未混入本正式宽扇面汇总。',
+        '本次去噪算法未继续调参，也未改动既有72km海试或湖试稳定基线。']
+    (a.out/'实验结果与适用边界.txt').write_text('\n'.join(lines)+'\n')
     plot_first_case(runs, arrays, a.experiment, a.out)
     print(json.dumps(dict(status=summary['status'], completed_runs=len(runs), output=str(a.out)), ensure_ascii=False))
 
