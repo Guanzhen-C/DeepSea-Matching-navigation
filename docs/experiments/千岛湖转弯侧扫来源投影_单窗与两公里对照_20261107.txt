@@ -1,0 +1,95 @@
+千岛湖转弯侧扫来源投影：单窗口物理验证与同输入导航对照
+
+一、结论和采用状态
+新的“转弯外观投影＋真实来源扫描平面验证”在单窗口与完整2km输入中
+取得正面证据。不是全16.489km、独立种子、未知初值或真实海域验收。
+仍属候选，不替换正在运行的旧配准＋历史回环全程。原湖试、海试、
+实测去噪冻结源和权重不变，不增加二次去噪、不使用光流。
+
+二、解决的是数据表示，不是假造测深或水平距离
+旧子图把曲线航迹强压成直条带，在选定转弯窗150ping中排除了63个
+近正交ping，仅87个参与拼图，且反向扫描原有双舷/法向问题。
+新SideScanProjectedSubmap.py按估计短时位姿把收到的距离栅格排到
+共同外观坐标，150ping方向均参与，不填未知格。强度采用原普通重叠平均。
+slant横向代理只用于排列图像，是外观坐标，不是真实地面坐标观测。
+每个非空像素存储主导贡献的真实ping/波束/距离bin，查回真实扫描平面、
+相位中心和斜距。不把不同扫描法向直接平均成假的观测，也不读地形高度。
+几何验证使用“匹配底图XY＋实际来源扫描平面”，不用外观投影XY作测量。
+
+原共享resample_supported_echoes要求相邻采集bin，精确原生栅格上也会
+排除孤立/末端bin。本转弯窗原始525610个正值bin，经相同旧距离栅格化
+保留497824个贡献，27786个未保留。独立审计如实记录这一损失，绝不把
+“投影保留全部已栅格化贡献”写成“使用了所有原始bin”。这一策略与基线
+共用，没有偷偷新增滤波；原始所有接收bin仍在完整归档里。后续可专门
+研究保留精确观测点的距离采样器，但不能边改边覆盖当前正面实验。
+
+三、特征和几何计算
+SideScanProjectedMatching.py原尺寸分块匹配，256×384、32px重叠，
+没有缩小图像；15个tile覆盖全查询域，其中12个有足够收到数据。
+跨tile坐标恢复到同一个图像栅格并去除重复对应。仍使用未微调的官方
+LoFTR outdoor权重。新上下文掩码是独立探索项，最终细匹配仍检查真实
+支持域，不能用粗掩码扩展为新观测；默认行为保持原postmask-only。
+物理求解按噪声感知可观子空间估计，只保留数据实际支持的方向。
+
+四、单窗口实验（只以估计航向历史选择，未按真实误差挑选）
+选定timestamp=1682.669610977s，重建旧查询的强度/法向与原保存查询
+逐值一致。诊断程序禁止打开navigation_states.npz、GPS和高程文件；
+结果结束后，独立ReviewProjectedSideScanTurn.py才读取评价真值。
+
+                      匹配对数    物理内点   结论
+旧条带/postmask            5          --    拒绝
+旧条带/context           13          --    拒绝
+双舷方向修正/postmask      4          --    拒绝
+双舷方向修正/context     19          --    拒绝
+来源投影/postmask        439         176    rank3，平面RMSE .37137m
+来源投影/context         392         105    rank3，平面RMSE .39168m
+
+主候选仍用原postmask模式，因为数据支持多、物理残差较小，不根据真值
+误差选模式。估计结束后评估：seed XY误差18.76663m，postmask匹配位姿
+XY误差2.05975m/yaw误差+.37165deg；context探索项1.24777m/-.56236deg。
+这些是一个时间点的匹配误差，不是航程RMSE或全局重定位成功率。
+独立审计逐个检查了169743个占据像素的真实来源、主导最大幅度、原始
+bin、相位中心与估计轨迹/标定一致性，重新构建计数和均值全部通过。
+第一次诊断在Kornia不接受Bool resize处失败，现场保留；改用浮点掩码
+后完整六组完成，并有真实Kornia resize/fine-support回归测试。
+
+五、完整2km同输入导航（隔离来源表示组件，双方回环关闭）
+原输入7576ping、125000 IMU、12500 DVL速度、25000压力样本全部无损
+重放。原ESIKF、cohort tracker、GTSAM、map→odom不改，DR/Local
+全程逐值相同。旧strip可表达的窗口保留旧处理；若会丢弃/反转扫描方向，
+采用来源投影及对应的物理配准。不是只改变图像颜色或仅替换一个矩阵秩。
+首次差异出现在1346.1356887816m，此前全部三路输出逐值相同。
+仅1个窗口触发投影并成功，总50尝试42地图匹配、40实际地图先验。
+
+                             原条带Global     来源投影Global
+全2km三维RMSE/m               10.31664          8.56415
+P95/m                         18.37482         17.53438
+最大/m                        19.36075         19.36075
+终点/m                         7.87793          6.80139
+第二条直线RMSE/m               11.37478          5.37079
+
+Global全2km RMSE降低16.987%，第二直线降低约52.8%。DR RMSE16.64782m、
+Local15.54794m均不变。最大误差发生在新信息到达前，不能后验改历史误差。
+代价必须同时说明：绝对校正使转弯段Global的10m/30m RPE由
+.41308/.84680m增为2.73568/3.74050m；Local短时增量不变。控制/短时
+运动应继续使用Local，不把Global位置差分当车辆速度，不改反馈链路来
+掩盖校正。map→odom沿用旧策略，未按真值调平滑程度。
+
+六、复现实验及权威输出
+以下共同前缀为output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/：
+  diagnose_projected_turn_v1/       Bool掩码失败，保留
+  diagnose_projected_turn_v2/       六组实际特征/图像/完整来源标记/源快照
+  review_projected_turn_v2/         独立来源与事后位姿核验、实际特征图
+  replay_adaptive_projected_submap2km_v1/  完整导航输入重放、轨迹/因子
+  review_adaptive_projected_submap2km_v1/  独立指标与同输入误差图
+
+.venv-sonar-denoise/bin/python standalone/ReplayPureSideScanNavigation.py \
+ --experiment output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2 \
+ --run output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_loftr2000m_turn_v1 \
+ --out output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/NEW_projected_replay \
+ --runtime current --submap-representation adaptive_projected
+
+新输出目录必须不存在，勿覆盖上述实验。当前投影开关仅允许回环关闭的
+表示消融，尚未验证历史子图混合类型/分块匹配兼容性，程序会明确拒绝
+--loop-closure组合，不能偷偷把它当成当前完整正式版。接下来要补齐这种
+互操作并进行完整同输入/独立种子验证；不能把上述2km视作整个目标完成。

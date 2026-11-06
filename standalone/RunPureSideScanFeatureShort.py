@@ -58,6 +58,7 @@ def main():
     p.add_argument('--loop-closure', action='store_true', help='Historical SSS feature loops; requires LoFTR.')
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--canonical-submaps', action='store_true')
+    p.add_argument('--submap-representation', choices=('legacy_strip', 'adaptive_projected'), default='legacy_strip')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
     sys.addaudithook(reject_gps_file)
@@ -104,7 +105,8 @@ def main():
         iq_simulator = PointScattererIQSimulator(world, ComplexEchoParameters(
             thermal_noise_rms=.004, interference_rms=.008, seed=a.seed))
     nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure,
-                                       scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps)
+                                       scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps,
+                                       submap_representation=a.submap_representation)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
                'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
@@ -112,6 +114,9 @@ def main():
                'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py', 'WriteSideScanReport.py']
     if a.loop_closure: sources += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
     if a.scan_plane_registration != 'rank2_baseline': sources += ['SideScanPlaneRegistration.py']
+    if a.submap_representation != 'legacy_strip':
+        sources += ['SideScanProjectedSubmap.py', 'SideScanProjectedMatching.py']
+        if 'SideScanPlaneRegistration.py' not in sources: sources += ['SideScanPlaneRegistration.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for source in sources: shutil.copy2(Path(__file__).parent/source, snapshot/source)
     report = dict(status='running', **route_scope_metadata(distance, a.full_route, route), seed=a.seed,
@@ -126,6 +131,7 @@ def main():
         secondary_denoising_used=False, historical_side_scan_loops_requested=a.loop_closure,
         scan_plane_registration=a.scan_plane_registration,
         canonical_submaps=a.canonical_submaps,
+        submap_representation=a.submap_representation,
         complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',

@@ -31,12 +31,12 @@ def metrics(error):
 
 
 def validate_comparison(reference, candidate, kind):
-    keys = ['loop_closure', 'scan_plane_registration', 'canonical_submaps']
-    defaults = [False, 'rank2_baseline', False]
+    keys = ['loop_closure', 'scan_plane_registration', 'canonical_submaps', 'submap_representation']
+    defaults = [False, 'rank2_baseline', False, 'legacy_strip']
     old = [reference.get(k, d) for k, d in zip(keys, defaults)]
     new = [candidate.get(k, d) for k, d in zip(keys, defaults)]
     changed = [i for i, (a, b) in enumerate(zip(old, new)) if a != b]
-    expected = {'loop': 0, 'registration': 1, 'submap_orientation': 2}[kind]
+    expected = {'loop': 0, 'registration': 1, 'submap_orientation': 2, 'projection': 3}[kind]
     if changed != [expected]: raise ValueError('Comparison must change exactly the declared estimator component.')
     if kind == 'loop' and (old[0] or not new[0]): raise ValueError('Explicit loop off/on required.')
     if kind != 'loop' and (old[0] or new[0]): raise ValueError('Representation/registration comparison requires loops OFF.')
@@ -111,7 +111,7 @@ def main():
     p.add_argument('--source-run', required=True, type=Path)
     p.add_argument('--without-loops', '--reference', dest='without_loops', required=True, type=Path)
     p.add_argument('--with-loops', '--candidate', dest='with_loops', required=True, type=Path)
-    p.add_argument('--comparison', choices=('loop', 'registration', 'submap_orientation'), default='loop')
+    p.add_argument('--comparison', choices=('loop', 'registration', 'submap_orientation', 'projection'), default='loop')
     p.add_argument('--out', required=True, type=Path)
     a = p.parse_args()
     if a.out.exists(): raise FileExistsError('Preserve earlier reviews.')
@@ -150,8 +150,8 @@ def main():
     fonts = [f.name for f in font_manager.fontManager.ttflist if 'Noto Sans CJK' in f.name]
     if fonts: plt.rcParams['font.family'] = fonts[0]
     fig, axes = plt.subplots(2, 1, figsize=(12, 7), constrained_layout=True)
-    before_label = {'loop': '无回环', 'registration': '固定两自由度', 'submap_orientation': '原始拼接方向'}[a.comparison]
-    after_label = {'loop': '历史子图回环', 'registration': '可观子空间', 'submap_orientation': '舷侧与平面方向对齐'}[a.comparison]
+    before_label = {'loop': '无回环', 'registration': '固定两自由度', 'submap_orientation': '原始拼接方向', 'projection': '原始直条带'}[a.comparison]
+    after_label = {'loop': '历史子图回环', 'registration': '可观子空间', 'submap_orientation': '舷侧与平面方向对齐', 'projection': '转弯来源投影＋物理验证'}[a.comparison]
     d = truth['distance_m']/1000
     axes[0].plot(d, off_error[:, 0], color='#888888', lw=1., label='DR')
     axes[0].plot(d, off_error[:, 1], color='#e67e22', lw=1., label='Local（两组逐值相同）')
@@ -165,7 +165,7 @@ def main():
         axes[1].plot(state['positions'][:, 2, 0], state['positions'][:, 2, 1], color=color, lw=1.2, label=label)
     axes[1].set(xlabel='场景 X / m', ylabel='场景 Y / m'); axes[1].set_aspect('equal', adjustable='datalim')
     axes[1].legend(); axes[1].grid(alpha=.2)
-    experiment_name = {'loop': '历史子图回环', 'registration': '扫描平面可观性', 'submap_orientation': '反向扫描拼接'}[a.comparison]
+    experiment_name = {'loop': '历史子图回环', 'registration': '扫描平面可观性', 'submap_orientation': '反向扫描拼接', 'projection': '转弯来源投影'}[a.comparison]
     fig.suptitle(f'同输入纯侧扫{experiment_name}对照：{d[-1]:.2f} km，实际回环因子 {on_review["actual_loop_edges"]} 条')
     fig.savefig(a.out/f'纯侧扫_{experiment_name}_同输入对照.png', dpi=200)
     plt.close(fig)

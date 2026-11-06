@@ -38,9 +38,11 @@ def main():
     p.add_argument('--loop-closure', action='store_true')
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--canonical-submaps', action='store_true')
+    p.add_argument('--submap-representation', choices=('legacy_strip', 'adaptive_projected'), default='legacy_strip')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
-    if a.out.exists() or ((a.loop_closure or a.canonical_submaps or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
+    if a.out.exists() or ((a.loop_closure or a.canonical_submaps or a.submap_representation != 'legacy_strip'
+                          or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
         raise ValueError('New output required; new loop module is only available in the current runtime.')
     original = json.loads((a.run/'run_summary.json').read_text())
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
@@ -76,6 +78,7 @@ def main():
     options = dict(loop_closure=True) if a.loop_closure else {}
     if a.scan_plane_registration != 'rank2_baseline': options['scan_plane_registration'] = a.scan_plane_registration
     if a.canonical_submaps: options['canonical_submaps'] = True
+    if a.submap_representation != 'legacy_strip': options['submap_representation'] = a.submap_representation
     nav = PureSideScanFeatureNavigator(IntensityFeatureMap.from_path(a.experiment/'scene/reference_baseline'),
         initial, np.array(init['startup_specific_force']), image_matcher=LoFTRSideScanMatcher(a.device), **options)
     a.out.mkdir()
@@ -83,6 +86,9 @@ def main():
              'SideScanLearnedFeatures.py', 'SideScanRecordedInputs.py']
     if a.loop_closure: names += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
     if a.scan_plane_registration != 'rank2_baseline': names += ['SideScanPlaneRegistration.py']
+    if a.submap_representation != 'legacy_strip':
+        names += ['SideScanProjectedSubmap.py', 'SideScanProjectedMatching.py']
+        if 'SideScanPlaneRegistration.py' not in names: names += ['SideScanPlaneRegistration.py']
     snapshot = a.out/'source_snapshot'; snapshot.mkdir()
     for name in names: shutil.copy2(runtime/name, snapshot/name)
     shutil.copy2(Path(__file__), snapshot/Path(__file__).name)
@@ -92,6 +98,7 @@ def main():
         loop_closure=a.loop_closure, secondary_denoising_used=False, sonar_resimulated=False,
         scan_plane_registration=a.scan_plane_registration,
         canonical_submaps=a.canonical_submaps,
+        submap_representation=a.submap_representation,
         all_navigation_observations_reused_losslessly=True, estimated_frames=0,
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
         executed_original_report_SHA256=sha(a.run/'run_summary.json'),
@@ -135,7 +142,8 @@ def main():
         np.testing.assert_array_equal(stamps, source['timestamps'])
         np.testing.assert_array_equal(array[:, :2], source['positions'][:, 1:3])
         difference = float(np.max(abs(array-source['positions'][:, 1:])))
-        if not a.loop_closure and not a.canonical_submaps and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7:
+        if (not a.loop_closure and not a.canonical_submaps and a.submap_representation == 'legacy_strip'
+                and a.scan_plane_registration == 'rank2_baseline' and difference > 1e-7):
             raise RuntimeError(f'Baseline replay failed reproducibility check: maximum state difference {difference}')
         error = np.linalg.norm(array-source['positions'][:, :1], axis=2)
         report['metrics'] = {n: dict(RMSE_m=float(np.sqrt(np.mean(error[:, k]**2))),

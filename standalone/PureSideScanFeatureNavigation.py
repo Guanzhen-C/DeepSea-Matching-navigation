@@ -57,7 +57,8 @@ class FeatureScanPlaneLikelihood:
 
 class PureSideScanFeatureNavigator:
     def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False,
-                 scan_plane_registration='rank2_baseline', canonical_submaps=False):
+                 scan_plane_registration='rank2_baseline', canonical_submaps=False,
+                 submap_representation='legacy_strip'):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -81,6 +82,12 @@ class PureSideScanFeatureNavigator:
         if scan_plane_registration not in ('rank2_baseline', 'observable_subspace'):
             raise ValueError('Explicit scan-plane registration mode required.')
         self.scan_plane_registration = scan_plane_registration
+        if submap_representation not in ('legacy_strip', 'adaptive_projected'):
+            raise ValueError('Explicit received-submap representation required.')
+        if submap_representation != 'legacy_strip' and (loop_closure or image_matcher is None):
+            raise ValueError('First isolate projected-map evidence with LoFTR and loops OFF; historical-image compatibility is not yet validated.')
+        self.submap_representation = submap_representation
+        self.projected_map_attempts = self.projected_map_accepts = 0
         if loop_closure:
             if image_matcher is None:
                 raise ValueError('Historical side-scan loops require a local-feature matcher.')
@@ -200,9 +207,22 @@ class PureSideScanFeatureNavigator:
             turning_window = float(np.ptp(historical_yaw)) > np.deg2rad(15.)
             sample_debug = self.observation_id % 1500 == 0 or turning_window
             try:
-                query = self.window.build(raw)
-                matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher,
-                                               registration_mode=self.scan_plane_registration)
+                # Use projection only when the legacy strip would discard or
+                # reverse acquired scan directions. This is representation
+                # support, never a true-pose/error-based acceptance threshold.
+                needs_projection = (self.submap_representation == 'adaptive_projected'
+                    and np.any(np.cos(historical_yaw-historical_yaw[-1]) < .5))
+                if needs_projection:
+                    from SideScanProjectedSubmap import build_projected_submap
+                    from SideScanProjectedMatching import match_projected_prior
+                    self.projected_map_attempts += 1
+                    query = build_projected_submap(self.window, raw)
+                    matched = match_projected_prior(self.map, query, target, self.image_matcher)
+                    self.projected_map_accepts += int(matched['accepted'])
+                else:
+                    query = self.window.build(raw)
+                    matched = match_feature_prior(self.map, query, target, image_matcher=self.image_matcher,
+                                                   registration_mode=self.scan_plane_registration)
                 if len(self.backend_query_examples) < 3 or (sample_debug and len(self.backend_query_examples) < 32):
                     self.backend_query_examples.append(dict(query, seed_pose2=target.copy()))
             except ValueError as exc:
@@ -283,6 +303,9 @@ class PureSideScanFeatureNavigator:
             secondary_submap_denoising_used=False,
             scan_plane_registration=self.scan_plane_registration,
             canonical_submap_orientation=self.window.canonical_orientation,
+            submap_representation=self.submap_representation,
+            projected_map=dict(attempts=self.projected_map_attempts, accepts=self.projected_map_accepts,
+                projected_XY_used_as_measurement=False),
             loop_closure=dict(enabled=False, actual_loop_edges=0) if self.historical_loops is None else
                 dict(enabled=True, **self.historical_loops.diagnostics(),
                      map_priors_replaced_by_loop=self.map_priors_replaced_by_loop,
