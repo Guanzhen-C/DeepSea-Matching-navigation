@@ -1,0 +1,147 @@
+千岛湖纯侧扫特征辅助导航：完整验证与运行说明
+
+一、最终结论与适用范围
+
+1. 已验证的方案
+（1）在已去噪的整幅实测侧扫强度场上，按照AUV当前位置生成收到的侧扫
+观测；按时间因果累计真实输入ping，构建子图，通过地貌特征匹配辅助定位。
+（2）当前配置固定为complex_IQ、LoFTR、adaptive_projected、历史回环开启；
+前端是GFTT/亚像素/SIFT描述子和扫描行几何的侧扫特征里程计，不是照搬
+官方FAST-LIVO2。后端为特征物理配准、原cohort候选跟踪、GTSAM图优化和
+map→odom软校正。回环检测与底图绝对匹配是两条不同约束链。
+（3）完整16.489km梳形路线已完成，Global全程RMSE10.79967m，相同传感器
+输入DR37.81686m，降低71.4422%；相同旧条带加回环17.04991m，降低36.6585%。
+这证明本场景中侧扫地貌约束对导航确实有帮助，不证明任意海域的实测精度。
+
+2. 数据与科学边界
+（1）使用先前固定方案处理后的强度场，不增加二次去噪；冻结去噪代码、
+原实测MAT和原湖试/海试基线均不改动。重叠平均与特征辐射归一化不是新去噪。
+（2）查询子图来自按AUV位姿收到的物理ping，不是直接从参考图裁图冒充观测。
+（3）IMU、DVL速度和压力深度可以使用；没有将MBES XYZ、DOA测深、地形
+高度似然、DVL离底高度、GPS或运行中真值提供给纯侧扫估计器。
+（4）复数I/Q是仿真生成，不是恢复了实测丢失的相位，也不是已标定的全波场。
+（5）场景来源于同航次实测记录拆分和标称航速地理编码，并非独立地理测量
+真值；初始化给定准确初值。未知初始位置全局搜寻、独立复测、实际海试和
+Jetson硬件在环不属于本次通过项。本场景未充分激励滚转/俯仰，不能外推6自由度性能。
+（6）平行条带仍可能存在高度—横向位姿歧义，不能把斜距像素当成水平量测；
+信息矩阵保持真实弱方向。新表示的转弯数据改善了部分可观性，但没有根除歧义。
+（7）回环/地图观测相关性采用保守信息预算，仍不是严格的全联合地标图；
+全程最大Global误差34.32114m，主要剩余误差在横向方向，不宣称全程高精度。
+
+二、完整试验与公平对照
+
+1. 完整范围
+（1）12条测线，每条1300m，线距28m，航速0.8m/s，掉头与闭合返航均保留。
+规划总长16488.7430927293m，末声呐采样16488.6441879272m，差0.099m，不足一采样间隔。
+（2）各组完整输入62458声呐、1030546 IMU、103054 DVL和206109压力，
+声呐周期来自实际记录时间戳。8同步相位中心与150连续物理ping不是同一概念。
+（3）四组共享同一完整无损float64导航输入，逐事件因果重放；没有重采样
+传感器随机流。四组DR/Local全帧逐值相同；旧版回环控制还与原全程位置、
+航向、时间和航程逐值相同。独立分析重算CSV/NPZ指标并核对真实GTSAM图边。
+
+2. 全程三维位置指标
+                                  RMSE/m    P95/m     最大/m    终点/m    回环边
+DR                                37.81686  56.95909  85.92279  72.61292     —
+Local                             34.65660  50.63750  84.20876  74.68033     —
+Global：旧条带无回环               15.83430  35.35116  44.01562  29.63637     0
+Global：旧条带有回环               17.04991  36.30941  41.59783  34.46315   294
+Global：新来源投影无回环           14.22340  30.93842  38.44514   7.01006     0
+Global：新来源投影有回环           10.79967  20.00914  34.32114   8.24144   304
+（1）采用新表示后回环单项使全程RMSE下降24.0711%，但终点误差略差于无回环。
+（2）旧条带加回环反而使全程RMSE增加7.6771%；没有删除或掩盖该负面结果。
+（3）两公里独立噪声seed32已完成四组对照，新表示在回环开启/关闭时分别
+降低RMSE24.1148%/25.2673%。这增加重复性证据，但不等同新地形泛化证明。
+
+3. 回环如何真正起作用
+（1）检索时间至少相隔180s且物理ping不重叠的历史子图，先按外观及估计
+覆盖范围检索，再进行LoFTR对应和声呐斜距/扫描平面几何验证。
+（2）图像仿射变换只筛选外观对应，不当成相对位姿；位姿由未知3D地物的
+物理观测消元求解，不提供地物真值高度，不把里程计初始化信息混入量测信息。
+（3）当前和历史窗口都不重叠的证据需给出一致校正，才向GTSAM加入回环边。
+轨迹相交不自动等于回环，必须扫描到共同地物并有可靠对应。
+（4）304是实际约束边，不是304次独立重访。其中11条涉及新来源投影子图，
+已与真实图中端点、量测和信息矩阵逐条对齐。其首次接受约在5.385km，
+不能把早期2km新类型候选全部拒绝的事实改写为当时已经成功。
+（5）Global绝对校正后差分并不等同可靠速度；Local短时相对运动没有因
+这次后端改进而改变，不通过强制覆盖Local来掩盖误差。
+
+三、运行方法
+
+1. 当前电脑完整重放（最快复现已验证结果，不重新生成声呐）
+在/home/cgz/OceanSim执行：
+
+.venv-sonar-denoise/bin/python standalone/RunValidatedSideScanNavigation.py \
+ --validation output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/validation_projected_full_comb_seed31_v3 \
+ --mode replay \
+ --out output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/user_verified_replay_01
+
+（1）默认无UI，完整62458帧，不用手工重复拼研究脚本参数。
+（2）首次只想检查命令时增加--dry-run；会核验完整证据，但不启动估计器。
+（3）输出目录必须不存在；再次运行请将_01改为_02，禁止覆盖此前结果。
+（4）replay不允许修改seed或截断distance，避免把非同输入实验当成复现。
+
+2. 重新生成声呐并完整运行（更慢，是新的完整仿真实验）
+
+.venv-sonar-denoise/bin/python standalone/RunValidatedSideScanNavigation.py \
+ --validation output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/validation_projected_full_comb_seed31_v3 \
+ --mode simulate \
+ --out output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/user_verified_simulation_01
+
+（1）默认完整路线、seed31，明确complex_IQ、LoFTR、新来源投影和回环。
+（2）可以显式加--seed 32或--distance-m 2000做新实验，但这不是自动通过
+全程验证的新结果。通用研究脚本名字含Short，不代表上述入口默认只跑短程。
+（3）入口需要本地场景、归档、冻结运行时、环境和LoFTR权重；不隐式下载，
+不把私有图像上传，不把GPU不可用静默替换为另一条算法路径。
+（4）入口先离线核验所有四组完整证据及53个bundle/39个运行源码SHA，
+再启动新估计器。离线评价真值不会传入新估计器，也不是在线误差门限。
+（5）不自动打开UI，不恢复RAM限制；尊重现有输出，不改变旧湖试/海试入口。
+
+四、结果和证据位置
+
+以下相对路径基准为：
+output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/
+
+1. 最终完整四组
+（1）validation_projected_full_comb_seed31_v3/validation_status.json
+（2）该目录projected_loops/为最终组合，estimated_positions.csv和
+estimated_states.npz保存全部估计，graph_factors.json为实际图，
+historical_loop_trace.json为历史候选与实际回环记录，source_snapshot为执行源码。
+（3）原始真值仅在源pure_sss_iq_loftr_full_comb_shared_loop_v2/navigation_states.npz，
+重放估计期间不读取；完整输入在该源的recorded_inputs/。
+（4）四个review_projection*/review_loops*目录有独立审核JSON和全程对照PNG。
+
+2. 推荐查看的全程图
+（1）validation_projected_full_comb_seed31_v3/review_projection_with_loops/
+纯侧扫_转弯来源投影_同输入对照.png
+（2）review_projected_full_terrain_v2/纯侧扫_16km_三维地形与三条轨迹.png
+以及同名PDF。三条原生轨迹为真值、Local、在线Global，不人为偏移或贴地；
+Z显示比例3倍，海底仅展示，不作为纯侧扫定位观测。全62458样本都保留。
+（3）review_directional_projected_full_loops_v1/保存方向误差和实际图信息诊断。
+
+3. 真实启动与回归检查
+（1）validated_pc_entry_smoke10m_v1/及其独立review已经完成，38声呐、
+625 IMU、62 DVL和125压力，原生输入与全程对应前缀逐值一致；仅验证入口、
+回波和记录链路，不作为后端精度证据，10m内尚未形成后端子图。
+（2）119项相关测试通过，覆盖特征、物理几何、来源投影、真实回环、完整
+输入协议、四组比较、入口门禁和三维绘图。它们不替代独立实测精度验收。
+（3）95个冻结去噪文件及所选权重SHA再次验证全部通过；原湖/海基线不变。
+
+4. 最终证据SHA256
+（1）完整矩阵validation_status.json：
+47b5d9729f81d827cf1e16ca40527a4ef70ad66585edf76e866fe9a9bb6134ae
+（2）runtime_pure_sss_projected_loops_v4/runtime_manifest.json：
+48b4c45e1aebbee001d35e363eb35f7199f0e1af4071d4cab09431644c1d93ef
+（3）真实入口smoke10m的run_summary.json：
+d486dba4eedf157f28b2e4a35b7a022276436ccf3b5e7f5bb5eb3a3d9cf254e3
+（4）上述smoke独立review的independent_review.json：
+d2e226d8bbc91ffccc5970d53432af30a7f66f83ab9e7830c0957b59ee94cd79
+
+五、后续迭代优先级（非本次已经验证的效果）
+
+1. 增加独立航次和准确地理配准参考，先区分底图误差与算法误差。
+2. 设计有足够不同扫描方向的重复覆盖，增强横向/航向约束，避免只凭平行条带。
+3. 改善历史检索与视角不变性；目前检索仍依赖估计覆盖，尚非任意初始位置全局检索。
+4. 对原生侧扫特征做有标注或自监督的声呐域适配；当前LoFTR是未修改公开室外权重。
+5. 改善共享地物/历史观测的相关性建模，保留真实退化，不用人造强信息压低曲线。
+6. 每次改进沿用同输入四组全程和独立种子对照，同时记录RPE和发布跳变，
+不能仅优化终点、挑选好看的航段，或牺牲Local运动连续性来美化Global误差。
