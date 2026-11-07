@@ -1,0 +1,46 @@
+{
+  "schema": "oceansim.validated-algorithm-profiles/v1",
+  "active_development_branch": "main",
+  "profile_names_are_not_git_branches": true,
+  "profiles": {
+    "lake_terrain_simulation": {
+      "tag": "lake-sim-baseline-20261021",
+      "commit": "204d3e24048a8b515616d9305b7516221bcf8fed",
+      "scope": "Lake Chelan terrain simulation and processor-in-loop baseline; not a physical lake trial",
+      "launcher": "standalone/run_chelan_guarded.py",
+      "frozen_bundle_builder": "standalone/hil/prepare_bundle.py",
+      "bundle_profile": "lake",
+      "requires_exact_frozen_source_for_reproduction": true
+    },
+    "sea_terrain_simulation": {
+      "tag": "sea-sim-baseline-20261021",
+      "commit": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+      "scope": "Monterey terrain simulation and processor-in-loop baseline; not a physical sea trial",
+      "launcher": "standalone/run_monterey_72km_stable.sh",
+      "frozen_bundle_builder": "standalone/hil/prepare_bundle.py",
+      "bundle_profile": "sea",
+      "requires_exact_frozen_source_for_reproduction": true
+    },
+    "measured_sonar_denoising": {
+      "tag": "sonar-denoise-frozen-20261106",
+      "commit": "0f106ba3da57104ae1def55e866c7638ad426936",
+      "manifest": "releases/sonar_denoise_20261106/release_manifest.json",
+      "baseline": "fusion_wide_front",
+      "comparison": "fusion_limited_front",
+      "source_test_and_weight_file_count": 95,
+      "real_clean_ground_truth_available": false,
+      "automatic_fidelity_acceptance": false
+    },
+    "pure_side_scan_feature_navigation": {
+      "tag": "pure-sss-sim-validated-20261107",
+      "commit": "f3476fb170db86570a897587562b57075d135d6e",
+      "launcher": "standalone/RunValidatedSideScanNavigation.py",
+      "submap_representation": "adaptive_projected",
+      "loop_closure": true,
+      "feature_matcher": "LoFTR",
+      "secondary_denoising": false,
+      "measured_height_likelihood": false,
+      "scope": "Measured-derived intensity scene with synthetic complex returns, controlled initialization and complete 16.489 km 2x2 identical-input evaluation; not independent field navigation"
+    }
+  }
+}
