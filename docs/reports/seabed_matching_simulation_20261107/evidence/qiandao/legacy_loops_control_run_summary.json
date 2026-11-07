@@ -1,0 +1,183 @@
+{
+  "status": "completed_lossless_navigation_input_replay",
+  "runtime": "current",
+  "loop_closure": true,
+  "secondary_denoising_used": false,
+  "sonar_resimulated": false,
+  "scan_plane_registration": "rank2_baseline",
+  "canonical_submaps": false,
+  "submap_representation": "legacy_strip",
+  "configuration_matches_executed_run": true,
+  "all_navigation_observations_reused_losslessly": true,
+  "estimated_frames": 62458,
+  "input_manifest_SHA256": "a5cec618e48a35ebf6fbcf1c4a25c3bf40deb88af6fedebb96523af26e800f83",
+  "executed_original_report_SHA256": "bbe350e653449d3d8a3e9167ffb199f77cb9ee668fb5455bdcad7b1751b37dc5",
+  "source_SHA256": {
+    "PureSideScanFeatures.py": "e551d3e54515921d0ebd77e3f86e9936e7ef7c2ff82c191778b8e876298b8255",
+    "SideScanFeatureMap.py": "cfedb62e0a1fe98c7d7de88b5075c5e3f135117f2cb213cde634105623add8e8",
+    "PureSideScanFeatureNavigation.py": "7e7a5e8efd822f652316c8526b9f772ea8f4d6bacefee7c47df21bb5e3fa45c3",
+    "SideScanLearnedFeatures.py": "edfb092b7d5dffa30a976fe55259b1277543d2f63677f999de47dab534f0fc5f",
+    "SideScanRecordedInputs.py": "6e3b219ae88e01987797bdac49b72d6bc4f24b45019962570b8b1ee9db746a9d",
+    "SideScanLoopGeometry.py": "df24659604f31e7ec42a9d3280b4ed62fe30adb05fed119ee239aa43a3db7267",
+    "SideScanLoopClosure.py": "640fbd32ac2a2f2f92fd4eea11769b71f46596fb17470ab61ca4a012baeb4c8f"
+  },
+  "events": {
+    "sonar": 62458,
+    "imu": 1030546,
+    "depth": 206109,
+    "dvl": 103054
+  },
+  "frozen_core_and_prior_dependency_SHA256": {
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/estimator_bundle/isaacsim/oceansim/slam/esikf.py": "ed2908396bce1287b848f5daefa34ecaec6e3f8aff567306bb24c5e89a9e0fbb",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/estimator_bundle/isaacsim/oceansim/slam/global_tracking.py": "717fe2536f8a14d8083263f5bffdd1511f129b8534095099d0efb0ae78177576",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/estimator_bundle/isaacsim/oceansim/slam/pose_graph.py": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/estimator_bundle/isaacsim/oceansim/slam/map_odom.py": "6beb5903cce337eac3985358b3404f44b875a2ae701078ea07ce91c42a0d451e",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/scene/reference_baseline/backscatter.npy": "4fa9a6f4e319d088f88ee0eba644860d19be58c0b4215e9f475f76153045188e",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/scene/reference_baseline/backscatter_valid_mask.npy": "0a2e9d105e7a2e6d26e8488c01cd3e9b052b2350bef17fd914d2c24a85532828",
+    "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/scene/reference_baseline/metadata.json": "a964b4c48062a19d3d42adfb4fb65ffa7065eacc4fd5b24cbef4169e698ea616"
+  },
+  "replay_driver_SHA256": "cefca81c195dcf98ccfada6079ed33cd393a6315c526eca943124ff35c457812",
+  "strict_report_writer_SHA256": "74e1550b2406b360b297c5da454da76f1fc525fa865e061c4a2056e6badafe2c",
+  "last_timestamp_s": 20542.165250778,
+  "elapsed_s": 2067.83845329599,
+  "diagnostics": {
+    "mode": "pure_side_scan_descriptor_features",
+    "feature_detector": "GFTT+subpixel",
+    "descriptor": "SIFT",
+    "matching": "mutual_ratio+scanline_RANSAC",
+    "optical_flow_calls": 0,
+    "DVL_altitude_observations": 0,
+    "MBES_points_consumed": 0,
+    "measured_height_likelihood_terms": 0,
+    "measured_height_graph_factors": 0,
+    "raw_intensity_correlation_calls": 0,
+    "frontend": {
+      "accepted": 62366,
+      "rejected": 91,
+      "updates": 20764
+    },
+    "feature_map": {
+      "attempts": 416,
+      "accepts": 343,
+      "graph_feature_priors": 331,
+      "last": {
+        "accepted": false,
+        "reason": "insufficient_mutual_feature_matches",
+        "matches": 20,
+        "inliers": 0,
+        "query_features": 20,
+        "map_features": 20,
+        "observable_rank": null,
+        "submap_assembly": {
+          "assembly": "ordinary_overlap_average_of_received_scans",
+          "canonical_port_starboard_and_plane_orientation": false,
+          "secondary_denoising_used": false,
+          "unknown_cells_filled": false
+        },
+        "status": "no_fix",
+        "null_probability": 0.9849189670398052,
+        "cohorts": 1,
+        "feature_likelihood_only": true,
+        "measured_depth_likelihood_terms": 0,
+        "measured_depth_graph_factors": 0,
+        "DVL_altitude_used": false,
+        "optical_flow_used": false
+      }
+    },
+    "optimizer_backend": "gtsam_isam2_incremental_fixed_lag",
+    "backend_feature_matcher": {
+      "algorithm": "LoFTR_local_features_plus_scan_plane_geometry",
+      "checkpoint_SHA256": "21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec",
+      "kornia_version": "0.8.2",
+      "torch_version": "2.8.0+cu128",
+      "unmodified_public_outdoor_weights": true,
+      "sonar_specific_training": false,
+      "optical_flow": false,
+      "raw_intensity_correlation": false,
+      "input_images_uploaded": false,
+      "received_support_context_masks": false
+    },
+    "secondary_submap_denoising_used": false,
+    "scan_plane_registration": "rank2_baseline",
+    "canonical_submap_orientation": false,
+    "submap_representation": "legacy_strip",
+    "projected_map": {
+      "attempts": 0,
+      "accepts": 0,
+      "projected_XY_used_as_measurement": false
+    },
+    "loop_closure": {
+      "enabled": true,
+      "historical_submaps": 416,
+      "candidate_attempts": 1146,
+      "historical_projected_submaps": 0,
+      "geometric_candidates": 512,
+      "independent_confirmations": 294,
+      "actual_loop_edges": 294,
+      "last": {
+        "accepted": false,
+        "reason": "too_few_historical_feature_matches",
+        "matches": 17,
+        "typed_source_geometry": false,
+        "historical_tiling": null,
+        "appearance_warp_is_not_a_loop_pose_measurement": true,
+        "association_consensus_model": "legacy_scan_row_consensus"
+      },
+      "measured_heights_used": false,
+      "image_homography_used_as_pose": false,
+      "confirmations_require_disjoint_ping_windows": true,
+      "temporal_consistency_is_an_association_heuristic_not_a_truth_error_gate": true,
+      "caveat": "Conservative loop/map correlation handling; not a fully joint landmark graph.",
+      "map_priors_replaced_by_loop": 0,
+      "shared_current_windows": 244,
+      "shared_observation_policy": "half_information_each_for_loop_and_map_not_independent_full_factors"
+    },
+    "global_cohort_tracker_updates": 416,
+    "map_to_odom": {
+      "timestamp_s": 20610.805234909,
+      "current_map_to_odom_pose2": [
+        -16.949415116814976,
+        -19.408190120383153,
+        0.03320850638628414
+      ],
+      "target_map_to_odom_pose2": [
+        -16.949415116814407,
+        -19.40819012038206,
+        0.03320850638628592
+      ],
+      "remaining_translation_m": 7.963152328398962e-13,
+      "remaining_yaw_deg": 1.0177774980683254e-13,
+      "update_calls": 62458,
+      "positive_time_updates": 62457,
+      "translation_rate_limit_activations": 0,
+      "yaw_rate_limit_activations": 0
+    },
+    "observation_limit": "Scan-plane geometry only; actual null directions retained. Slant pixels are not horizontal observations.",
+    "short_test_is_not_validated_whole_map_unknown_pose_relocalization": true
+  },
+  "metrics": {
+    "DR": {
+      "RMSE_m": 37.81686180805838,
+      "P95_m": 56.959085399373876,
+      "max_m": 85.92278577396203,
+      "final_m": 72.61292135864106
+    },
+    "Local": {
+      "RMSE_m": 34.65659760299344,
+      "P95_m": 50.63750407228696,
+      "max_m": 84.20876453992727,
+      "final_m": 74.68032869037445
+    },
+    "Global": {
+      "RMSE_m": 17.049913348892527,
+      "P95_m": 36.309408864677444,
+      "max_m": 41.59782768149158,
+      "final_m": 34.46314547905147
+    }
+  },
+  "DR_and_Local_bit_exact": true,
+  "maximum_difference_from_original_m": 0.0,
+  "evaluation_truth_read_only_after_estimation": true,
+  "full_native_navigation_inputs_verified": true,
+  "source_snapshots_verified": true
+}

@@ -1,0 +1,60 @@
+{
+  "status": "completed_post_estimation_submap_display",
+  "replay_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/validation_projected_full_comb_seed31_v3/projected_loops",
+  "source_inputs": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_loftr_full_comb_shared_loop_v2/recorded_inputs",
+  "recorded_inputs_verified": true,
+  "estimator_launched": false,
+  "reference_map_read": false,
+  "truth_read": false,
+  "extra_denoising": false,
+  "color_only_display_transform": true,
+  "unsupported_pixels_black_for_display": true,
+  "views": [
+    {
+      "name": "直航子图",
+      "shape": [
+        86,
+        1024
+      ],
+      "observation_start_id": 5551,
+      "observation_end_id": 5700,
+      "start_s": 1831.499576569,
+      "end_s": 1880.669565201,
+      "native_pixels_preserved": true,
+      "provenance": "pixel_exact_to_saved_actual_loop_0_new_image",
+      "distance_m": 1504.5356521608,
+      "feature_count": 1463
+    },
+    {
+      "name": "转弯子图",
+      "shape": [
+        1000,
+        1054
+      ],
+      "observation_start_id": 4951,
+      "observation_end_id": 5100,
+      "start_s": 1633.499622345,
+      "end_s": 1682.669610977,
+      "native_pixels_preserved": true,
+      "provenance": "post_estimation_reconstruction_from_recorded_packets_and_executed_Local",
+      "distance_m": 1346.1356887816,
+      "feature_count": 2165
+    }
+  ],
+  "executed_output_SHA256": {
+    "estimated_positions.csv": "1fcb7bda1ec576534136d31f2278a3b62be2f26e0ab8f1768ed33932cea85538",
+    "estimated_states.npz": "e73ba8f2bd1474dd81e9e7964913a104cf72f1a8f256d484871ff78df8c2c7b5",
+    "graph_factors.json": "4ad16b76c780dd95c9bd87c9877237b5bfe85f0796501444693abe12fa0235e2"
+  },
+  "straight_saved_loop_image_SHA256": "827bb6920af05180cd0b3365c1b8cef59b2cb9a62b35e9648640dcce3dcd5eff",
+  "render_script_SHA256": "fcc8cf7638bc4924ef568cbfbc38d9be8b92750b226ed2c4218fc10779a324c5",
+  "artifacts_SHA256": {
+    "当前侧扫子图_直航与转弯.png": "407087fae1cd00374f685da479db6c4da9c9ad55b11753e7fe3cd36f35d0be87",
+    "直航子图_数值与有效区域.npz": "53d09caee294173bf9e19b071816667539eb5c8b82ead45fcfb7ed472a7dcf2e",
+    "直航子图_琥珀色_原生.png": "1370c1459108823544c37af6eb8ef05710922187b77f0dc08cef8322a30706df",
+    "直航子图_算法输入灰度_原生.png": "3ad4edac888ef7477347fac437b01a49b37c1fac0190f571229a96a0a11d46d1",
+    "转弯子图_数值与有效区域.npz": "51605f0f30da15abb7aa50e6157c7b48d410ece23cb6671bafec51c51ea732a5",
+    "转弯子图_琥珀色_原生.png": "686442f842bdde1cec8be421a0334f8ae6d6e7a8433af4e7d7034c97853cfe92",
+    "转弯子图_算法输入灰度_原生.png": "3ece308421ed02ff790f00fac52691c0616b56bd6a11cad5c599c93750cb08c4"
+  }
+}

@@ -1,0 +1,6 @@
+# Audited report artifacts must retain identical bytes on Windows and Linux.
+# In particular, the CSV writer's standard CRLF records are not whitespace bugs.
+docs/reports/seabed_matching_simulation_20261107/** -text
+docs/reports/seabed_matching_simulation_20261107/data/*.csv whitespace=cr-at-eol
+# Two trailing spaces intentionally represent Markdown hard line breaks.
+docs/reports/seabed_matching_simulation_20261107/海底地形地貌匹配算法仿真报告.md whitespace=-blank-at-eol

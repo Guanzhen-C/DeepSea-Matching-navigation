@@ -1,0 +1,120 @@
+{
+  "status": "completed_independent_full_route_2x2_ablation",
+  "target_unit": "oceansim-pure-sss-shared-loop-full16km-20261107-v2.service",
+  "target_PID": 886838,
+  "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_loftr_full_comb_shared_loop_v2",
+  "runtime": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/runtime_pure_sss_projected_loops_v4",
+  "runtime_manifest_SHA256": "48b4c45e1aebbee001d35e363eb35f7199f0e1af4071d4cab09431644c1d93ef",
+  "observer_SHA256": "d7ead5b9e783a753b7fe17b1d0ba577e9f35fb840458041c4724c07e42c41b4b",
+  "estimator_restart_allowed": false,
+  "secondary_denoising_allowed": false,
+  "completed_replays": [
+    "projected_loops",
+    "projected_no_loops",
+    "legacy_loops_control",
+    "legacy_no_loops"
+  ],
+  "completed_comparisons": [
+    "projection_with_loops",
+    "projection_without_loops",
+    "loops_with_projection",
+    "loops_without_projection"
+  ],
+  "source_run_summary_SHA256": "bbe350e653449d3d8a3e9167ffb199f77cb9ee668fb5455bdcad7b1751b37dc5",
+  "current_replay": "legacy_no_loops",
+  "legacy_control": {
+    "positions_timestamps_yaw_distance_bit_exact": true,
+    "frames": 62458
+  },
+  "current_comparison": "loops_without_projection",
+  "metrics": {
+    "projected_loops": {
+      "DR": {
+        "RMSE_m": 37.81686180805838,
+        "P95_m": 56.959085399373876,
+        "max_m": 85.92278577396203,
+        "final_m": 72.61292135864106
+      },
+      "Local": {
+        "RMSE_m": 34.65659760299344,
+        "P95_m": 50.63750407228696,
+        "max_m": 84.20876453992727,
+        "final_m": 74.68032869037445
+      },
+      "Global": {
+        "RMSE_m": 10.799671504220969,
+        "P95_m": 20.009143800396785,
+        "max_m": 34.3211393778629,
+        "final_m": 8.2414433976531
+      }
+    },
+    "projected_no_loops": {
+      "DR": {
+        "RMSE_m": 37.81686180805838,
+        "P95_m": 56.959085399373876,
+        "max_m": 85.92278577396203,
+        "final_m": 72.61292135864106
+      },
+      "Local": {
+        "RMSE_m": 34.65659760299344,
+        "P95_m": 50.63750407228696,
+        "max_m": 84.20876453992727,
+        "final_m": 74.68032869037445
+      },
+      "Global": {
+        "RMSE_m": 14.223398427021833,
+        "P95_m": 30.938416256439226,
+        "max_m": 38.44514433374199,
+        "final_m": 7.010064285375569
+      }
+    },
+    "legacy_loops_control": {
+      "DR": {
+        "RMSE_m": 37.81686180805838,
+        "P95_m": 56.959085399373876,
+        "max_m": 85.92278577396203,
+        "final_m": 72.61292135864106
+      },
+      "Local": {
+        "RMSE_m": 34.65659760299344,
+        "P95_m": 50.63750407228696,
+        "max_m": 84.20876453992727,
+        "final_m": 74.68032869037445
+      },
+      "Global": {
+        "RMSE_m": 17.049913348892527,
+        "P95_m": 36.309408864677444,
+        "max_m": 41.59782768149158,
+        "final_m": 34.46314547905147
+      }
+    },
+    "legacy_no_loops": {
+      "DR": {
+        "RMSE_m": 37.81686180805838,
+        "P95_m": 56.959085399373876,
+        "max_m": 85.92278577396203,
+        "final_m": 72.61292135864106
+      },
+      "Local": {
+        "RMSE_m": 34.65659760299344,
+        "P95_m": 50.63750407228696,
+        "max_m": 84.20876453992727,
+        "final_m": 74.68032869037445
+      },
+      "Global": {
+        "RMSE_m": 15.83430215887208,
+        "P95_m": 35.35115790204013,
+        "max_m": 44.01562117815842,
+        "final_m": 29.636374100437603
+      }
+    }
+  },
+  "Global_RMSE_change_percent": {
+    "projection_with_loops": -36.65849624436679,
+    "projection_without_loops": -10.173506326249083,
+    "loops_with_projection": -24.071089201132224,
+    "loops_without_projection": 7.677074605648682
+  },
+  "scope": "Same measured-derived scene, seed and controlled initialization; not independent field validation.",
+  "negative_results_must_be_retained": true
+}

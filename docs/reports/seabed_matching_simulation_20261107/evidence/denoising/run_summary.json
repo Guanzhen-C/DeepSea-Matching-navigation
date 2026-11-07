@@ -1,0 +1,111 @@
+{
+  "status": "completed_full_measured_frozen_inference_and_native_images_pending_independent_audit",
+  "PID": 1545823,
+  "workers": 4,
+  "expected_native_shape": [
+    2,
+    8,
+    2020,
+    12189
+  ],
+  "expected_native_source_values": 393948480,
+  "original_source_receipt_SHA256": "30c11f87265ce8cdf7decc1a8fd09b0f23aa1d843f01072accf013e1d395d874",
+  "protocol_manifest_SHA256": "75687a7c0b939a02c7676c7d3408c61cb66730179df48f89155fb3d40beea20f",
+  "recovery_bundle_SHA256": "d8ffa5a179f2c962f56c015c5ba464eb82108595cb3a0b6db3a4b648852146c1",
+  "models": {
+    "mandatory_wide_raw": {
+      "path": "selected_weights/mandatory_wide_raw.pt",
+      "SHA256": "1e220da1f7ff10216e81d0cc78ea4ae22413b8395a8338a1c1777a1ca1f31c1d",
+      "step": 400,
+      "condition": {
+        "noise": "wide",
+        "frontend": false,
+        "aggregation": "mandatory"
+      }
+    },
+    "fusion_wide_raw": {
+      "path": "selected_weights/fusion_wide_raw.pt",
+      "SHA256": "4206817401f28ede1c256a47d80cb06ddbd9e0939b8f92b74257e3ec8d8a188a",
+      "step": 400,
+      "condition": {
+        "noise": "wide",
+        "frontend": false,
+        "aggregation": "learned_fusion"
+      }
+    },
+    "fusion_limited_raw": {
+      "path": "selected_weights/fusion_limited_raw.pt",
+      "SHA256": "c88124e94062dd940b2ece1f5b770de574ba81fd655eda8d9dabbfb7e26add20",
+      "step": 400,
+      "condition": {
+        "noise": "limited",
+        "frontend": false,
+        "aggregation": "learned_fusion"
+      }
+    },
+    "fusion_wide_front": {
+      "path": "selected_weights/fusion_wide_front.pt",
+      "SHA256": "faece15dfd9c9a4b028a409b6d8ee583c93287e1b6ec81afd0c274c4686073e0",
+      "step": 400,
+      "condition": {
+        "noise": "wide",
+        "frontend": true,
+        "aggregation": "learned_fusion"
+      }
+    },
+    "fusion_limited_front": {
+      "path": "selected_weights/fusion_limited_front.pt",
+      "SHA256": "1bdf60020552169378efd9079526b3d50f543a892eb0efd497b00535c6b88f1a",
+      "step": 400,
+      "condition": {
+        "noise": "limited",
+        "frontend": true,
+        "aggregation": "learned_fusion"
+      }
+    },
+    "frozen_prior_anchored_raw": {
+      "path": "selected_weights/frozen_prior_anchored_raw.pt",
+      "SHA256": "4257fd19356eaec92bca966d5f34742b68cf1bf5c8056c67a7f377da91c52583",
+      "step": 400,
+      "condition": {
+        "frontend": false
+      }
+    }
+  },
+  "full_native_grid_resampled": false,
+  "original_MAT_modified": false,
+  "models_retrained": false,
+  "final_observed_water_support_is_separate_from_network_training": true,
+  "original_phase_not_replaced_by_invented_phase": true,
+  "real_clean_truth": false,
+  "quality_accepted": false,
+  "gain_fields": {
+    "mandatory_wide_raw": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/mandatory_wide_raw_supported_log_delta.npy",
+    "fusion_wide_raw": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/fusion_wide_raw_supported_log_delta.npy",
+    "fusion_limited_raw": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/fusion_limited_raw_supported_log_delta.npy",
+    "fusion_wide_front": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/fusion_wide_front_supported_log_delta.npy",
+    "fusion_limited_front": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/fusion_limited_front_supported_log_delta.npy",
+    "frozen_prior_anchored_raw": "/data/dcliu/OceanSim-sonar/matched_processing_recovery_20261105_v1/measured_full_voyage_20261105_v1/full_frozen_inference/frozen_prior_anchored_raw_supported_log_delta.npy"
+  },
+  "worker_PIDs": [
+    1546088,
+    1546089,
+    1546090,
+    1546091
+  ],
+  "new_execution_source_SHA256": {
+    "InferFullMeasuredSonar172.py": "12da4728cf99be983028e6760d7acda58b3ea9dc965a2f95afeb329f51722ac7",
+    "RecoveredMatchedSonarModels.py": "f8e52747ad84495f65bde724f4f7fbdfa1470ff83b50d99b899ac7d574d8ed69",
+    "FullMeasuredSonarProtocol.py": "05b97af287faa212e62f6d2f78dfac22ef1a9a50823a7f338e74492b2914fc31",
+    "RenderFullMeasuredSonar172.py": "7095030a0df3225b63cefa68e640b160eafa7b901984d0896260fe580ca3f2bd",
+    "AuditFullMeasuredSonar172.py": "cec04110355d80f1b4a4df4e908146b7ba5b37126bdea0d24a5f3a2e0431e924",
+    "NativeSonarPaletteStream.py": "a2264168f4d023b6e1b9c06e0da5ce8c4a2ba756751e93d94abd8853a9239a91"
+  },
+  "worker_exit_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "elapsed_s": 369.62447556102416
+}

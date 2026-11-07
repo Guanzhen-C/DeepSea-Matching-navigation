@@ -1,0 +1,275 @@
+{
+  "kind": "two_complete_processor_HIL_sensor_missions_final_data_review_not_deployment_acceptance",
+  "recorded_utc": "2026-10-23T07:49:40.225687+00:00",
+  "hardware": "actual Jetson AGX Orin, aarch64",
+  "evidence_path_base": "demo/hil/jetson_20261021/full_missions_lake_original_20261021_v2",
+  "lake": {
+    "distance_m": 47116.48901858927,
+    "samples": 157056,
+    "baseline_sha": "204d3e24048a8b515616d9305b7516221bcf8fed",
+    "online_board": {
+      "dr": {
+        "rmse_m": 735.7610393391914,
+        "median_m": 261.5816768388638,
+        "p95_m": 1766.9415952396946,
+        "p99_m": 1975.699422640778,
+        "max_m": 2045.563260052846,
+        "final_m": 2024.9387574297718
+      },
+      "local": {
+        "rmse_m": 734.3903394125668,
+        "median_m": 264.9426902660633,
+        "p95_m": 1761.9793119999565,
+        "p99_m": 1968.6526521441585,
+        "max_m": 2038.06207886939,
+        "final_m": 2016.9200734295039
+      },
+      "global": {
+        "rmse_m": 6.828697062062329,
+        "median_m": 4.167925464560639,
+        "p95_m": 13.526643045529024,
+        "p99_m": 21.987830287644016,
+        "max_m": 38.78417353107484,
+        "final_m": 22.51695855344694
+      }
+    },
+    "original_PC": {
+      "dr": {
+        "rmse_m": 944.1429194142128,
+        "median_m": 295.9760065840324,
+        "p95_m": 2328.5128750156346,
+        "p99_m": 2593.4277825438635,
+        "max_m": 2676.002001737233,
+        "final_m": 2656.6417235465883
+      },
+      "local": {
+        "rmse_m": 942.3254946029449,
+        "median_m": 301.5366516618027,
+        "p95_m": 2321.4829673339245,
+        "p99_m": 2584.1607108885637,
+        "max_m": 2666.0762626369456,
+        "final_m": 2646.317206334623
+      },
+      "global": {
+        "rmse_m": 7.1204203906569745,
+        "median_m": 4.041331622336122,
+        "p95_m": 13.323067983834225,
+        "p99_m": 25.721404565568616,
+        "max_m": 46.69117574727368,
+        "final_m": 36.39810572390677
+      }
+    },
+    "relative_accuracy_review_passed": true,
+    "source_OOM_kills": 0,
+    "realtime_accepted": false
+  },
+  "sea": {
+    "distance_m": 73070.32881952196,
+    "samples": 243569,
+    "baseline_sha": "8b5df53cb57f9de2506d78d90b16e33bf5e96510",
+    "online_board": {
+      "dr": {
+        "rmse_m": 939.1273397059207,
+        "median_m": 640.5448098361867,
+        "p95_m": 2047.9014391436338,
+        "p99_m": 2287.1705652622986,
+        "max_m": 2316.987453263859,
+        "final_m": 2192.007128315627
+      },
+      "local": {
+        "rmse_m": 929.5978097365102,
+        "median_m": 608.588172065681,
+        "p95_m": 2041.5974649137286,
+        "p99_m": 2279.5660520172196,
+        "max_m": 2308.3690856665876,
+        "final_m": 2184.606762287672
+      },
+      "global": {
+        "rmse_m": 6.829882592425078,
+        "median_m": 4.051072823341106,
+        "p95_m": 13.267354170575725,
+        "p99_m": 21.657805274616504,
+        "max_m": 41.45334039504116,
+        "final_m": 4.450662175063113
+      }
+    },
+    "original_PC": {
+      "dr": {
+        "rmse_m": 624.7451506632638,
+        "median_m": 266.13528076415867,
+        "p95_m": 1394.9703873035703,
+        "p99_m": 1538.3189561424927,
+        "max_m": 1559.7990432868496,
+        "final_m": 1466.1051383010938
+      },
+      "local": {
+        "rmse_m": 625.0160491709695,
+        "median_m": 256.0492195193209,
+        "p95_m": 1392.69881975028,
+        "p99_m": 1533.737295484292,
+        "max_m": 1554.371432784066,
+        "final_m": 1462.144546928942
+      },
+      "global": {
+        "rmse_m": 6.364549700227672,
+        "median_m": 3.9329247852877347,
+        "p95_m": 11.70640473682292,
+        "p99_m": 17.599500656190052,
+        "max_m": 53.84625800105146,
+        "final_m": 4.354309271619619
+      }
+    },
+    "relative_changes": {
+      "dr": {
+        "rmse_m": 0.5032166935731979,
+        "p95_m": 0.46806086909282474
+      },
+      "local": {
+        "rmse_m": 0.48731830321724123,
+        "p95_m": 0.46592891152144444
+      },
+      "global": {
+        "rmse_m": 0.07311324667332886,
+        "p95_m": 0.13334148859920947
+      }
+    },
+    "relative_accuracy_review_passed": false,
+    "failed_accuracy_items": [
+      {
+        "channel": "dr",
+        "metric": "rmse_m",
+        "relative_change": 0.5032166935731979
+      },
+      {
+        "channel": "dr",
+        "metric": "p95_m",
+        "relative_change": 0.46806086909282474
+      },
+      {
+        "channel": "local",
+        "metric": "rmse_m",
+        "relative_change": 0.48731830321724123
+      },
+      {
+        "channel": "local",
+        "metric": "p95_m",
+        "relative_change": 0.46592891152144444
+      },
+      {
+        "channel": "global",
+        "metric": "p95_m",
+        "relative_change": 0.13334148859920947
+      }
+    ],
+    "source_OOM_kills": 1,
+    "realtime_accepted": false,
+    "raw_input_sha256": "a2ac4081d4a26fd68a8339fe3174ba575141ceb30a159b60954cc16e59596b00",
+    "raw_input_bytes": 67769318915,
+    "all_packet_and_EOF_checks_passed": true,
+    "independent_recorded_board_input_byte_archive_not_available": true
+  },
+  "host_complete_test_result": {
+    "tests": 591,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "requirements": [
+    {
+      "item": "Both full requested sensor routes and every online board output retained",
+      "status": "proven",
+      "evidence": [
+        "lake_full_route_live_review/completion_evidence.json",
+        "sea_full_route_failed_resource_review_20261023/failed_run_integrity_evidence.json"
+      ]
+    },
+    {
+      "item": "Real Jetson full original frontend, hybrid terrain backend and native GTSAM without ongoing truth input",
+      "status": "proven_with_simulated_sensor_scope",
+      "evidence": [
+        "sea_full_route_live/board_artifacts/extraction_audit.json",
+        "sea_full_route_live/board_artifacts/receiver_summary.json",
+        "sea_full_route_failed_resource_review_20261023/failed_run_integrity_evidence.json"
+      ]
+    },
+    {
+      "item": "Actual board six-pose channels and input sequences equal returned results",
+      "status": "proven",
+      "evidence": [
+        "lake_full_route_live_review/completion_evidence.json",
+        "sea_full_route_failed_resource_review_20261023/failed_run_integrity_evidence.json"
+      ]
+    },
+    {
+      "item": "Complete saved raw archive packet checksums, sequence, field whitelist, cadence and gzip EOF",
+      "status": "proven_for_saved_PC_archives_not_independent_board_raw_archive",
+      "evidence": [
+        "../archive_integrity_20261022/lake_completed_full_archive.json",
+        "sea_full_route_failed_resource_review_20261023/sea_full_archive_integrity.json"
+      ]
+    },
+    {
+      "item": "Original all-channel RMSE/P95 <=10% relative degradation rule",
+      "status": "failed_on_sea",
+      "evidence": [
+        "sea_full_route_failed_resource_review_20261023/common_truth_metrics.json"
+      ]
+    },
+    {
+      "item": "No host OOM during sensor run and shutdown",
+      "status": "failed_on_sea_shutdown",
+      "evidence": [
+        "sea_full_route_live/host_resource_summary.json"
+      ]
+    },
+    {
+      "item": "Sustained nominal 5Hz real-time throughput",
+      "status": "failed",
+      "evidence": [
+        "lake_full_route_live_review/completion_evidence.json",
+        "sea_full_route_failed_resource_review_20261023/completed_online_motion_timing_and_risk_audit.json"
+      ]
+    },
+    {
+      "item": "2D errors, measured-terrain 3D trajectories and full 10/30/60s SE3 relative-motion audit",
+      "status": "proven_generated_and_images_visually_checked",
+      "evidence": [
+        "lake_full_route_live_review/figures/plot_audit.json",
+        "sea_full_route_failed_resource_review_20261023/figures/plot_audit.json",
+        "sea_full_route_failed_resource_review_20261023/relative_motion_audit.json"
+      ]
+    },
+    {
+      "item": "Current complete host regression with CUDA and native BBS available",
+      "status": "proven_591_passed_no_skips",
+      "evidence": [
+        "sea_full_route_failed_resource_review_20261023/host_complete_tests_20261023.xml"
+      ]
+    },
+    {
+      "item": "Architecture-related inertial branch difference isolated from sonar and graph",
+      "status": "reproduced_but_unique_root_not_identified",
+      "evidence": [
+        "../inertial_arm_control_20261023/comparison_to_actual_ARM_HIL_DR.json",
+        "../inertial_arm_control_20261023/comparison_to_original_PC_DR.json"
+      ]
+    }
+  ],
+  "scientific_scope": [
+    "navigation processor-in-loop with simulated raw sonar, IMU, DVL and depth; not physical sonar hardware, actuator/controller closed loop or field trial",
+    "real registered bathymetry/backscatter plus declared procedural subgrid augmentation and simulated returns; related source/prior map products do not prove independent field generalization",
+    "only controlled t0 navigation seed uses truth; all later truth evaluation stays on PC",
+    "unaligned synchronized 3D online errors; no posterior replacement of online board output",
+    "overlapping RPE windows and selected historical risk intervals are not independent experimental repetitions"
+  ],
+  "raw_archive_pending_in_earlier_snapshot_is_historical": true,
+  "full_route_data_complete": true,
+  "full_route_acceptance": false,
+  "final_acceptance": false,
+  "remaining_required_work": [
+    "localize and repair the source shutdown OOM without altering estimator state or hiding original failure",
+    "qualify numerical portability under the original accuracy review rule",
+    "localize and improve the measured throughput bottlenecks before claiming real-time qualification",
+    "qualify any changed deployment implementation separately; retain original frozen baselines and all failed evidence"
+  ]
+}

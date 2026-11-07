@@ -1,0 +1,414 @@
+{
+  "images": [
+    {
+      "file": "figures/qiandao_full_field_route.png",
+      "native_shape": [
+        3230,
+        1700
+      ],
+      "placed_width_cm": 10.0,
+      "placed_height_cm": 19.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/qiandao_received_submaps.png",
+      "native_shape": [
+        2070,
+        2160
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 15.333333333333334,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/denoising_full_voyage_comparison.png",
+      "native_shape": [
+        1396,
+        2192
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 10.18978102189781,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_hil_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_hil_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_hil_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_hil_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/qiandao_projection_full_route.png",
+      "native_shape": [
+        1400,
+        2400
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.333333333333334,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/qiandao_loops_full_route.png",
+      "native_shape": [
+        1400,
+        2400
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.333333333333334,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/qiandao_terrain_trajectories.png",
+      "native_shape": [
+        1584,
+        3300
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 7.68,
+      "aspect_ratio_preserved": true
+    }
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "text": "海底地形地貌匹配算法仿真报告"
+    },
+    {
+      "level": 2,
+      "text": "一、任务目标与试验范围"
+    },
+    {
+      "level": 3,
+      "text": "1. 研究背景与验证问题"
+    },
+    {
+      "level": 3,
+      "text": "2. 月度目标与实际时间"
+    },
+    {
+      "level": 3,
+      "text": "3. 试验层级"
+    },
+    {
+      "level": 2,
+      "text": "二、仿真系统总体方案"
+    },
+    {
+      "level": 3,
+      "text": "1. 原项目基础与新增能力"
+    },
+    {
+      "level": 3,
+      "text": "2. 两条验证链路"
+    },
+    {
+      "level": 3,
+      "text": "3. 坐标系与结果输出"
+    },
+    {
+      "level": 2,
+      "text": "三、数据来源与场景构建"
+    },
+    {
+      "level": 3,
+      "text": "1. Monterey海区场景"
+    },
+    {
+      "level": 3,
+      "text": "2. Lake Chelan湖区场景"
+    },
+    {
+      "level": 3,
+      "text": "3. 千岛湖实测声呐数据"
+    },
+    {
+      "level": 4,
+      "text": "（1）原始记录"
+    },
+    {
+      "level": 4,
+      "text": "（2）去噪与成像"
+    },
+    {
+      "level": 4,
+      "text": "（3）场景栅格"
+    },
+    {
+      "level": 4,
+      "text": "（4）参考与查询"
+    },
+    {
+      "level": 3,
+      "text": "4. 梳形路线与覆盖范围"
+    },
+    {
+      "level": 2,
+      "text": "四、传感器模型与数据接口"
+    },
+    {
+      "level": 3,
+      "text": "1. 硬件在环输入"
+    },
+    {
+      "level": 3,
+      "text": "2. 纯侧扫仿真观测"
+    },
+    {
+      "level": 3,
+      "text": "3. 同步8通道与连续150个ping"
+    },
+    {
+      "level": 3,
+      "text": "4. 模型与实物的边界"
+    },
+    {
+      "level": 2,
+      "text": "五、导航与地形地貌匹配算法"
+    },
+    {
+      "level": 3,
+      "text": "1. 局部状态估计"
+    },
+    {
+      "level": 3,
+      "text": "2. 海湖地形全局匹配"
+    },
+    {
+      "level": 3,
+      "text": "3. 纯侧扫子图与特征地图匹配"
+    },
+    {
+      "level": 4,
+      "text": "（1）直航表示"
+    },
+    {
+      "level": 4,
+      "text": "（2）转弯表示"
+    },
+    {
+      "level": 4,
+      "text": "（3）匹配与几何"
+    },
+    {
+      "level": 4,
+      "text": "（4）保持退化"
+    },
+    {
+      "level": 3,
+      "text": "4. 历史回环检测与图优化"
+    },
+    {
+      "level": 3,
+      "text": "5. 观测残差与信息退化"
+    },
+    {
+      "level": 4,
+      "text": "（1）运动与基础水下观测"
+    },
+    {
+      "level": 4,
+      "text": "（2）参考地图的扫描平面约束"
+    },
+    {
+      "level": 4,
+      "text": "（3）历史回环的斜距与扫描平面约束"
+    },
+    {
+      "level": 4,
+      "text": "（4）后端目标与多候选处理"
+    },
+    {
+      "level": 2,
+      "text": "六、实测侧扫去噪方案与效果边界"
+    },
+    {
+      "level": 3,
+      "text": "1. 问题与技术选择"
+    },
+    {
+      "level": 3,
+      "text": "2. 固定处理链"
+    },
+    {
+      "level": 3,
+      "text": "3. 原生分辨率与完整处理"
+    },
+    {
+      "level": 3,
+      "text": "4. 可报告结果与不能作出的结论"
+    },
+    {
+      "level": 2,
+      "text": "七、试验设计与评价指标"
+    },
+    {
+      "level": 3,
+      "text": "1. 可比较性设计"
+    },
+    {
+      "level": 3,
+      "text": "2. 三维绝对位置误差"
+    },
+    {
+      "level": 3,
+      "text": "3. 相对运动与方向退化"
+    },
+    {
+      "level": 3,
+      "text": "4. 完整性与实时性"
+    },
+    {
+      "level": 2,
+      "text": "八、海湖处理器在环试验结果"
+    },
+    {
+      "level": 3,
+      "text": "1. 部署与接口结果"
+    },
+    {
+      "level": 3,
+      "text": "2. 湖区47.12 km完整结果"
+    },
+    {
+      "level": 3,
+      "text": "3. 海区73.07 km完整结果"
+    },
+    {
+      "level": 3,
+      "text": "4. 时序与资源问题"
+    },
+    {
+      "level": 2,
+      "text": "九、纯侧扫16.49 km完整仿真结果"
+    },
+    {
+      "level": 3,
+      "text": "1. 完整输入与运行条件"
+    },
+    {
+      "level": 3,
+      "text": "2. 全程四组对照"
+    },
+    {
+      "level": 3,
+      "text": "3. 实际匹配与回环"
+    },
+    {
+      "level": 3,
+      "text": "4. 误差方向与残余问题"
+    },
+    {
+      "level": 3,
+      "text": "5. 独立噪声种子的短程补充"
+    },
+    {
+      "level": 2,
+      "text": "十、结果分析与工程适用性"
+    },
+    {
+      "level": 3,
+      "text": "1. 绝对地形地貌匹配的作用"
+    },
+    {
+      "level": 3,
+      "text": "2. 相对定位与全局校正的关系"
+    },
+    {
+      "level": 3,
+      "text": "3. 地形和地貌可观性"
+    },
+    {
+      "level": 3,
+      "text": "4. 去噪与匹配的联合评价"
+    },
+    {
+      "level": 2,
+      "text": "十一、阶段完成情况与后续工作"
+    },
+    {
+      "level": 3,
+      "text": "1. 已有成果能够支撑的结论"
+    },
+    {
+      "level": 3,
+      "text": "2. 不能提前认定通过的事项"
+    },
+    {
+      "level": 3,
+      "text": "3. 后续实施优先级"
+    },
+    {
+      "level": 2,
+      "text": "十二、软件与数据交付及复现方法"
+    },
+    {
+      "level": 3,
+      "text": "1. main分支与版本追溯"
+    },
+    {
+      "level": 3,
+      "text": "2. 报告数据包"
+    },
+    {
+      "level": 3,
+      "text": "3. 结果重算与仿真重新执行"
+    },
+    {
+      "level": 3,
+      "text": "4. 测试口径"
+    },
+    {
+      "level": 2,
+      "text": "十三、结论"
+    },
+    {
+      "level": 2,
+      "text": "十四、参考文献与方法来源"
+    },
+    {
+      "level": 3,
+      "text": "1. 公开方法"
+    },
+    {
+      "level": 3,
+      "text": "2. 数据与本项目结果"
+    }
+  ],
+  "tables": 6,
+  "editable_word_reopened": true,
+  "pdf_conversion_completed": true,
+  "libreoffice_output": "convert /home/cgz/OceanSim/docs/reports/seabed_matching_simulation_20261107/海底地形地貌匹配算法仿真报告.docx -> /home/cgz/OceanSim/docs/reports/seabed_matching_simulation_20261107/海底地形地貌匹配算法仿真报告.pdf using filter : writer_pdf_Export"
+}
