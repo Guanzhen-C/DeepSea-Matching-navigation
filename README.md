@@ -4,6 +4,7 @@
 
 ## 报告与数据入口
 
+- [实测侧扫声呐去噪与高清增强完整管线](releases/sonar_denoise_enhanced_20261107/README.md)：原始 MAT → 固定模型 → 边缘修复 → Shotwell 增强，含权重、运行命令、测试与示例图。
 - [海底地形地貌匹配算法仿真报告](docs/reports/seabed_matching_simulation_20261107/海底地形地貌匹配算法仿真报告.md)
 - [报告数据与阅读说明](docs/reports/seabed_matching_simulation_20261107/README.md)
 - [完整试验指标](docs/reports/seabed_matching_simulation_20261107/data/verified_metrics.json)

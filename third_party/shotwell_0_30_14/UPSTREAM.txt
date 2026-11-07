@@ -1,0 +1,16 @@
+Upstream: GNOME Shotwell
+Tag: shotwell-0.30.14
+Repository: https://github.com/GNOME/shotwell/tree/shotwell-0.30.14
+License: GNU LGPL 2.1 or later; original copyright headers retained.
+Original files (unchanged):
+  src/ColorTransformation.vala
+  src/util/KeyValueMap.vala
+  src/_transformation.c
+  COPYING
+
+These three source files implement the real Shotwell colour transformation
+engine. They are compiled as a separate local batch executable, not reimplemented
+as an approximate gamma curve or linked into the navigation algorithm.
+Adapter source: ../../standalone/shotwell_reference/EnhancePalette.vala
+Pinned hashes and build command: ../../standalone/EnhanceEdgeSonarShotwell.py
+The adapter's Gdk.Point declaration is only for unused red-eye metadata methods.
