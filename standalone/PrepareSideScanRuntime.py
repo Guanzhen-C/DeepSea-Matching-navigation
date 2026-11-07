@@ -39,10 +39,12 @@ def source_closure(source, entries):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--out', required=True, type=Path)
+    p.add_argument('--entrypoint', action='append',
+                   help='Optional explicit analysis-only entrypoint(s); default navigation closure is unchanged')
     a = p.parse_args()
     if a.out.exists(): raise FileExistsError('Never overwrite an existing staged runtime.')
     source = Path(__file__).resolve().parent
-    entries = list(ENTRYPOINTS)
+    entries = list(a.entrypoint or ENTRYPOINTS)
     names = source_closure(source, entries)
     target = a.out/'standalone'; target.mkdir(parents=True)
     hashes = {}

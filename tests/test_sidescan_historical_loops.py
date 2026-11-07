@@ -105,3 +105,25 @@ def test_no_candidate_is_logged_as_no_candidate_not_as_stale_success():
     assert loops.observe(query(), np.zeros(3), g, [np.eye(3)]*3, 49.) is None
     assert loops.last['status'] == 'no_time_separated_overlapping_historical_submap'
     assert loops.diagnostics()['actual_loop_edges'] == 0
+
+
+def test_trace_records_actual_inserted_information_after_graph_tempering(monkeypatch):
+    loops = SideScanHistoricalLoops(None); g = graph()
+    g.add_edge = lambda source, target, measurement, info, **kw: g.edges.append(
+        SimpleNamespace(information=np.asarray(info)*.5))
+    old1, old2 = frame(query()), frame(query(151, 300, 50., 99.), 1)
+    monkeypatch.setattr(loops, 'candidates', lambda *args: [old1])
+    monkeypatch.setattr(loops, 'match_pair', lambda *args: dict(accepted=True,
+        relative_pose2=np.zeros(3), information=np.diag([1., 0., 10.]),
+        standardized_rmse=.1, observable_rank=2, matches=40, inliers=30,
+        old_pixels=np.zeros((30, 2)), new_pixels=np.zeros((30, 2))))
+    monkeypatch.setattr(module, 'lift_loop_to_graph_nodes',
+                        lambda *a, **kw: (np.zeros(3), np.diag([1., 0., 10.])))
+    loops.observe(query(301, 450, 850., 899.), np.zeros(3), g, [np.eye(3)]*3, 899.)
+    monkeypatch.setattr(loops, 'candidates', lambda *args: [old2])
+    selected = loops.observe(query(451, 600, 900., 949.), np.zeros(3), g, [np.eye(3)]*3, 949.,
+                             shared_current_window=True)
+    assert selected is not None
+    np.testing.assert_array_equal(selected['information'], np.diag([.25, 0., 2.5]))
+    np.testing.assert_array_equal(loops.trace[-1]['factor']['information'], g.edges[-1].information)
+    assert loops.trace[-1]['factor']['information_is_actual_graph']

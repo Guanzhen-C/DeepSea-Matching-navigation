@@ -30,7 +30,8 @@ def sha(path):
 
 
 def same_executed_configuration(original, *, loop_closure=False, scan_plane_registration='rank2_baseline',
-                                canonical_submaps=False, submap_representation='legacy_strip'):
+                                canonical_submaps=False, submap_representation='legacy_strip',
+                                mapped_range_changes=False, mapped_range_policy='tempered_legacy'):
     """Only the EXECUTED protocol is a reproduction; other settings are ablations.
 
     In particular, loop-off is not always the original baseline: a full source
@@ -40,6 +41,8 @@ def same_executed_configuration(original, *, loop_closure=False, scan_plane_regi
         and original.get('scan_plane_registration', 'rank2_baseline') == scan_plane_registration
         and bool(original.get('canonical_submaps', False)) == bool(canonical_submaps)
         and original.get('submap_representation', 'legacy_strip') == submap_representation
+        and bool(original.get('mapped_range_changes', False)) == bool(mapped_range_changes)
+        and (not mapped_range_changes or original.get('mapped_range_policy', 'tempered_legacy') == mapped_range_policy)
         and original.get('requested_feature_matcher') == 'LoFTR')
 
 
@@ -53,17 +56,23 @@ def main():
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--canonical-submaps', action='store_true')
     p.add_argument('--submap-representation', choices=('legacy_strip', 'adaptive_projected'), default='legacy_strip')
+    p.add_argument('--mapped-range-changes', action='store_true',
+                   help='Opt-in causal map-associated two-reception range-change constraints; no seabed height')
+    p.add_argument('--mapped-range-policy', choices=('tempered_legacy', 'preserve_legacy'), default='tempered_legacy')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
-    if a.out.exists() or ((a.loop_closure or a.canonical_submaps or a.submap_representation != 'legacy_strip'
+    if a.out.exists() or ((a.loop_closure or a.canonical_submaps or a.mapped_range_changes or a.submap_representation != 'legacy_strip'
                           or a.scan_plane_registration != 'rank2_baseline') and a.runtime != 'current'):
         raise ValueError('New output required; new loop module is only available in the current runtime.')
     original = json.loads((a.run/'run_summary.json').read_text())
+    if not a.mapped_range_changes and a.mapped_range_policy != 'tempered_legacy':
+        raise ValueError('Mapped range precision policy requires its explicit opt-in')
     if not original['status'].startswith('completed_') or not original.get('recorded_navigation_inputs'):
         raise ValueError('Complete executed input archive required; never replay a partial stale running file.')
     reproduce_executed = same_executed_configuration(original, loop_closure=a.loop_closure,
         scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps,
-        submap_representation=a.submap_representation)
+        submap_representation=a.submap_representation, mapped_range_changes=a.mapped_range_changes,
+        mapped_range_policy=a.mapped_range_policy)
     dependencies = {a.experiment/'estimator_bundle/isaacsim/oceansim/slam'/name: expected
         for name, expected in original['original_core_source_SHA256'].items()}
     dependencies.update({a.experiment/'scene/reference_baseline'/name: expected
@@ -77,7 +86,8 @@ def main():
     def guard(event, args):
         if event != 'open' or not args or not isinstance(args[0], (str, bytes, Path)): return
         path = Path(args[0].decode() if isinstance(args[0], bytes) else args[0])
-        if ('gps' in path.name.lower() or path.name in ('elevation.npy', 'navigation_elevation.npy')
+        if ('gps' in path.name.lower() or path.name in ('elevation.npy', 'navigation_elevation.npy',
+                'elevation_m.npy', 'navigation_elevation_m.npy')
                 or (not estimation_finished and path.resolve() == evaluation_file)):
             raise RuntimeError('Forbidden estimator access to GPS/terrain height/evaluation truth: '+str(path))
     sys.addaudithook(guard)
@@ -96,12 +106,16 @@ def main():
     if a.scan_plane_registration != 'rank2_baseline': options['scan_plane_registration'] = a.scan_plane_registration
     if a.canonical_submaps: options['canonical_submaps'] = True
     if a.submap_representation != 'legacy_strip': options['submap_representation'] = a.submap_representation
+    if a.mapped_range_changes:
+        options.update(mapped_range_changes=True, mapped_range_policy=a.mapped_range_policy)
     nav = PureSideScanFeatureNavigator(IntensityFeatureMap.from_path(a.experiment/'scene/reference_baseline'),
         initial, np.array(init['startup_specific_force']), image_matcher=LoFTRSideScanMatcher(a.device), **options)
     a.out.mkdir()
     names = ['PureSideScanFeatures.py', 'SideScanFeatureMap.py', 'PureSideScanFeatureNavigation.py',
              'SideScanLearnedFeatures.py', 'SideScanRecordedInputs.py']
     if a.loop_closure: names += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.mapped_range_changes:
+        names += ['SideScanMappedRangeChange.py', 'SideScanMappedRangeGraph.py', 'SideScanMappedRangeBank.py']
     if a.loop_closure and a.submap_representation != 'legacy_strip': names += ['SideScanHistoricalMatching.py']
     if a.scan_plane_registration != 'rank2_baseline': names += ['SideScanPlaneRegistration.py']
     if a.submap_representation != 'legacy_strip':
@@ -117,6 +131,8 @@ def main():
         scan_plane_registration=a.scan_plane_registration,
         canonical_submaps=a.canonical_submaps,
         submap_representation=a.submap_representation,
+        mapped_range_changes=a.mapped_range_changes,
+        mapped_range_policy=a.mapped_range_policy,
         configuration_matches_executed_run=reproduce_executed,
         all_navigation_observations_reused_losslessly=True, estimated_frames=0,
         input_manifest_SHA256=sha(a.run/'recorded_inputs/input_manifest.json'),
@@ -161,6 +177,16 @@ def main():
         np.testing.assert_array_equal(stamps, source['timestamps'])
         np.testing.assert_array_equal(array[:, :2], source['positions'][:, 1:3])
         difference = float(np.max(abs(array-source['positions'][:, 1:])))
+        if a.mapped_range_changes and a.mapped_range_policy == 'preserve_legacy':
+            first_range_s = min((t['timestamp_s'] for t in nav.mapped_ranges.trace), default=np.inf)
+            prefix = np.asarray(stamps) < first_range_s
+            before = float(np.max(abs(array[prefix, 2]-source['positions'][prefix, 3]))) if prefix.any() else 0.
+            report['maximum_Global_difference_before_first_range_m'] = before
+            baseline_scope = same_executed_configuration(original, loop_closure=a.loop_closure,
+                scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps,
+                submap_representation=a.submap_representation)
+            if baseline_scope and before > 1e-7:
+                raise RuntimeError('Preserve-legacy profile altered the baseline before any new range factor')
         if reproduce_executed and difference > 1e-7:
             raise RuntimeError(f'Executed-configuration replay failed reproducibility check: maximum state difference {difference}')
         error = np.linalg.norm(array-source['positions'][:, :1], axis=2)
@@ -183,6 +209,9 @@ def main():
             (a.out/'historical_loop_trace.json').write_text(json.dumps(loop_trace, indent=2, allow_nan=False)+'\n')
             for k, example in enumerate(nav.historical_loops.examples):
                 np.savez_compressed(a.out/f'actual_historical_loop_{k}.npz', **example)
+        if getattr(nav, 'mapped_ranges', None) is not None:
+            (a.out/'mapped_range_change_trace.json').write_text(
+                json.dumps(nav.mapped_ranges.trace, indent=2, allow_nan=False)+'\n')
         diagnostics, _ = sanitize_for_strict_json(nav.diagnostics())
         report.update(status='completed_lossless_navigation_input_replay', elapsed_s=time.monotonic()-started,
             diagnostics=diagnostics, DR_and_Local_bit_exact=True, maximum_difference_from_original_m=difference,

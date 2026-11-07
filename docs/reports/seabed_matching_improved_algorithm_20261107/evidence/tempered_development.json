@@ -1,0 +1,97 @@
+{
+  "status": "completed_independent_heldout_recording_mapped_range_comparison_NOT_full16km",
+  "executed_scope": "completed_heldout_source_recording_NOT_full16km",
+  "source_seed": 32,
+  "samples": 7576,
+  "distance_m": 1999.7995376584001,
+  "all_received_events_verified": true,
+  "DR_and_Local_bit_exact": true,
+  "full_original_input_file_SHA256_reverified": true,
+  "baseline_Global": {
+    "RMSE_m": 7.797477070194722,
+    "P95_m": 15.136027808563508,
+    "max_m": 16.183968956446805,
+    "final_m": 2.08296893322299
+  },
+  "candidate_Global": {
+    "RMSE_m": 9.54015499290874,
+    "P95_m": 15.302995086561957,
+    "max_m": 16.013402936443978,
+    "final_m": 4.668865359283791
+  },
+  "baseline_directional": {
+    "along_track_RMSE_m": 2.023591902892658,
+    "cross_track_RMSE_m": 7.530313627091617,
+    "vertical_RMSE_m": 0.010057255988695753
+  },
+  "candidate_directional": {
+    "along_track_RMSE_m": 2.712251989170651,
+    "cross_track_RMSE_m": 9.146482673004055,
+    "vertical_RMSE_m": 0.010057255988695753
+  },
+  "baseline_planar_relative": {
+    "10m": {
+      "pairs": 7538,
+      "RMSE_m": {
+        "DR": 0.5445994091538102,
+        "Local": 0.5437068454958829,
+        "Global": 1.0195940041868259
+      }
+    },
+    "30m": {
+      "pairs": 7462,
+      "RMSE_m": {
+        "DR": 0.9587251266364838,
+        "Local": 0.9510401843429167,
+        "Global": 1.9720494784665552
+      }
+    }
+  },
+  "candidate_planar_relative": {
+    "10m": {
+      "pairs": 7538,
+      "RMSE_m": {
+        "DR": 0.5445994091538102,
+        "Local": 0.5437068454958829,
+        "Global": 0.6209531148373137
+      }
+    },
+    "30m": {
+      "pairs": 7462,
+      "RMSE_m": {
+        "DR": 0.9587251266364838,
+        "Local": 0.9510401843429167,
+        "Global": 1.1267909340419575
+      }
+    }
+  },
+  "Global_RMSE_change_percent": 22.349253572995753,
+  "actual_range_input_audit": {
+    "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+    "factors": 5,
+    "feature_pairs": 46,
+    "unique_received_samples": 92,
+    "Local_not_truth_used_to_reconstruct_offsets": true,
+    "source_bins_and_unsupported_echoes_checked": true,
+    "raw_data_uploaded": false
+  },
+  "actual_historical_loop_edges": 12,
+  "legacy_pre_budget_loop_trace_reconciliations": 0,
+  "actual_new_map_priors": 42,
+  "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_projected_loops2000m_seed32_v1",
+  "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/heldout_seed32_mapped_ranges_v2",
+  "source_states_SHA256": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4",
+  "replay_outputs_SHA256": {
+    "estimated_positions.csv": "7712df3b1fbd437d2f82c36a6dfffa43b4ae4fd3ea5eb67137ecf7d29b6116b2",
+    "estimated_states.npz": "a8a4ead73fa3f7a8cdf7adc802bd85bbcc2ad4860acdd7e901036670f2068f72",
+    "graph_factors.json": "c63a98215eecfa5e50d7df620d3d1f8de3159ef4c212c0082b4e330810bff808"
+  },
+  "raw_data_uploaded": false,
+  "external_upload_performed": false,
+  "limitations": [
+    "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+    "Opt-in combination includes conservative correlation tempering, not isolated range-information ablation.",
+    "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+    "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+  ]
+}

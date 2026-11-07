@@ -41,12 +41,34 @@ def write(path, value):
         f.write('\n')
 
 
+def appearance_values(values, lookup):
+    """Explicit uncalibrated HSV-V appearance, not recovered acoustic power.
+
+    The fixed lookup is the max RGB component of each of the 256 colours
+    transformed by the actual Shotwell engine. The native display quantizer
+    is applied before lookup, exactly as in the reviewed palette image.
+    This happens before spatial bin averaging, never from a portrait crop.
+    """
+    values, lookup = np.asarray(values, float), np.asarray(lookup, float)
+    if (not np.isfinite(values).all() or (values < 0).any()
+            or lookup.shape != (256,) or not np.isfinite(lookup).all()
+            or lookup[0] != 0 or lookup.min() < 0 or lookup.max() > 1
+            or (np.diff(lookup) < 0).any()):
+        raise ValueError('Finite nonnegative native values and a monotonic black-preserving 256-entry LUT required.')
+    index = np.minimum((np.clip(values, 0, 1)*256).astype(np.uint16), 255)
+    return lookup[index]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, required=True)
     parser.add_argument('--raw-cache', type=Path, required=True)
     parser.add_argument('--stopped-experiment', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--edge-patch', type=Path,
+                        help='Frozen gain_and_commonmode last512 patch; original baseline unchanged if absent.')
+    parser.add_argument('--shotwell-appearance-lut', type=Path,
+                        help='Fixed 256-entry enhanced HSV-V display appearance, NOT calibrated echo amplitude.')
     a = parser.parse_args()
     sys.addaudithook(reject_gps_file)
     if a.out.exists():
@@ -70,6 +92,21 @@ def main():
         raise ValueError('Frozen full native gain changed.')
     raw_path = a.raw_cache/'原始MAT逐束包络_float64.npy'
     raw, gain = np.load(raw_path, mmap_mode='r'), np.load(gain_path, mmap_mode='r')
+    edge = None
+    lookup = None
+    if a.edge_patch is not None:
+        if sha(a.edge_patch) != audit['edge_gain_file_SHA256']:
+            raise ValueError('Not the reviewed full native gain_and_commonmode patch.')
+        edge = np.load(a.edge_patch, mmap_mode='r')
+        if edge.dtype != np.float32 or edge.shape != (2, 8, 2020, 512):
+            raise ValueError('Complete original16-beam/2020-record last512 edge patch required.')
+    if a.shotwell_appearance_lut is not None:
+        if edge is None:
+            raise ValueError('The newly approved appearance uses the reviewed edge repair first.')
+        lookup = np.load(a.shotwell_appearance_lut)
+        appearance_values(np.array([0., 1.]), lookup)  # validate once before geometry
+    variant = ('edge_shotwell_HSV_V_appearance' if lookup is not None else
+               'gain_and_commonmode_linear_amplitude' if edge is not None else 'frozen_baseline_linear_amplitude')
     identities = np.load(a.raw_cache/'PingNum_PingS_PingUs.npy')
     if raw.shape != (2, 8, 2020, 12189) or gain.shape != raw.shape or identities.shape != (2020, 3):
         raise ValueError('All native2020 records,16beams and12189range samples required.')
@@ -116,11 +153,17 @@ def main():
                     retained = []
                     for side, reader in enumerate(readers):
                         angle, delay = reader.depth(local)
+                        current_gain = np.asarray(gain[side, :, index])
+                        if edge is not None:
+                            current_gain = current_gain.copy()
+                            current_gain[:, -512:] = edge[side, :, index]
                         xyz, values, beam, native_bin = native_bottom_samples(angle, delay,
-                            np.asarray(raw[side, :, index]), np.asarray(gain[side, :, index]), side=side,
+                            np.asarray(raw[side, :, index]), current_gain, side=side,
                             sound_speed=p['c'], sampling_frequency=p['BeamSigFs'], installation_deg=p['InstallAngle'],
                             beam_spacing_m=p['BeamSpacingAlongTrackDisRes'],
                             vehicle_along_m=speed*times[index]-extent/2, platform_depth_m=source_depth)
+                        if lookup is not None:
+                            values = appearance_values(values, lookup)
                         ix = np.rint(xyz[:, 0]/resolution+(shape[1]-1)/2).astype(int)
                         iy = np.rint(xyz[:, 1]/resolution+(shape[0]-1)/2).astype(int)
                         inside = (ix >= 0)&(ix < shape[1])&(iy >= 0)&(iy < shape[0])
@@ -168,6 +211,10 @@ def main():
             source_product='ALL2020 same-echo measured angle-delay bathymetry plus frozen denoised native amplitude',
             coordinate_frame='nominal source straight-track local simulation frame, NOT geodetic',
             backscatter_units='uncalibrated linear envelope amplitude proxy, NOT calibrated reflectivity',
+            appearance_variant=variant,
+            numeric_map_derived_from_native_beams_not_portrait_pixels=True,
+            shotwell_display_value_is_not_calibrated_acoustic_amplitude=lookup is not None,
+            radiometric_mapping_stage='per_native_bottom_sample_before_spatial_bin_average',
             assumed_layout_speed_mps=speed, source_platform_depth_m_assumed=source_depth,
             source_platform_attitude_assumed='level straight source platform, not recovered',
             GPS_read_or_used=False, actual_vessel_trajectory_or_attitude_recovered=False,
@@ -179,6 +226,12 @@ def main():
             elevation_smoothing_sigma_m=.6, maximum_local_interpolation_distance_m=1.5,
             reference_and_query_depth_are_not_identical_by_construction=True,
             full_map_display_must_not_be_estimator_reference=('display_only' in name))
+        if lookup is not None:
+            metadata['backscatter_units'] = 'uncalibrated enhanced sRGB HSV-V appearance proxy, NOT physical echo amplitude'
+            metadata['source_product'] = 'ALL2020 native samples with frozen denoising, reviewed edge repair and fixed Shotwell appearance'
+            metadata['appearance_lut_SHA256'] = sha(a.shotwell_appearance_lut)
+        if edge is not None:
+            metadata['edge_gain_patch_SHA256'] = sha(a.edge_patch)
         write(folder/'metadata.json', metadata)
     np.save(scene/'physical_record_timestamps_s.npy', times)
     np.save(scene/'reference_record_ids.npy', np.arange(0, 2020, 2))
@@ -194,6 +247,7 @@ def main():
         GPS_read_or_used=False, measured_depth_and_denoised_side_scan_enabled=True,
         full_native_image_shape=[8084, 24378], full_native_image_is_not_geodetic_map=True,
         virtual_observations_on_new_route_are_simulated_not_original_comb_measurements=True)
+    definition['appearance_variant'] = variant
     write(a.out/'experiment_definition.json', definition)
     report = dict(status='completed_ALL2020_both_parts_joint_measured_scene',
         source_records=2020, parts=parameter_records, grid_shape=list(shape), resolution_m=resolution,
@@ -216,6 +270,10 @@ def main():
             ('PrepareQiandaoFullFrameJointScene.py', 'QiandaoLocalScene.py', 'QiandaoCombTrajectory.py',
              'QiandaoNativeBottomProjection.py')},
         old_denoising_weights_or_algorithm_changed=False, raw_MAT_modified=False,
+        appearance_variant=variant,
+        edge_gain_patch_SHA256=None if edge is None else sha(a.edge_patch),
+        appearance_lut_SHA256=None if lookup is None else sha(a.shotwell_appearance_lut),
+        appearance_mapping_after_gain_before_grid_average=lookup is not None,
         elapsed_s=time.monotonic()-started)
     write(scene/'scene_report.json', report)
     print(json.dumps(report, ensure_ascii=False), flush=True)

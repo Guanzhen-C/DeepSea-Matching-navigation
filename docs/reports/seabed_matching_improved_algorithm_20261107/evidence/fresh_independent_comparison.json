@@ -1,0 +1,110 @@
+{
+  "status": "completed_independent_heldout_recording_mapped_range_comparison_NOT_full16km",
+  "executed_scope": "completed_heldout_source_recording_NOT_full16km",
+  "source_seed": 33,
+  "mapped_range_precision_policy": "preserve_legacy",
+  "samples": 15152,
+  "distance_m": 3999.8630752560002,
+  "all_received_events_verified": true,
+  "DR_and_Local_bit_exact": true,
+  "full_original_input_file_SHA256_reverified": true,
+  "executed_dependency_audit": {
+    "status": "independently_rehashed_all_executed_original_core_and_prior_files",
+    "core_files": 4,
+    "prior_files": 3
+  },
+  "preserved_prefix_audit": {
+    "status": "independently_verified_original_Global_before_any_new_range_factor",
+    "samples": 5549,
+    "first_new_range_timestamp_s": 1831.169576645,
+    "maximum_coordinate_difference_m": 0.0,
+    "compared_estimates_not_ground_truth": true
+  },
+  "baseline_Global": {
+    "RMSE_m": 7.628778367690237,
+    "P95_m": 12.807173753119288,
+    "max_m": 15.53447910413706,
+    "final_m": 12.657868347302633
+  },
+  "candidate_Global": {
+    "RMSE_m": 5.950846141581468,
+    "P95_m": 11.781138309796926,
+    "max_m": 15.53447910413706,
+    "final_m": 1.5912843062114999
+  },
+  "baseline_directional": {
+    "along_track_RMSE_m": 1.6243953665401214,
+    "cross_track_RMSE_m": 7.453824844688539,
+    "vertical_RMSE_m": 0.00970882100907817
+  },
+  "candidate_directional": {
+    "along_track_RMSE_m": 1.7873973807899994,
+    "cross_track_RMSE_m": 5.676062556272148,
+    "vertical_RMSE_m": 0.00970882100907817
+  },
+  "baseline_planar_relative": {
+    "10m": {
+      "pairs": 15114,
+      "RMSE_m": {
+        "DR": 0.5655014571925329,
+        "Local": 0.5648101994368201,
+        "Global": 0.8450600356347051
+      }
+    },
+    "30m": {
+      "pairs": 15038,
+      "RMSE_m": {
+        "DR": 0.9340876560566953,
+        "Local": 0.9302138689393001,
+        "Global": 1.5478898667962537
+      }
+    }
+  },
+  "candidate_planar_relative": {
+    "10m": {
+      "pairs": 15114,
+      "RMSE_m": {
+        "DR": 0.5655014571925329,
+        "Local": 0.5648101994368201,
+        "Global": 0.8866577995881394
+      }
+    },
+    "30m": {
+      "pairs": 15038,
+      "RMSE_m": {
+        "DR": 0.9340876560566953,
+        "Local": 0.9302138689393001,
+        "Global": 1.6068691321312436
+      }
+    }
+  },
+  "Global_RMSE_change_percent": -21.994769611019592,
+  "actual_range_input_audit": {
+    "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+    "factors": 19,
+    "feature_pairs": 202,
+    "unique_received_samples": 404,
+    "Local_not_truth_used_to_reconstruct_offsets": true,
+    "source_bins_and_unsupported_echoes_checked": true,
+    "raw_data_uploaded": false
+  },
+  "actual_historical_loop_edges": 47,
+  "legacy_pre_budget_loop_trace_reconciliations": 0,
+  "actual_new_map_priors": 88,
+  "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/blind_seed33_4km_v1/source_baseline",
+  "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/blind_seed33_4km_v1/candidate",
+  "source_states_SHA256": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858",
+  "replay_outputs_SHA256": {
+    "estimated_positions.csv": "8b11c613d3987cb8b6d976e7c6291f9796dec6b3e2745925785b1a66a3d437d0",
+    "estimated_states.npz": "76c901baca31e1f5e62e0faf6be9b221fe0e74b670c4502ef9bd5c145d43fa36",
+    "graph_factors.json": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559"
+  },
+  "raw_data_uploaded": false,
+  "external_upload_performed": false,
+  "limitations": [
+    "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+    "Legacy map and loop precisions preserved; new range precision budget .5; no full correlation proof.",
+    "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+    "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+  ]
+}

@@ -75,11 +75,12 @@ class IntensityFeatureMap:
 
 
 class SideScanFeatureWindow:
-    def __init__(self, pings=150, *, canonical_orientation=False):
+    def __init__(self, pings=150, *, canonical_orientation=False, received_provenance=False):
         self.scans = deque(maxlen=pings)
         self.vertical_positions = deque(maxlen=pings)
         self.pings = int(pings)
         self.canonical_orientation = bool(canonical_orientation)
+        self.received_provenance = bool(received_provenance)
 
     def add(self, packet, local_pose2, observation_id, vertical_position_m=0.):
         if self.scans and (packet.timestamp <= self.scans[-1][0].timestamp
@@ -110,6 +111,11 @@ class SideScanFeatureWindow:
         weight = np.zeros_like(image, np.uint32)
         normal_sum = np.zeros((height, 2)); normal_count = np.zeros(height)
         origin_sum = np.zeros((height, 3)); origin_count = np.zeros(height)
+        if self.received_provenance:
+            labels = np.full(image.shape, -1, np.int32)
+            columns = np.zeros(image.shape, np.uint16)
+            dominant = np.zeros(image.shape)
+            origin_table, id_table, beam_table, time_table = [], [], [], []
         for packet, intercept, normal, identifier, relative, z in entries:
             row = np.rint((intercept-x0)/step).astype(int)
             uniform = resample_supported_echoes(packet, bins)
@@ -125,6 +131,20 @@ class SideScanFeatureWindow:
             np.add.at(weight, row, uniform > 0)
             origins = np.column_stack([relative[:2, 2]+packet.row_centres_m[:, None]*normal[None],
                                       np.full(8, z-self.vertical_positions[-1])])
+            if self.received_provenance:
+                phase_start = 8*len(origin_table)
+                origin_table.append(origins)
+                id_table.append(np.full(8, identifier, np.int64))
+                beam_table.append(np.arange(8))
+                time_table.append(np.full(8, packet.timestamp))
+                source_columns = np.arange(2*bins)
+                if self.canonical_orientation and normal[0] < 0:
+                    source_columns = source_columns[::-1]
+                for beam, line in enumerate(row):
+                    take = uniform[beam] > dominant[line]
+                    labels[line, take] = phase_start+beam
+                    columns[line, take] = source_columns[take]
+                    dominant[line, take] = uniform[beam, take]
             np.add.at(origin_sum, row, origins); np.add.at(origin_count, row, 1.)
             for r in np.unique(row):
                 normal_sum[r] += assembled_normal; normal_count[r] += 1
@@ -144,7 +164,7 @@ class SideScanFeatureWindow:
         along = x0+row_float*step
         feature_normal = np.column_stack([np.interp(row_float, np.arange(height), normals[:, k]) for k in range(2)])
         feature_normal /= np.linalg.norm(feature_normal, axis=1, keepdims=True)
-        return dict(image=u8, raw_amplitude=image,
+        result = dict(image=u8, raw_amplitude=image,
             assembled_amplitude=image, observation_count=weight, support=weight > 0,
             row_normals=normals,
             row_scan_origins=origins, anchor_vertical_z_m=self.vertical_positions[-1],
@@ -160,6 +180,12 @@ class SideScanFeatureWindow:
             step=step, scale=scale, max_range_m=self.scans[-1][0].max_range_m,
             timestamp=self.scans[-1][0].timestamp,
             patch_start_s=self.scans[0][0].timestamp, patch_start_id=self.scans[0][2], patch_end_id=self.scans[-1][2])
+        if self.received_provenance:
+            result.update(received_phase_centre=labels, received_range_column=columns,
+                received_phase_origins=np.concatenate(origin_table),
+                received_packet_ids=np.concatenate(id_table), received_beam_rows=np.concatenate(beam_table),
+                received_timestamps_s=np.concatenate(time_table))
+        return result
 
 
 def match_feature_prior(feature_map, query, seed_pose2, margin_m=30., image_matcher=None,

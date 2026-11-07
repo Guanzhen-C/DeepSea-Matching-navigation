@@ -30,6 +30,25 @@ def metrics(error):
                 max_m=float(np.max(error)), final_m=float(error[-1]))
 
 
+def loop_trace_precision(factor, graph, report):
+    """Reconcile ONLY the known v1 pre-budget trace, without editing it.
+
+    Never fit a scale to data or relax equality tolerances. The versioned
+    factor policy and exact known graph source must agree. New traces are
+    explicitly marked as inserted-factor information and remain unscaled.
+    """
+    info = np.asarray(factor['information'], float)
+    if factor.get('information_is_actual_graph', False): return info, False
+    if not report.get('mapped_range_changes', False): return info, False
+    policy = graph.get('mapped_range_change_policy', {})
+    known_graph_sha = '338f24704692cb82b113148acfd088c95cb9fc9dcff03340a06e9741566d334a'
+    if (policy.get('schema') != 'oceansim.sss.mapped_range_change_graph.v1'
+            or policy.get('original_map_and_loop_precision_budget') != .5
+            or report.get('source_SHA256', {}).get('SideScanMappedRangeGraph.py') != known_graph_sha):
+        raise ValueError('Unknown legacy precision semantics; do not guess a normalization')
+    return info*.5, True
+
+
 def validate_comparison(reference, candidate, kind):
     keys = ['loop_closure', 'scan_plane_registration', 'canonical_submaps', 'submap_representation']
     defaults = [False, 'rank2_baseline', False, 'legacy_strip']
@@ -81,6 +100,7 @@ def read_replay(path, truth):
             raise ValueError('Loop is not long-baseline or has invalid information.')
         loop_checks.append(dict(source=edge['source'], target=edge['target'], separation_s=separation,
             rank=int(np.linalg.matrix_rank(info, tol=1e-8)), information_eigenvalues=values.tolist()))
+    legacy_loop_reconciliations = 0
     if report['loop_closure']:
         trace = json.loads((path/'historical_loop_trace.json').read_text())
         if trace and 'actual_loop_edge_added' in trace[0]:
@@ -90,7 +110,9 @@ def read_replay(path, truth):
                 if (a['source'], a['target']) != (b['source'], b['target']):
                     raise ValueError('Loop endpoint mismatch.')
                 np.testing.assert_array_equal(a['measurement'], b['measurement'])
-                np.testing.assert_allclose(a['information'], b['information'], rtol=0, atol=1e-9)
+                precision, reconciled = loop_trace_precision(a, graph, report)
+                np.testing.assert_allclose(precision, b['information'], rtol=0, atol=1e-9)
+                legacy_loop_reconciliations += int(reconciled)
     positions = np.concatenate([truth['positions'][:, :1], state['positions']], axis=1)
     yaw = np.column_stack([truth['yaw_rad'][:, 0], state['yaw_rad']])
     phases = {}
@@ -101,6 +123,7 @@ def read_replay(path, truth):
             planar_RPE=planar_relative_metrics(positions, yaw, truth['distance_m'],
                 segment_index=truth['segment_index'], selected_segment=segment))
     return report, dict(metrics=calculated, actual_loop_edges=len(loops), loop_factors=loop_checks,
+        legacy_pre_budget_loop_trace_reconciliations=legacy_loop_reconciliations,
         global_anchor_bridge=graph['global_anchor_bridge'], phases=phases,
         output_SHA256={n: sha(path/n) for n in ['estimated_positions.csv', 'estimated_states.npz', 'graph_factors.json']}), state, error
 

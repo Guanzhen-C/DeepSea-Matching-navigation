@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'standalone'))
-from AnalyzeSideScanLoopReplay import read_replay, metrics, sha, validate_comparison
+from AnalyzeSideScanLoopReplay import read_replay, metrics, sha, validate_comparison, loop_trace_precision
 
 
 def write_replay(tmp_path):
@@ -76,3 +76,28 @@ def test_comparison_never_attributes_two_changed_components_to_just_loops_or_geo
     with pytest.raises(ValueError, match='exactly the declared'):
         validate_comparison(old, dict(loop_closure=False, canonical_submaps=True,
                                      scan_plane_registration='observable_subspace'), 'registration')
+
+
+def test_legacy_range_graph_precision_migration_requires_exact_known_policy_and_source():
+    proposal = dict(information=np.diag([2., 0., 100.]).tolist())
+    graph = dict(mapped_range_change_policy=dict(schema='oceansim.sss.mapped_range_change_graph.v1',
+                                                 original_map_and_loop_precision_budget=.5))
+    report = dict(mapped_range_changes=True, source_SHA256={})
+    with pytest.raises(ValueError, match='Unknown legacy'): loop_trace_precision(proposal, graph, report)
+    report['source_SHA256']['SideScanMappedRangeGraph.py'] = '338f24704692cb82b113148acfd088c95cb9fc9dcff03340a06e9741566d334a'
+    matrix, migrated = loop_trace_precision(proposal, graph, report)
+    np.testing.assert_array_equal(matrix, np.diag([1., 0., 50.]))
+    assert migrated
+    graph['mapped_range_change_policy']['original_map_and_loop_precision_budget'] = .25
+    with pytest.raises(ValueError, match='Unknown legacy'): loop_trace_precision(proposal, graph, report)
+
+
+def test_new_actual_factor_trace_is_not_tempered_twice_and_original_protocol_stays_strict():
+    info = np.diag([1., 0., 50.])
+    matrix, migrated = loop_trace_precision(dict(information=info, information_is_actual_graph=True),
+                                          {}, dict(mapped_range_changes=True))
+    np.testing.assert_array_equal(matrix, info)
+    assert not migrated
+    matrix, migrated = loop_trace_precision(dict(information=info), {}, dict(mapped_range_changes=False))
+    np.testing.assert_array_equal(matrix, info)
+    assert not migrated

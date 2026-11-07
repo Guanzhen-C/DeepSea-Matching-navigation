@@ -1,0 +1,839 @@
+{
+  "status": "completed_full_and_predeclared_fresh_report_evidence",
+  "main": {
+    "comparison": {
+      "status": "completed_independent_full_identical_input_mapped_range_comparison",
+      "executed_scope": "completed_full16km_planned_loop",
+      "source_seed": 31,
+      "mapped_range_precision_policy": "preserve_legacy",
+      "samples": 62458,
+      "distance_m": 16488.6441879272,
+      "all_received_events_verified": true,
+      "DR_and_Local_bit_exact": true,
+      "full_original_input_file_SHA256_reverified": true,
+      "executed_dependency_audit": {
+        "status": "independently_rehashed_all_executed_original_core_and_prior_files",
+        "core_files": 4,
+        "prior_files": 3
+      },
+      "preserved_prefix_audit": {
+        "status": "independently_verified_original_Global_before_any_new_range_factor",
+        "samples": 5549,
+        "first_new_range_timestamp_s": 1831.169576645,
+        "maximum_coordinate_difference_m": 0.0,
+        "compared_estimates_not_ground_truth": true
+      },
+      "baseline_Global": {
+        "RMSE_m": 11.733122253232043,
+        "P95_m": 21.122520819022686,
+        "max_m": 35.14544617675721,
+        "final_m": 7.927576893055227
+      },
+      "candidate_Global": {
+        "RMSE_m": 5.040239169345844,
+        "P95_m": 11.1576695610936,
+        "max_m": 21.742572549906416,
+        "final_m": 9.94031151550629
+      },
+      "baseline_directional": {
+        "along_track_RMSE_m": 2.23083030281954,
+        "cross_track_RMSE_m": 11.519091065512217,
+        "vertical_RMSE_m": 0.009746473604853818
+      },
+      "candidate_directional": {
+        "along_track_RMSE_m": 1.511691983689704,
+        "cross_track_RMSE_m": 4.80819126459302,
+        "vertical_RMSE_m": 0.009746473604853818
+      },
+      "baseline_planar_relative": {
+        "10m": {
+          "pairs": 62420,
+          "RMSE_m": {
+            "DR": 0.8946114752482063,
+            "Local": 0.8956813297989757,
+            "Global": 1.2198259579436252
+          }
+        },
+        "30m": {
+          "pairs": 62344,
+          "RMSE_m": {
+            "DR": 1.581184308220433,
+            "Local": 1.5777681982143374,
+            "Global": 2.2844417138775004
+          }
+        }
+      },
+      "candidate_planar_relative": {
+        "10m": {
+          "pairs": 62420,
+          "RMSE_m": {
+            "DR": 0.8946114752482063,
+            "Local": 0.8956813297989757,
+            "Global": 1.1925894850307663
+          }
+        },
+        "30m": {
+          "pairs": 62344,
+          "RMSE_m": {
+            "DR": 1.581184308220433,
+            "Local": 1.5777681982143374,
+            "Global": 2.21220213864585
+          }
+        }
+      },
+      "Global_RMSE_change_percent": -57.04264337689446,
+      "actual_range_input_audit": {
+        "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+        "factors": 277,
+        "feature_pairs": 3119,
+        "unique_received_samples": 6238,
+        "Local_not_truth_used_to_reconstruct_offsets": true,
+        "source_bins_and_unsupported_echoes_checked": true,
+        "raw_data_uploaded": false
+      },
+      "actual_historical_loop_edges": 311,
+      "legacy_pre_budget_loop_trace_reconciliations": 0,
+      "actual_new_map_priors": 350,
+      "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_edge_shotwell_navigation_20261107_v1/full_enhanced_seed31",
+      "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/full_preserve_legacy_seed31_v3",
+      "source_states_SHA256": "a70a0f03e1b23ad87ab8d3ccdc95cd84b792cc1051f05e5304ec084f7836b4ca",
+      "replay_outputs_SHA256": {
+        "estimated_positions.csv": "db2a189b0dcfeef591eaa33597d4414c7b9a19878db30cba397dd4c95ff12490",
+        "estimated_states.npz": "2cdd9cecc62fc75e2597b06217f759baa0754bd5ec9de3f89e2395f0f30969fe",
+        "graph_factors.json": "2628dd9f6217a13e5829fd8a88f6173562479d1d2da7a714bd7ade77ccfc45ca"
+      },
+      "raw_data_uploaded": false,
+      "external_upload_performed": false,
+      "limitations": [
+        "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+        "Legacy map and loop precisions preserved; new range precision budget .5; no full correlation proof.",
+        "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+        "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+      ]
+    },
+    "comparison_path": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/review_full_preserve_legacy_seed31_v5/independent_comparison.json",
+    "comparison_SHA256": "ae1ae37c04d68d9e633aa57db58c73999b3b8475c30e5afb1ce9629c01835d80",
+    "statistics": {
+      "DR": {
+        "rmse_m": 37.81686180805838,
+        "median_m": 33.655306318099264,
+        "p95_m": 56.959085399373876,
+        "p99_m": 82.99894270685435,
+        "max_m": 85.92278577396203,
+        "final_m": 72.61292135864106
+      },
+      "Local": {
+        "rmse_m": 34.55262353217366,
+        "median_m": 30.681583832298934,
+        "p95_m": 50.459652873659124,
+        "p99_m": 78.80013287902955,
+        "max_m": 83.94275142060351,
+        "final_m": 74.42766146038811
+      },
+      "baseline_Global": {
+        "rmse_m": 11.733122253232043,
+        "median_m": 7.619891976628401,
+        "p95_m": 21.122520819022686,
+        "p99_m": 32.58448915891484,
+        "max_m": 35.14544617675721,
+        "final_m": 7.927576893055227
+      },
+      "improved_Global": {
+        "rmse_m": 5.040239169345844,
+        "median_m": 2.5830041632602847,
+        "p95_m": 11.1576695610936,
+        "p99_m": 17.883976564525124,
+        "max_m": 21.742572549906416,
+        "final_m": 9.94031151550629
+      }
+    },
+    "extra": {
+      "first_new_range_distance_m": 1464.935661316,
+      "worst": {
+        "DR": {
+          "distance_m": 16133.5642700192,
+          "error_m": 85.92278577396203
+        },
+        "Local": {
+          "distance_m": 16414.7242050168,
+          "error_m": 83.94275142060351
+        },
+        "baseline_Global": {
+          "distance_m": 10331.3736114504,
+          "error_m": 35.14544617675721
+        },
+        "improved_Global": {
+          "distance_m": 1337.6876907352,
+          "error_m": 21.742572549906416
+        }
+      },
+      "before_first_range": {
+        "DR": {
+          "rmse_m": 16.359887240846543,
+          "median_m": 13.974455198870503,
+          "p95_m": 26.586327528457524,
+          "p99_m": 27.332336462295615,
+          "max_m": 27.552070298106884,
+          "final_m": 24.18747145290594
+        },
+        "Local": {
+          "rmse_m": 15.341236856434248,
+          "median_m": 12.688461243422445,
+          "p95_m": 25.70675471720852,
+          "p99_m": 26.54063293535572,
+          "max_m": 26.73365954406496,
+          "final_m": 23.30032315617659
+        },
+        "baseline_Global": {
+          "rmse_m": 10.755244595648588,
+          "median_m": 6.788044260306309,
+          "p95_m": 20.573392274829597,
+          "p99_m": 21.42039349736221,
+          "max_m": 21.742572549906416,
+          "final_m": 2.4760230158624394
+        },
+        "improved_Global": {
+          "rmse_m": 10.755244595648588,
+          "median_m": 6.788044260306309,
+          "p95_m": 20.573392274829597,
+          "p99_m": 21.42039349736221,
+          "max_m": 21.742572549906416,
+          "final_m": 2.4760230158624394
+        }
+      },
+      "after_first_range": {
+        "DR": {
+          "rmse_m": 39.286936579818,
+          "median_m": 35.5657154401454,
+          "p95_m": 57.979977625940315,
+          "p99_m": 83.04674594812317,
+          "max_m": 85.92278577396203,
+          "final_m": 72.61292135864106
+        },
+        "Local": {
+          "rmse_m": 35.87961490745551,
+          "median_m": 32.64066660022403,
+          "p95_m": 52.286349203377526,
+          "p99_m": 79.1739656801414,
+          "max_m": 83.94275142060351,
+          "final_m": 74.42766146038811
+        },
+        "baseline_Global": {
+          "rmse_m": 11.824145285065173,
+          "median_m": 7.673387834008323,
+          "p95_m": 22.37989699191008,
+          "p99_m": 32.722979468916144,
+          "max_m": 35.14544617675721,
+          "final_m": 7.927576893055227
+        },
+        "improved_Global": {
+          "rmse_m": 4.074551589555281,
+          "median_m": 2.4601530604102546,
+          "p95_m": 8.06119375405513,
+          "p99_m": 12.695980455376704,
+          "max_m": 15.800197248374257,
+          "final_m": 9.94031151550629
+        }
+      },
+      "source_events": {
+        "sonar": 62458,
+        "imu": 1030546,
+        "depth": 206109,
+        "dvl": 103054
+      },
+      "candidate_events": {
+        "sonar": 62458,
+        "imu": 1030546,
+        "depth": 206109,
+        "dvl": 103054
+      },
+      "elapsed_replay_s": 2325.806928404025,
+      "original_core": {
+        "esikf.py": "ed2908396bce1287b848f5daefa34ecaec6e3f8aff567306bb24c5e89a9e0fbb",
+        "global_tracking.py": "717fe2536f8a14d8083263f5bffdd1511f129b8534095099d0efb0ae78177576",
+        "pose_graph.py": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+        "map_odom.py": "6beb5903cce337eac3985358b3404f44b875a2ae701078ea07ce91c42a0d451e"
+      },
+      "prior_inputs": {
+        "backscatter.npy": "5ca09629a265d3fd335103fdb700a99447e455838d006305e56ff04c6d10bd72",
+        "backscatter_valid_mask.npy": "0a2e9d105e7a2e6d26e8488c01cd3e9b052b2350bef17fd914d2c24a85532828",
+        "metadata.json": "4f5924706ee928954be512d1d260a953ef3437aa76c5d8c0f6a76d7c2858999f"
+      },
+      "online_states_not_final_history_smoothing": true
+    }
+  },
+  "fresh": {
+    "comparison": {
+      "status": "completed_independent_heldout_recording_mapped_range_comparison_NOT_full16km",
+      "executed_scope": "completed_heldout_source_recording_NOT_full16km",
+      "source_seed": 33,
+      "mapped_range_precision_policy": "preserve_legacy",
+      "samples": 15152,
+      "distance_m": 3999.8630752560002,
+      "all_received_events_verified": true,
+      "DR_and_Local_bit_exact": true,
+      "full_original_input_file_SHA256_reverified": true,
+      "executed_dependency_audit": {
+        "status": "independently_rehashed_all_executed_original_core_and_prior_files",
+        "core_files": 4,
+        "prior_files": 3
+      },
+      "preserved_prefix_audit": {
+        "status": "independently_verified_original_Global_before_any_new_range_factor",
+        "samples": 5549,
+        "first_new_range_timestamp_s": 1831.169576645,
+        "maximum_coordinate_difference_m": 0.0,
+        "compared_estimates_not_ground_truth": true
+      },
+      "baseline_Global": {
+        "RMSE_m": 7.628778367690237,
+        "P95_m": 12.807173753119288,
+        "max_m": 15.53447910413706,
+        "final_m": 12.657868347302633
+      },
+      "candidate_Global": {
+        "RMSE_m": 5.950846141581468,
+        "P95_m": 11.781138309796926,
+        "max_m": 15.53447910413706,
+        "final_m": 1.5912843062114999
+      },
+      "baseline_directional": {
+        "along_track_RMSE_m": 1.6243953665401214,
+        "cross_track_RMSE_m": 7.453824844688539,
+        "vertical_RMSE_m": 0.00970882100907817
+      },
+      "candidate_directional": {
+        "along_track_RMSE_m": 1.7873973807899994,
+        "cross_track_RMSE_m": 5.676062556272148,
+        "vertical_RMSE_m": 0.00970882100907817
+      },
+      "baseline_planar_relative": {
+        "10m": {
+          "pairs": 15114,
+          "RMSE_m": {
+            "DR": 0.5655014571925329,
+            "Local": 0.5648101994368201,
+            "Global": 0.8450600356347051
+          }
+        },
+        "30m": {
+          "pairs": 15038,
+          "RMSE_m": {
+            "DR": 0.9340876560566953,
+            "Local": 0.9302138689393001,
+            "Global": 1.5478898667962537
+          }
+        }
+      },
+      "candidate_planar_relative": {
+        "10m": {
+          "pairs": 15114,
+          "RMSE_m": {
+            "DR": 0.5655014571925329,
+            "Local": 0.5648101994368201,
+            "Global": 0.8866577995881394
+          }
+        },
+        "30m": {
+          "pairs": 15038,
+          "RMSE_m": {
+            "DR": 0.9340876560566953,
+            "Local": 0.9302138689393001,
+            "Global": 1.6068691321312436
+          }
+        }
+      },
+      "Global_RMSE_change_percent": -21.994769611019592,
+      "actual_range_input_audit": {
+        "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+        "factors": 19,
+        "feature_pairs": 202,
+        "unique_received_samples": 404,
+        "Local_not_truth_used_to_reconstruct_offsets": true,
+        "source_bins_and_unsupported_echoes_checked": true,
+        "raw_data_uploaded": false
+      },
+      "actual_historical_loop_edges": 47,
+      "legacy_pre_budget_loop_trace_reconciliations": 0,
+      "actual_new_map_priors": 88,
+      "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/blind_seed33_4km_v1/source_baseline",
+      "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/blind_seed33_4km_v1/candidate",
+      "source_states_SHA256": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858",
+      "replay_outputs_SHA256": {
+        "estimated_positions.csv": "8b11c613d3987cb8b6d976e7c6291f9796dec6b3e2745925785b1a66a3d437d0",
+        "estimated_states.npz": "76c901baca31e1f5e62e0faf6be9b221fe0e74b670c4502ef9bd5c145d43fa36",
+        "graph_factors.json": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559"
+      },
+      "raw_data_uploaded": false,
+      "external_upload_performed": false,
+      "limitations": [
+        "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+        "Legacy map and loop precisions preserved; new range precision budget .5; no full correlation proof.",
+        "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+        "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+      ]
+    },
+    "comparison_path": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/blind_seed33_4km_v1/review_v5/independent_comparison.json",
+    "comparison_SHA256": "66c2f60b32ea8ee5b1be9b338bf9a8751e5f2810090098bf9df6d89732bde2b4",
+    "statistics": {
+      "DR": {
+        "rmse_m": 15.917370822309302,
+        "median_m": 16.191939147914287,
+        "p95_m": 21.007613268575223,
+        "p99_m": 21.799119534429746,
+        "max_m": 23.031271858820894,
+        "final_m": 16.483601237511383
+      },
+      "Local": {
+        "rmse_m": 15.692294494282404,
+        "median_m": 15.915621124663291,
+        "p95_m": 21.67284683820253,
+        "p99_m": 22.431328781769103,
+        "max_m": 23.650822368057984,
+        "final_m": 15.516396342548079
+      },
+      "baseline_Global": {
+        "rmse_m": 7.628778367690237,
+        "median_m": 5.067566929213295,
+        "p95_m": 12.807173753119288,
+        "p99_m": 14.941476450260241,
+        "max_m": 15.53447910413706,
+        "final_m": 12.657868347302633
+      },
+      "improved_Global": {
+        "rmse_m": 5.950846141581468,
+        "median_m": 3.515409118838056,
+        "p95_m": 11.781138309796926,
+        "p99_m": 14.941476450260241,
+        "max_m": 15.53447910413706,
+        "final_m": 1.5912843062114999
+      }
+    },
+    "extra": {
+      "first_new_range_distance_m": 1464.935661316,
+      "worst": {
+        "DR": {
+          "distance_m": 3493.2471923832004,
+          "error_m": 23.031271858820894
+        },
+        "Local": {
+          "distance_m": 3493.2471923832004,
+          "error_m": 23.650822368057984
+        },
+        "baseline_Global": {
+          "distance_m": 1336.36769104,
+          "error_m": 15.53447910413706
+        },
+        "improved_Global": {
+          "distance_m": 1336.36769104,
+          "error_m": 15.53447910413706
+        }
+      },
+      "before_first_range": {
+        "DR": {
+          "rmse_m": 13.230208841465984,
+          "median_m": 11.999917861670733,
+          "p95_m": 20.750093491400474,
+          "p99_m": 20.95769764927884,
+          "max_m": 21.13364014388488,
+          "final_m": 20.015260706755797
+        },
+        "Local": {
+          "rmse_m": 12.056659017473269,
+          "median_m": 10.619546384015617,
+          "p95_m": 19.521133020944607,
+          "p99_m": 19.69203503102256,
+          "max_m": 19.858663261921976,
+          "final_m": 18.992401110618314
+        },
+        "baseline_Global": {
+          "rmse_m": 8.780275674094016,
+          "median_m": 7.929836413354522,
+          "p95_m": 14.418155995450865,
+          "p99_m": 15.40006074844276,
+          "max_m": 15.53447910413706,
+          "final_m": 0.650248521595378
+        },
+        "improved_Global": {
+          "rmse_m": 8.780275674094016,
+          "median_m": 7.929836413354522,
+          "p95_m": 14.418155995450865,
+          "p99_m": 15.40006074844276,
+          "max_m": 15.53447910413706,
+          "final_m": 0.650248521595378
+        }
+      },
+      "after_first_range": {
+        "DR": {
+          "rmse_m": 17.280671546245298,
+          "median_m": 17.386547308848442,
+          "p95_m": 21.302486745205314,
+          "p99_m": 21.88793216962387,
+          "max_m": 23.031271858820894,
+          "final_m": 16.483601237511383
+        },
+        "Local": {
+          "rmse_m": 17.451176667464377,
+          "median_m": 17.005896496476286,
+          "p95_m": 21.96159796214561,
+          "p99_m": 22.588778047028843,
+          "max_m": 23.650822368057984,
+          "final_m": 15.516396342548079
+        },
+        "baseline_Global": {
+          "rmse_m": 6.876043802689881,
+          "median_m": 3.4318039773314712,
+          "p95_m": 12.400974262156684,
+          "p99_m": 12.878355412208387,
+          "max_m": 13.250610582460402,
+          "final_m": 12.657868347302633
+        },
+        "improved_Global": {
+          "rmse_m": 3.365679729429663,
+          "median_m": 2.641993359823838,
+          "p95_m": 5.99244813862085,
+          "p99_m": 7.062083628864374,
+          "max_m": 8.519787826846668,
+          "final_m": 1.5912843062114999
+        }
+      },
+      "source_events": {
+        "sonar": 15152,
+        "imu": 250000,
+        "depth": 50000,
+        "dvl": 25000
+      },
+      "candidate_events": {
+        "sonar": 15152,
+        "imu": 250000,
+        "depth": 50000,
+        "dvl": 25000
+      },
+      "elapsed_replay_s": 406.46959080395754,
+      "original_core": {
+        "esikf.py": "ed2908396bce1287b848f5daefa34ecaec6e3f8aff567306bb24c5e89a9e0fbb",
+        "global_tracking.py": "717fe2536f8a14d8083263f5bffdd1511f129b8534095099d0efb0ae78177576",
+        "pose_graph.py": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+        "map_odom.py": "6beb5903cce337eac3985358b3404f44b875a2ae701078ea07ce91c42a0d451e"
+      },
+      "prior_inputs": {
+        "backscatter.npy": "5ca09629a265d3fd335103fdb700a99447e455838d006305e56ff04c6d10bd72",
+        "backscatter_valid_mask.npy": "0a2e9d105e7a2e6d26e8488c01cd3e9b052b2350bef17fd914d2c24a85532828",
+        "metadata.json": "4f5924706ee928954be512d1d260a953ef3437aa76c5d8c0f6a76d7c2858999f"
+      },
+      "online_states_not_final_history_smoothing": true
+    }
+  },
+  "development": {
+    "tempered_full": {
+      "status": "completed_independent_full_identical_input_mapped_range_comparison",
+      "executed_scope": "completed_full16km_planned_loop",
+      "source_seed": 31,
+      "samples": 62458,
+      "distance_m": 16488.6441879272,
+      "all_received_events_verified": true,
+      "DR_and_Local_bit_exact": true,
+      "full_original_input_file_SHA256_reverified": true,
+      "baseline_Global": {
+        "RMSE_m": 11.733122253232043,
+        "P95_m": 21.122520819022686,
+        "max_m": 35.14544617675721,
+        "final_m": 7.927576893055227
+      },
+      "candidate_Global": {
+        "RMSE_m": 5.30053310397224,
+        "P95_m": 11.552918819303581,
+        "max_m": 23.18788182255395,
+        "final_m": 8.2322680908616
+      },
+      "baseline_directional": {
+        "along_track_RMSE_m": 2.23083030281954,
+        "cross_track_RMSE_m": 11.519091065512217,
+        "vertical_RMSE_m": 0.009746473604853818
+      },
+      "candidate_directional": {
+        "along_track_RMSE_m": 1.8232563404534148,
+        "cross_track_RMSE_m": 4.977076703201819,
+        "vertical_RMSE_m": 0.009746473604853818
+      },
+      "baseline_planar_relative": {
+        "10m": {
+          "pairs": 62420,
+          "RMSE_m": {
+            "DR": 0.8946114752482063,
+            "Local": 0.8956813297989757,
+            "Global": 1.2198259579436252
+          }
+        },
+        "30m": {
+          "pairs": 62344,
+          "RMSE_m": {
+            "DR": 1.581184308220433,
+            "Local": 1.5777681982143374,
+            "Global": 2.2844417138775004
+          }
+        }
+      },
+      "candidate_planar_relative": {
+        "10m": {
+          "pairs": 62420,
+          "RMSE_m": {
+            "DR": 0.8946114752482063,
+            "Local": 0.8956813297989757,
+            "Global": 1.1115175135101147
+          }
+        },
+        "30m": {
+          "pairs": 62344,
+          "RMSE_m": {
+            "DR": 1.581184308220433,
+            "Local": 1.5777681982143374,
+            "Global": 2.0553747660371138
+          }
+        }
+      },
+      "Global_RMSE_change_percent": -54.82418925182393,
+      "actual_range_input_audit": {
+        "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+        "factors": 262,
+        "feature_pairs": 3055,
+        "unique_received_samples": 6110,
+        "Local_not_truth_used_to_reconstruct_offsets": true,
+        "source_bins_and_unsupported_echoes_checked": true,
+        "raw_data_uploaded": false
+      },
+      "actual_historical_loop_edges": 315,
+      "legacy_pre_budget_loop_trace_reconciliations": 315,
+      "actual_new_map_priors": 351,
+      "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_edge_shotwell_navigation_20261107_v1/full_enhanced_seed31",
+      "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/full_mapped_ranges_seed31",
+      "source_states_SHA256": "a70a0f03e1b23ad87ab8d3ccdc95cd84b792cc1051f05e5304ec084f7836b4ca",
+      "replay_outputs_SHA256": {
+        "estimated_positions.csv": "45b03c8482fe5ad09689f5b7699fdfb648f4812b158f1346cfd407f0cdfe4d32",
+        "estimated_states.npz": "80d2a8e1192d3732d2f3aae864eef6a5cd008162f5ce9eadba2a1c1873b82da9",
+        "graph_factors.json": "c69a9b52606643529cb33d6d7a856be94be9da461ca43c905529c88ba5ad589e"
+      },
+      "raw_data_uploaded": false,
+      "external_upload_performed": false,
+      "limitations": [
+        "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+        "Opt-in combination includes conservative correlation tempering, not isolated range-information ablation.",
+        "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+        "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+      ]
+    },
+    "tempered_development": {
+      "status": "completed_independent_heldout_recording_mapped_range_comparison_NOT_full16km",
+      "executed_scope": "completed_heldout_source_recording_NOT_full16km",
+      "source_seed": 32,
+      "samples": 7576,
+      "distance_m": 1999.7995376584001,
+      "all_received_events_verified": true,
+      "DR_and_Local_bit_exact": true,
+      "full_original_input_file_SHA256_reverified": true,
+      "baseline_Global": {
+        "RMSE_m": 7.797477070194722,
+        "P95_m": 15.136027808563508,
+        "max_m": 16.183968956446805,
+        "final_m": 2.08296893322299
+      },
+      "candidate_Global": {
+        "RMSE_m": 9.54015499290874,
+        "P95_m": 15.302995086561957,
+        "max_m": 16.013402936443978,
+        "final_m": 4.668865359283791
+      },
+      "baseline_directional": {
+        "along_track_RMSE_m": 2.023591902892658,
+        "cross_track_RMSE_m": 7.530313627091617,
+        "vertical_RMSE_m": 0.010057255988695753
+      },
+      "candidate_directional": {
+        "along_track_RMSE_m": 2.712251989170651,
+        "cross_track_RMSE_m": 9.146482673004055,
+        "vertical_RMSE_m": 0.010057255988695753
+      },
+      "baseline_planar_relative": {
+        "10m": {
+          "pairs": 7538,
+          "RMSE_m": {
+            "DR": 0.5445994091538102,
+            "Local": 0.5437068454958829,
+            "Global": 1.0195940041868259
+          }
+        },
+        "30m": {
+          "pairs": 7462,
+          "RMSE_m": {
+            "DR": 0.9587251266364838,
+            "Local": 0.9510401843429167,
+            "Global": 1.9720494784665552
+          }
+        }
+      },
+      "candidate_planar_relative": {
+        "10m": {
+          "pairs": 7538,
+          "RMSE_m": {
+            "DR": 0.5445994091538102,
+            "Local": 0.5437068454958829,
+            "Global": 0.6209531148373137
+          }
+        },
+        "30m": {
+          "pairs": 7462,
+          "RMSE_m": {
+            "DR": 0.9587251266364838,
+            "Local": 0.9510401843429167,
+            "Global": 1.1267909340419575
+          }
+        }
+      },
+      "Global_RMSE_change_percent": 22.349253572995753,
+      "actual_range_input_audit": {
+        "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+        "factors": 5,
+        "feature_pairs": 46,
+        "unique_received_samples": 92,
+        "Local_not_truth_used_to_reconstruct_offsets": true,
+        "source_bins_and_unsupported_echoes_checked": true,
+        "raw_data_uploaded": false
+      },
+      "actual_historical_loop_edges": 12,
+      "legacy_pre_budget_loop_trace_reconciliations": 0,
+      "actual_new_map_priors": 42,
+      "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_projected_loops2000m_seed32_v1",
+      "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/heldout_seed32_mapped_ranges_v2",
+      "source_states_SHA256": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4",
+      "replay_outputs_SHA256": {
+        "estimated_positions.csv": "7712df3b1fbd437d2f82c36a6dfffa43b4ae4fd3ea5eb67137ecf7d29b6116b2",
+        "estimated_states.npz": "a8a4ead73fa3f7a8cdf7adc802bd85bbcc2ad4860acdd7e901036670f2068f72",
+        "graph_factors.json": "c63a98215eecfa5e50d7df620d3d1f8de3159ef4c212c0082b4e330810bff808"
+      },
+      "raw_data_uploaded": false,
+      "external_upload_performed": false,
+      "limitations": [
+        "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+        "Opt-in combination includes conservative correlation tempering, not isolated range-information ablation.",
+        "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+        "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+      ]
+    },
+    "preserved_development": {
+      "status": "completed_independent_heldout_recording_mapped_range_comparison_NOT_full16km",
+      "executed_scope": "completed_heldout_source_recording_NOT_full16km",
+      "source_seed": 32,
+      "mapped_range_precision_policy": "preserve_legacy",
+      "samples": 7576,
+      "distance_m": 1999.7995376584001,
+      "all_received_events_verified": true,
+      "DR_and_Local_bit_exact": true,
+      "full_original_input_file_SHA256_reverified": true,
+      "baseline_Global": {
+        "RMSE_m": 7.797477070194722,
+        "P95_m": 15.136027808563508,
+        "max_m": 16.183968956446805,
+        "final_m": 2.08296893322299
+      },
+      "candidate_Global": {
+        "RMSE_m": 7.873697415806101,
+        "P95_m": 15.136027808563508,
+        "max_m": 16.183968956446805,
+        "final_m": 4.693354294126477
+      },
+      "baseline_directional": {
+        "along_track_RMSE_m": 2.023591902892658,
+        "cross_track_RMSE_m": 7.530313627091617,
+        "vertical_RMSE_m": 0.010057255988695753
+      },
+      "candidate_directional": {
+        "along_track_RMSE_m": 2.0937670541088065,
+        "cross_track_RMSE_m": 7.590200878132421,
+        "vertical_RMSE_m": 0.010057255988695753
+      },
+      "baseline_planar_relative": {
+        "10m": {
+          "pairs": 7538,
+          "RMSE_m": {
+            "DR": 0.5445994091538102,
+            "Local": 0.5437068454958829,
+            "Global": 1.0195940041868259
+          }
+        },
+        "30m": {
+          "pairs": 7462,
+          "RMSE_m": {
+            "DR": 0.9587251266364838,
+            "Local": 0.9510401843429167,
+            "Global": 1.9720494784665552
+          }
+        }
+      },
+      "candidate_planar_relative": {
+        "10m": {
+          "pairs": 7538,
+          "RMSE_m": {
+            "DR": 0.5445994091538102,
+            "Local": 0.5437068454958829,
+            "Global": 1.0310885833047425
+          }
+        },
+        "30m": {
+          "pairs": 7462,
+          "RMSE_m": {
+            "DR": 0.9587251266364838,
+            "Local": 0.9510401843429167,
+            "Global": 2.007868922692243
+          }
+        }
+      },
+      "Global_RMSE_change_percent": 0.9775000929816757,
+      "actual_range_input_audit": {
+        "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+        "factors": 8,
+        "feature_pairs": 110,
+        "unique_received_samples": 220,
+        "Local_not_truth_used_to_reconstruct_offsets": true,
+        "source_bins_and_unsupported_echoes_checked": true,
+        "raw_data_uploaded": false
+      },
+      "actual_historical_loop_edges": 12,
+      "legacy_pre_budget_loop_trace_reconciliations": 0,
+      "actual_new_map_priors": 43,
+      "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_fullframe_joint_comb_20261106_v2/pure_sss_iq_projected_loops2000m_seed32_v1",
+      "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/validation_seed32_preserve_v3",
+      "source_states_SHA256": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4",
+      "replay_outputs_SHA256": {
+        "estimated_positions.csv": "99a8a4e298d0756f888f2f20fee9d18c2b6416d0f0cb585d1a7f8eb7536cd42e",
+        "estimated_states.npz": "f30172dd2bd19d9612767181106a783a1a92debbc3c869be187ed0688c05f91b",
+        "graph_factors.json": "70b26f3bb9930a08f3915be4e2e5f4c6c581ca23e49db47ef7be71811530fc6f"
+      },
+      "raw_data_uploaded": false,
+      "external_upload_performed": false,
+      "limitations": [
+        "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+        "Legacy map and loop precisions preserved; new range precision budget .5; no full correlation proof.",
+        "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+        "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+      ]
+    }
+  },
+  "regression": {
+    "regression_candidate_and_independent_audit_v5.xml": {
+      "tests": 117,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "regression_original_sea_lake_core_v1.xml": {
+      "tests": 161,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "fresh_sources_reverified": 91,
+  "same_main_fresh_core_and_prior": true,
+  "raw_payloads_copied": false,
+  "external_upload_performed": false
+}

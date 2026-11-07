@@ -59,8 +59,12 @@ def main():
     p.add_argument('--scan-plane-registration', choices=('rank2_baseline', 'observable_subspace'), default='rank2_baseline')
     p.add_argument('--canonical-submaps', action='store_true')
     p.add_argument('--submap-representation', choices=('legacy_strip', 'adaptive_projected'), default='legacy_strip')
+    p.add_argument('--mapped-range-changes', action='store_true')
+    p.add_argument('--mapped-range-policy', choices=('tempered_legacy', 'preserve_legacy'), default='tempered_legacy')
     p.add_argument('--device', default='cuda')
     a = p.parse_args()
+    if not a.mapped_range_changes and a.mapped_range_policy != 'tempered_legacy':
+        raise ValueError('Mapped range precision policy requires its explicit opt-in')
     sys.addaudithook(reject_gps_file)
     if a.out.exists() or a.seed < 0:
         raise ValueError('New separately named output and nonnegative seed required.')
@@ -106,13 +110,17 @@ def main():
             thermal_noise_rms=.004, interference_rms=.008, seed=a.seed))
     nav = PureSideScanFeatureNavigator(prior, first, startup, image_matcher=matcher, loop_closure=a.loop_closure,
                                        scan_plane_registration=a.scan_plane_registration, canonical_submaps=a.canonical_submaps,
-                                       submap_representation=a.submap_representation)
+                                       submap_representation=a.submap_representation,
+                                       mapped_range_changes=a.mapped_range_changes,
+                                       mapped_range_policy=a.mapped_range_policy)
     a.out.mkdir()
     sources = ['RunPureSideScanFeatureShort.py', 'PureSideScanFeatures.py', 'SideScanFeatureMap.py',
                'PureSideScanFeatureNavigation.py', 'SideScanLearnedFeatures.py',
                'SideScanComplexEcho.py', 'SideScanIQHistory.py', 'QiandaoCombTrajectory.py',
                'QiandaoLocalRaycaster.py', 'QiandaoVirtualNavigation.py', 'SideScanRecordedInputs.py', 'WriteSideScanReport.py']
     if a.loop_closure: sources += ['SideScanLoopGeometry.py', 'SideScanLoopClosure.py']
+    if a.mapped_range_changes:
+        sources += ['SideScanMappedRangeChange.py', 'SideScanMappedRangeGraph.py', 'SideScanMappedRangeBank.py']
     if a.loop_closure and a.submap_representation != 'legacy_strip': sources += ['SideScanHistoricalMatching.py']
     if a.scan_plane_registration != 'rank2_baseline': sources += ['SideScanPlaneRegistration.py']
     if a.submap_representation != 'legacy_strip':
@@ -133,6 +141,8 @@ def main():
         scan_plane_registration=a.scan_plane_registration,
         canonical_submaps=a.canonical_submaps,
         submap_representation=a.submap_representation,
+        mapped_range_changes=a.mapped_range_changes,
+        mapped_range_policy=a.mapped_range_policy,
         complex_echo_parameters=None if iq_simulator is None else vars(iq_simulator.parameters),
         submap_is_NOT_reference_map_crop=True, submap_frozen_complex_IQ_neural_model_used=False,
         frontend='GFTT + subpixel + SIFT descriptors + mutual matches + robust scanline model',
@@ -260,6 +270,8 @@ def main():
         clean, _ = sanitize_for_strict_json(diagnostic)
         dump(a.out/'final_diagnostics.json', clean)
         dump(a.out/'feature_graph_factors.json', nav.graph.factor_stream_payload())
+        if nav.mapped_ranges is not None:
+            dump(a.out/'mapped_range_change_trace.json', nav.mapped_ranges.trace)
         if a.loop_closure:
             loop_trace, _ = sanitize_for_strict_json(nav.historical_loops.trace)
             dump(a.out/'historical_loop_trace.json', loop_trace)

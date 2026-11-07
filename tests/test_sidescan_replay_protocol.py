@@ -27,3 +27,13 @@ def test_changed_canonical_geometry_or_matcher_is_not_claimed_as_original_protoc
     assert not same_executed_configuration(original, canonical_submaps=True)
     assert not same_executed_configuration(original, scan_plane_registration='observable_subspace')
     assert not same_executed_configuration(dict(original, requested_feature_matcher='RootSIFT_baseline'))
+
+
+def test_new_range_constraints_are_an_explicit_ablation_not_original_reproduction():
+    original = dict(requested_feature_matcher='LoFTR')
+    assert not same_executed_configuration(original, mapped_range_changes=True)
+    upgraded = dict(original, mapped_range_changes=True)
+    assert same_executed_configuration(upgraded, mapped_range_changes=True)
+    assert not same_executed_configuration(upgraded)
+    assert not same_executed_configuration(upgraded, mapped_range_changes=True,
+                                           mapped_range_policy='preserve_legacy')

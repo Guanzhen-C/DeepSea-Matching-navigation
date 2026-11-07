@@ -191,6 +191,12 @@ class SideScanHistoricalLoops:
                     score=float(fit['inliers']/fit['matches']), current_window_information_weight=weight)
                 if (old['node'], node) not in self.used_pairs and old['node'] != node:
                     graph.add_edge(old['node'], node, measurement, info, kind='loop', score=selected['score'])
+                    # A graph wrapper may temper precision. Trace the actual
+                    # inserted factor, not the pre-budget proposal.
+                    inserted = graph.edges[-1]
+                    if hasattr(inserted, 'information'):
+                        selected['information'] = np.asarray(inserted.information).copy()
+                        selected['information_is_actual_graph'] = True
                     self.used_pairs.add((old['node'], node)); self.confirmed += 1; self.added_edges += 1
                     if len(self.examples) < 16:
                         self.examples.append(dict(old_image=old['query']['image'], new_image=query['image'],
@@ -204,6 +210,8 @@ class SideScanHistoricalLoops:
             actual_loop_edge_added=selected is not None,
             factor=None if selected is None else dict(source=selected['source'], target=selected['target'],
                 measurement=selected['measurement'].tolist(), information=selected['information'].tolist())))
+        if selected is not None and selected.get('information_is_actual_graph', False):
+            self.trace[-1]['factor']['information_is_actual_graph'] = True
         # Store compact historical observation geometry, not the full world
         # raster or every descriptor/float image. No age-based deletion.
         keys = ['image', 'support', 'anchor_vertical_z_m',

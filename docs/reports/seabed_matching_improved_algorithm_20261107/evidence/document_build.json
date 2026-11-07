@@ -1,0 +1,510 @@
+{
+  "images": [
+    {
+      "file": "figures/new_field_comb_trajectory.png",
+      "native_shape": [
+        988,
+        2660
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 5.942857142857143,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/new_received_feature_match.png",
+      "native_shape": [
+        900,
+        2100
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 6.857142857142857,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/approved_enhanced_portrait.png",
+      "native_shape": [
+        1956,
+        1100
+      ],
+      "placed_width_cm": 9.560327198364009,
+      "placed_height_cm": 17.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_hil_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_hil_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_hil_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_hil_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/main_full_errors.png",
+      "native_shape": [
+        1540,
+        2860
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 8.615384615384615,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/main_directional_errors.png",
+      "native_shape": [
+        1430,
+        2860
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 8.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/actual_range_constraints.png",
+      "native_shape": [
+        1276,
+        2860
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 7.138461538461539,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/improved_3d_trajectories.png",
+      "native_shape": [
+        1610,
+        2990
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 8.615384615384615,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/fresh_full_errors.png",
+      "native_shape": [
+        1540,
+        2860
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 8.615384615384615,
+      "aspect_ratio_preserved": true
+    }
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "text": "海底地形地貌匹配导航算法仿真报告"
+    },
+    {
+      "level": 2,
+      "text": "一、任务目标与试验范围"
+    },
+    {
+      "level": 3,
+      "text": "1. 研究背景与验证问题"
+    },
+    {
+      "level": 3,
+      "text": "2. 月度目标与实际时间"
+    },
+    {
+      "level": 3,
+      "text": "3. 试验层级"
+    },
+    {
+      "level": 3,
+      "text": "4. 本次修订的核心验证问题"
+    },
+    {
+      "level": 2,
+      "text": "二、仿真系统总体方案"
+    },
+    {
+      "level": 3,
+      "text": "1. 原项目基础与新增能力"
+    },
+    {
+      "level": 3,
+      "text": "2. 两条验证链路"
+    },
+    {
+      "level": 3,
+      "text": "3. 坐标系与结果输出"
+    },
+    {
+      "level": 2,
+      "text": "三、数据来源与场景构建"
+    },
+    {
+      "level": 3,
+      "text": "1. Monterey海区场景"
+    },
+    {
+      "level": 3,
+      "text": "2. Lake Chelan湖区场景"
+    },
+    {
+      "level": 3,
+      "text": "3. 千岛湖实测声呐数据"
+    },
+    {
+      "level": 4,
+      "text": "（1）原始记录"
+    },
+    {
+      "level": 4,
+      "text": "（2）去噪与成像"
+    },
+    {
+      "level": 4,
+      "text": "（3）场景栅格"
+    },
+    {
+      "level": 4,
+      "text": "（4）参考与查询"
+    },
+    {
+      "level": 3,
+      "text": "4. 梳形路线与覆盖范围"
+    },
+    {
+      "level": 3,
+      "text": "5. 本轮新底图的定义"
+    },
+    {
+      "level": 2,
+      "text": "四、传感器模型与数据接口"
+    },
+    {
+      "level": 3,
+      "text": "1. 硬件在环输入"
+    },
+    {
+      "level": 3,
+      "text": "2. 纯侧扫仿真观测"
+    },
+    {
+      "level": 3,
+      "text": "3. 同步8通道与连续150个ping"
+    },
+    {
+      "level": 3,
+      "text": "4. 模型与实物的边界"
+    },
+    {
+      "level": 3,
+      "text": "5. 新斜距变化约束的数据来源"
+    },
+    {
+      "level": 2,
+      "text": "五、导航与地形地貌匹配算法"
+    },
+    {
+      "level": 3,
+      "text": "1. 局部状态估计"
+    },
+    {
+      "level": 3,
+      "text": "2. 海湖地形全局匹配"
+    },
+    {
+      "level": 3,
+      "text": "3. 纯侧扫子图与特征地图匹配"
+    },
+    {
+      "level": 4,
+      "text": "（1）直航表示"
+    },
+    {
+      "level": 4,
+      "text": "（2）转弯表示"
+    },
+    {
+      "level": 4,
+      "text": "（3）匹配与几何"
+    },
+    {
+      "level": 4,
+      "text": "（4）保持退化"
+    },
+    {
+      "level": 3,
+      "text": "4. 历史回环检测与图优化"
+    },
+    {
+      "level": 3,
+      "text": "5. 观测残差与信息退化"
+    },
+    {
+      "level": 4,
+      "text": "（1）运动与基础水下观测"
+    },
+    {
+      "level": 4,
+      "text": "（2）参考地图的扫描平面约束"
+    },
+    {
+      "level": 4,
+      "text": "（3）历史回环的斜距与扫描平面约束"
+    },
+    {
+      "level": 4,
+      "text": "（4）后端目标与多候选处理"
+    },
+    {
+      "level": 3,
+      "text": "6. 跨航线斜距变化约束"
+    },
+    {
+      "level": 4,
+      "text": "（1）从两次真实距离量测出发"
+    },
+    {
+      "level": 4,
+      "text": "（2）等深消去与不等深区间"
+    },
+    {
+      "level": 4,
+      "text": "（3）可追溯的因果关联"
+    },
+    {
+      "level": 4,
+      "text": "（4）噪声预算与鲁棒性"
+    },
+    {
+      "level": 3,
+      "text": "7. 图优化接入与策略选择"
+    },
+    {
+      "level": 4,
+      "text": "（1）真实两变量因子"
+    },
+    {
+      "level": 4,
+      "text": "（2）保留既有信息的正式候选"
+    },
+    {
+      "level": 4,
+      "text": "（3）输出与前端的边界"
+    },
+    {
+      "level": 4,
+      "text": "（4）与公开方案的关系"
+    },
+    {
+      "level": 2,
+      "text": "六、实测侧扫去噪方案与效果边界"
+    },
+    {
+      "level": 3,
+      "text": "1. 原始复数处理与固定模型"
+    },
+    {
+      "level": 3,
+      "text": "2. 采用后来确认的边缘修复"
+    },
+    {
+      "level": 3,
+      "text": "3. 采用本机同版本Shotwell增强"
+    },
+    {
+      "level": 3,
+      "text": "4. 去噪与导航观测之间的边界"
+    },
+    {
+      "level": 2,
+      "text": "七、试验设计与评价指标"
+    },
+    {
+      "level": 3,
+      "text": "1. 主试验的同输入设计"
+    },
+    {
+      "level": 3,
+      "text": "2. 开发记录与新噪声补充"
+    },
+    {
+      "level": 3,
+      "text": "3. 三维位置与方向误差"
+    },
+    {
+      "level": 3,
+      "text": "4. 相对运动与完整性评价"
+    },
+    {
+      "level": 3,
+      "text": "5. 运行时间与复现实验边界"
+    },
+    {
+      "level": 2,
+      "text": "八、海湖处理器在环历史试验结果"
+    },
+    {
+      "level": 3,
+      "text": "1. 部署与接口结果"
+    },
+    {
+      "level": 3,
+      "text": "2. 湖区47.12 km完整结果"
+    },
+    {
+      "level": 3,
+      "text": "3. 海区73.07 km完整结果"
+    },
+    {
+      "level": 3,
+      "text": "4. 时序与资源问题"
+    },
+    {
+      "level": 2,
+      "text": "九、纯侧扫16.49 km完整仿真结果"
+    },
+    {
+      "level": 3,
+      "text": "1. 完整执行与主要结果"
+    },
+    {
+      "level": 3,
+      "text": "2. 方向性改善"
+    },
+    {
+      "level": 3,
+      "text": "3. 首段与剩余峰值"
+    },
+    {
+      "level": 3,
+      "text": "4. 相对运动与发布代价"
+    },
+    {
+      "level": 3,
+      "text": "5. 实际新增约束及回环"
+    },
+    {
+      "level": 3,
+      "text": "6. 改进后实际三维轨迹"
+    },
+    {
+      "level": 2,
+      "text": "十、新噪声种子与开发验证结果"
+    },
+    {
+      "level": 3,
+      "text": "1. 预先冻结的4 km新噪声检验"
+    },
+    {
+      "level": 3,
+      "text": "2. 补充试验中的代价"
+    },
+    {
+      "level": 3,
+      "text": "3. 旧场开发记录及负结果"
+    },
+    {
+      "level": 3,
+      "text": "4. 能够支持的泛化范围"
+    },
+    {
+      "level": 2,
+      "text": "十一、结果分析与阶段成果"
+    },
+    {
+      "level": 3,
+      "text": "1. 11 m不是已证实的底图精度下限"
+    },
+    {
+      "level": 3,
+      "text": "2. 去噪与定位改进的因果区分"
+    },
+    {
+      "level": 3,
+      "text": "3. 尚未解决的约束与统计问题"
+    },
+    {
+      "level": 3,
+      "text": "4. 月度目标的支撑情况"
+    },
+    {
+      "level": 3,
+      "text": "5. 下一阶段工作"
+    },
+    {
+      "level": 2,
+      "text": "十二、软件与数据交付及复现方法"
+    },
+    {
+      "level": 3,
+      "text": "1. 本地交付与数据保密"
+    },
+    {
+      "level": 3,
+      "text": "2. 结果文件与数据字典"
+    },
+    {
+      "level": 3,
+      "text": "3. 核心实现与版本绑定"
+    },
+    {
+      "level": 3,
+      "text": "4. 同输入复现命令"
+    },
+    {
+      "level": 3,
+      "text": "5. 报告质量检查"
+    },
+    {
+      "level": 2,
+      "text": "十三、结论"
+    },
+    {
+      "level": 2,
+      "text": "十四、参考文献与方法来源"
+    },
+    {
+      "level": 3,
+      "text": "1. 仿真与导航基础"
+    },
+    {
+      "level": 3,
+      "text": "2. 侧扫特征与多视角几何"
+    },
+    {
+      "level": 3,
+      "text": "3. 场景与软件来源"
+    }
+  ],
+  "tables": 9,
+  "editable_word_reopened": true,
+  "pdf_conversion_completed": true,
+  "libreoffice_output": "convert /home/cgz/OceanSim/output/reports/seabed_matching_improved_algorithm_20261107_v1/海底地形地貌匹配导航算法仿真报告.docx -> /home/cgz/OceanSim/output/reports/seabed_matching_improved_algorithm_20261107_v1/海底地形地貌匹配导航算法仿真报告.pdf using filter : writer_pdf_Export"
+}

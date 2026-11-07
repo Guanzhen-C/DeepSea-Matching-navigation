@@ -58,7 +58,8 @@ class FeatureScanPlaneLikelihood:
 class PureSideScanFeatureNavigator:
     def __init__(self, intensity_map, initial, startup_specific_force, image_matcher=None, *, loop_closure=False,
                  scan_plane_registration='rank2_baseline', canonical_submaps=False,
-                 submap_representation='legacy_strip'):
+                 submap_representation='legacy_strip', mapped_range_changes=False,
+                 mapped_range_policy='tempered_legacy'):
         from oceansim.slam import AcousticESIKF, ESIKFConfig, gauge_anchored_initial_covariance
         from oceansim.slam.pose_graph import GTSAMPlanarPoseGraph, PoseGraphConfig
         from oceansim.slam.global_tracking import GlobalCohortTracker, GlobalCohortTrackerConfig
@@ -69,9 +70,23 @@ class PureSideScanFeatureNavigator:
         for f in (self.local, self.dr):
             f.initialize(0., rotation=initial.rotation, position=initial.position,
                          velocity=initial.velocity, covariance=covariance)
-        self.graph = GTSAMPlanarPoseGraph(PoseGraphConfig(fixed_lag_seconds=180.,
+        graph_class = GTSAMPlanarPoseGraph
+        if mapped_range_policy not in ('tempered_legacy', 'preserve_legacy'):
+            raise ValueError('Explicit mapped range precision policy required')
+        self.mapped_range_policy = mapped_range_policy
+        graph_options = {}
+        if mapped_range_changes:
+            from SideScanMappedRangeGraph import MappedRangePoseGraph
+            from SideScanMappedRangeBank import MappedRangeBank
+            graph_class = MappedRangePoseGraph
+            graph_options['legacy_precision_budget'] = 1. if mapped_range_policy == 'preserve_legacy' else .5
+            self.mapped_ranges = MappedRangeBank()
+        else:
+            self.mapped_ranges = None
+        self.last_range_change = None
+        self.graph = graph_class(PoseGraphConfig(fixed_lag_seconds=180.,
             terrain_prior_enabled=False, intensity_factor_enabled=False,
-            odometry_reference_interval_s=30., odometry_xy_std_m=1.))
+            odometry_reference_interval_s=30., odometry_xy_std_m=1.), **graph_options)
         self.graph.add_pose(state_pose2(self.local.state), timestamp=0.)
         self.raw_keyframe_poses = [pose_matrix(state_pose2(self.local.state))]
         self.last_keyframe_s = 0.
@@ -99,7 +114,8 @@ class PureSideScanFeatureNavigator:
         self.shared_feature_windows = 0
         self.latest_gyro = np.zeros(3)
         self.latest_acceleration = np.mean(startup_specific_force, axis=0)
-        self.window = SideScanFeatureWindow(150, canonical_orientation=canonical_submaps)
+        self.window = SideScanFeatureWindow(150, canonical_orientation=canonical_submaps,
+                                           received_provenance=mapped_range_changes)
         self.previous_frame = None
         self.previous_local_pose = None
         self.anchor_pose = None
@@ -284,6 +300,14 @@ class PureSideScanFeatureNavigator:
                 add_side_scan_feature_prior(self.graph, len(self.graph.poses)-1, cohort.last_measurement_pose2,
                     cohort.last_measurement_information, score=matched.get('score', 0))
                 self.graph.optimize(); self.graph_feature_priors += 1
+            if graph_ready and self.mapped_ranges is not None:
+                try:
+                    added = self.mapped_ranges.observe(query, matched, raw, self.graph, self.raw_keyframe_poses)
+                    self.last_range_change = dict(added_factors=added, observation_id=self.observation_id)
+                    if added: self.graph.optimize()
+                except ValueError as exc:
+                    self.last_range_change = dict(added_factors=0, reason=str(exc),
+                                                  observation_id=self.observation_id)
             target = self.raw_graph_pose(raw)
         published = self.soft.update(packet.timestamp, raw, target)
         position = self.local.state.position.copy(); position[:2] = published[:2]
@@ -312,6 +336,12 @@ class PureSideScanFeatureNavigator:
                      shared_current_windows=self.shared_feature_windows,
                      shared_observation_policy='half_information_each_for_loop_and_map_not_independent_full_factors'),
             global_cohort_tracker_updates=self.tracker.updates,
+            mapped_range_changes=dict(enabled=False) if self.mapped_ranges is None else
+                dict(**self.mapped_ranges.diagnostics(), last=self.last_range_change,
+                     legacy_precision_policy=self.mapped_range_policy),
             map_to_odom=self.soft.diagnostics(),
-            observation_limit='Scan-plane geometry only; actual null directions retained. Slant pixels are not horizontal observations.',
+            observation_limit=(
+                'Scan-plane geometry plus two-reception range-change compatibility; unknown landmark height profiled over its physical interval. No measured bathymetry or altitude.'
+                if self.mapped_ranges is not None else
+                'Scan-plane geometry only; actual null directions retained. Slant pixels are not horizontal observations.'),
             short_test_is_not_validated_whole_map_unknown_pose_relocalization=True)

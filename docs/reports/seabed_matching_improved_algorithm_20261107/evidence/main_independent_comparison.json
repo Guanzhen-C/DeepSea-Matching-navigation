@@ -1,0 +1,110 @@
+{
+  "status": "completed_independent_full_identical_input_mapped_range_comparison",
+  "executed_scope": "completed_full16km_planned_loop",
+  "source_seed": 31,
+  "mapped_range_precision_policy": "preserve_legacy",
+  "samples": 62458,
+  "distance_m": 16488.6441879272,
+  "all_received_events_verified": true,
+  "DR_and_Local_bit_exact": true,
+  "full_original_input_file_SHA256_reverified": true,
+  "executed_dependency_audit": {
+    "status": "independently_rehashed_all_executed_original_core_and_prior_files",
+    "core_files": 4,
+    "prior_files": 3
+  },
+  "preserved_prefix_audit": {
+    "status": "independently_verified_original_Global_before_any_new_range_factor",
+    "samples": 5549,
+    "first_new_range_timestamp_s": 1831.169576645,
+    "maximum_coordinate_difference_m": 0.0,
+    "compared_estimates_not_ground_truth": true
+  },
+  "baseline_Global": {
+    "RMSE_m": 11.733122253232043,
+    "P95_m": 21.122520819022686,
+    "max_m": 35.14544617675721,
+    "final_m": 7.927576893055227
+  },
+  "candidate_Global": {
+    "RMSE_m": 5.040239169345844,
+    "P95_m": 11.1576695610936,
+    "max_m": 21.742572549906416,
+    "final_m": 9.94031151550629
+  },
+  "baseline_directional": {
+    "along_track_RMSE_m": 2.23083030281954,
+    "cross_track_RMSE_m": 11.519091065512217,
+    "vertical_RMSE_m": 0.009746473604853818
+  },
+  "candidate_directional": {
+    "along_track_RMSE_m": 1.511691983689704,
+    "cross_track_RMSE_m": 4.80819126459302,
+    "vertical_RMSE_m": 0.009746473604853818
+  },
+  "baseline_planar_relative": {
+    "10m": {
+      "pairs": 62420,
+      "RMSE_m": {
+        "DR": 0.8946114752482063,
+        "Local": 0.8956813297989757,
+        "Global": 1.2198259579436252
+      }
+    },
+    "30m": {
+      "pairs": 62344,
+      "RMSE_m": {
+        "DR": 1.581184308220433,
+        "Local": 1.5777681982143374,
+        "Global": 2.2844417138775004
+      }
+    }
+  },
+  "candidate_planar_relative": {
+    "10m": {
+      "pairs": 62420,
+      "RMSE_m": {
+        "DR": 0.8946114752482063,
+        "Local": 0.8956813297989757,
+        "Global": 1.1925894850307663
+      }
+    },
+    "30m": {
+      "pairs": 62344,
+      "RMSE_m": {
+        "DR": 1.581184308220433,
+        "Local": 1.5777681982143374,
+        "Global": 2.21220213864585
+      }
+    }
+  },
+  "Global_RMSE_change_percent": -57.04264337689446,
+  "actual_range_input_audit": {
+    "status": "verified_actual_received_ranges_offsets_pressure_and_one_use_tokens",
+    "factors": 277,
+    "feature_pairs": 3119,
+    "unique_received_samples": 6238,
+    "Local_not_truth_used_to_reconstruct_offsets": true,
+    "source_bins_and_unsupported_echoes_checked": true,
+    "raw_data_uploaded": false
+  },
+  "actual_historical_loop_edges": 311,
+  "legacy_pre_budget_loop_trace_reconciliations": 0,
+  "actual_new_map_priors": 350,
+  "source_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_edge_shotwell_navigation_20261107_v1/full_enhanced_seed31",
+  "candidate_run": "/home/cgz/OceanSim/output/real_sonar/qiandao_range_change_navigation_20261107_v1/full_preserve_legacy_seed31_v3",
+  "source_states_SHA256": "a70a0f03e1b23ad87ab8d3ccdc95cd84b792cc1051f05e5304ec084f7836b4ca",
+  "replay_outputs_SHA256": {
+    "estimated_positions.csv": "db2a189b0dcfeef591eaa33597d4414c7b9a19878db30cba397dd4c95ff12490",
+    "estimated_states.npz": "2cdd9cecc62fc75e2597b06217f759baa0754bd5ec9de3f89e2395f0f30969fe",
+    "graph_factors.json": "2628dd9f6217a13e5829fd8a88f6173562479d1d2da7a714bd7ade77ccfc45ca"
+  },
+  "raw_data_uploaded": false,
+  "external_upload_performed": false,
+  "limitations": [
+    "One same-voyage nominally geocoded simulated route and seed, not field navigation accuracy.",
+    "Legacy map and loop precisions preserved; new range precision budget .5; no full correlation proof.",
+    "Unknown landmark height remains an interval; relative geometry does not create measured bathymetry.",
+    "Map/loop correlations are conservatively tempered but not fully jointly modelled."
+  ]
+}

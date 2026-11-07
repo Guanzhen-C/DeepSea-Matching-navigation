@@ -63,6 +63,7 @@ def add_table(document, lines):
         for cell, value in zip(row.cells, values):
             paragraph = cell.paragraphs[0]; inline(paragraph, value)
             paragraph.paragraph_format.space_after = Pt(4)
+            paragraph.paragraph_format.keep_with_next = i < len(rows)-1
             for run in paragraph.runs:
                 run.font.size = Pt(9); run.bold = i == 0
     document.add_paragraph()
@@ -70,6 +71,10 @@ def add_table(document, lines):
 
 def build(source, target):
     if target.exists(): raise FileExistsError('Preserve earlier Word documents.')
+    source_titles = re.findall(r'^# (.+)$', source.read_text(), re.M)
+    if len(source_titles) != 1:
+        raise ValueError('Exactly one first-level document title required.')
+    document_title = source_titles[0]
     doc = Document(); section = doc.sections[0]
     section.page_width = Cm(21); section.page_height = Cm(29.7)
     section.top_margin = section.bottom_margin = Cm(2.2)
@@ -85,7 +90,7 @@ def build(source, target):
         style.paragraph_format.space_after = Pt(7)
         if level == 2: style.paragraph_format.page_break_before = True
     header = section.header.paragraphs[0]
-    header.text = '海底地形地貌匹配算法仿真报告'; header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    header.text = document_title; header.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     for run in header.runs: run.font.size = Pt(8)
     footer = section.footer.paragraphs[0]; footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
     footer.add_run('— ')
@@ -101,6 +106,8 @@ def build(source, target):
                 block.append(lines[i]); i += 1
             paragraph = doc.add_paragraph()
             run = paragraph.add_run('\n'.join(block)); run.font.name = 'Consolas'; run.font.size = Pt(8)
+            paragraph.paragraph_format.keep_together = True
+            paragraph.paragraph_format.line_spacing = 1.05
             shade = OxmlElement('w:shd'); shade.set(qn('w:fill'), 'F0F3F5')
             paragraph._p.get_or_add_pPr().append(shade); i += 1; continue
         if text.startswith('|'):
@@ -113,8 +120,11 @@ def build(source, target):
             path = (source.parent/image[2]).resolve()
             if not path.is_relative_to(source.parent.resolve()): raise ValueError('Unexpected report image location.')
             with Image.open(path) as im: width, height = im.size
-            size = min(16.0/width, 19.0/height)
+            size = min(16.0/width, 17.0/height)
             paragraph = doc.add_paragraph(); paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.paragraph_format.line_spacing = 1.0
+            paragraph.paragraph_format.space_after = Pt(4)
+            paragraph.paragraph_format.keep_with_next = True
             paragraph.add_run().add_picture(str(path), width=Cm(width*size), height=Cm(height*size))
             images.append(dict(file=image[2], native_shape=[height,width],
                 placed_width_cm=width*size, placed_height_cm=height*size, aspect_ratio_preserved=True))
@@ -132,8 +142,9 @@ def build(source, target):
         paragraph = doc.add_paragraph(); inline(paragraph, paragraph_text)
         if text.startswith('图') and re.match(r'^图\d+', text):
             paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            paragraph.paragraph_format.keep_together = True
             for run in paragraph.runs: run.font.size = Pt(9)
-    doc.core_properties.title = '海底地形地貌匹配算法仿真报告'
+    doc.core_properties.title = document_title
     doc.core_properties.subject = '处理器在环与实测来源纯侧扫导航仿真'
     doc.core_properties.author = '项目研究组'
     doc.save(target)
