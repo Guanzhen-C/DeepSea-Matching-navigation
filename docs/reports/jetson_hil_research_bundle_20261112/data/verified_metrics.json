@@ -1,0 +1,648 @@
+{
+  "sea": {
+    "samples": 243569,
+    "distance_m": 73070.32881952196,
+    "board": "Monterey海底 AGX Orin",
+    "metrics": {
+      "DR": {
+        "rmse_m": 939.1273397059207,
+        "median_m": 640.5448098361867,
+        "p95_m": 2047.9014391436338,
+        "p99_m": 2287.1705652622986,
+        "max_m": 2316.987453263859,
+        "final_m": 2192.007128315627
+      },
+      "Local": {
+        "rmse_m": 929.5978097365102,
+        "median_m": 608.588172065681,
+        "p95_m": 2041.5974649137286,
+        "p99_m": 2279.5660520172196,
+        "max_m": 2308.3690856665876,
+        "final_m": 2184.606762287672
+      },
+      "Global": {
+        "rmse_m": 6.829882592425078,
+        "median_m": 4.051072823341106,
+        "p95_m": 13.267354170575725,
+        "p99_m": 21.657805274616504,
+        "max_m": 41.45334039504116,
+        "final_m": 4.450662175063113
+      }
+    },
+    "tail": {
+      "5": {
+        "percent_samples_over": 38.98689898960869,
+        "runs": 1124,
+        "longest_sample_span_s": 1131.2000000000007
+      },
+      "10": {
+        "percent_samples_over": 11.210786265904117,
+        "runs": 429,
+        "longest_sample_span_s": 1063.0
+      },
+      "20": {
+        "percent_samples_over": 1.3154383357488022,
+        "runs": 39,
+        "longest_sample_span_s": 195.20000000000073
+      },
+      "worst": {
+        "distance_m": 24923.694696875435,
+        "timestamp_s": 16615.8,
+        "error_m": 41.45334039504116
+      }
+    },
+    "segments": [
+      {
+        "start_km": 0.0,
+        "end_km": 7.307032881952196,
+        "samples": 24357,
+        "rmse_m": 3.8575501763420132,
+        "median_m": 2.2694384881533307,
+        "p95_m": 8.232834804557882,
+        "p99_m": 13.0312815363568,
+        "max_m": 19.62094734119507,
+        "final_m": 9.189840542054409
+      },
+      {
+        "start_km": 7.307032881952196,
+        "end_km": 14.614065763904392,
+        "samples": 24357,
+        "rmse_m": 5.173059864092567,
+        "median_m": 4.184264448101807,
+        "p95_m": 9.663779767242389,
+        "p99_m": 10.474579066986015,
+        "max_m": 11.376073244567246,
+        "final_m": 3.6571617463230828
+      },
+      {
+        "start_km": 14.614065763904392,
+        "end_km": 21.92109864585659,
+        "samples": 24357,
+        "rmse_m": 9.324506487783593,
+        "median_m": 5.629804098528646,
+        "p95_m": 18.077266647992253,
+        "p99_m": 22.620294897389975,
+        "max_m": 23.66085738700199,
+        "final_m": 5.94771730993229
+      },
+      {
+        "start_km": 21.92109864585659,
+        "end_km": 29.228131527808785,
+        "samples": 24357,
+        "rmse_m": 6.738042235284652,
+        "median_m": 3.4459880414664847,
+        "p95_m": 11.522858555408542,
+        "p99_m": 36.28403267060412,
+        "max_m": 41.45334039504116,
+        "final_m": 9.790067708562749
+      },
+      {
+        "start_km": 29.228131527808785,
+        "end_km": 36.53516440976098,
+        "samples": 24356,
+        "rmse_m": 4.833737691075678,
+        "median_m": 3.776072521693032,
+        "p95_m": 8.985409245635811,
+        "p99_m": 10.899153017787699,
+        "max_m": 16.50590984785431,
+        "final_m": 14.858439253049609
+      },
+      {
+        "start_km": 36.53516440976098,
+        "end_km": 43.84219729171318,
+        "samples": 24357,
+        "rmse_m": 8.296347577380352,
+        "median_m": 5.021932791171982,
+        "p95_m": 18.437009688692473,
+        "p99_m": 21.958078999519497,
+        "max_m": 24.26994409033427,
+        "final_m": 11.361676888852566
+      },
+      {
+        "start_km": 43.84219729171318,
+        "end_km": 51.14923017366538,
+        "samples": 24357,
+        "rmse_m": 6.961944469948465,
+        "median_m": 3.5468733056287314,
+        "p95_m": 13.501344032074766,
+        "p99_m": 28.551466550104145,
+        "max_m": 33.57256527735293,
+        "final_m": 12.913844734446505
+      },
+      {
+        "start_km": 51.14923017366538,
+        "end_km": 58.45626305561757,
+        "samples": 24357,
+        "rmse_m": 6.502980027973766,
+        "median_m": 4.7303638311703065,
+        "p95_m": 12.466088370059488,
+        "p99_m": 15.801880588297342,
+        "max_m": 18.536910300047307,
+        "final_m": 5.77629341891672
+      },
+      {
+        "start_km": 58.45626305561757,
+        "end_km": 65.76329593756977,
+        "samples": 24357,
+        "rmse_m": 8.8498913798784,
+        "median_m": 5.445042663026021,
+        "p95_m": 15.844238523265497,
+        "p99_m": 34.41481874636213,
+        "max_m": 40.23274703801928,
+        "final_m": 4.803916402760908
+      },
+      {
+        "start_km": 65.76329593756977,
+        "end_km": 73.07032881952196,
+        "samples": 24357,
+        "rmse_m": 5.586656387133665,
+        "median_m": 4.0875878139347215,
+        "p95_m": 10.530117731631222,
+        "p99_m": 12.901963300753396,
+        "max_m": 15.696539543244787,
+        "final_m": 4.450662175063113
+      }
+    ],
+    "global_RMSE_reduction_vs_DR_percent": 99.27274158640044,
+    "local_RMSE_reduction_vs_DR_percent": 1.0147218131669522
+  },
+  "lake": {
+    "samples": 157056,
+    "distance_m": 47116.48901858927,
+    "board": "Chelan湖底 AGX Orin",
+    "metrics": {
+      "DR": {
+        "rmse_m": 735.7610393391914,
+        "median_m": 261.5816768388638,
+        "p95_m": 1766.9415952396946,
+        "p99_m": 1975.699422640778,
+        "max_m": 2045.563260052846,
+        "final_m": 2024.9387574297718
+      },
+      "Local": {
+        "rmse_m": 734.3903394125668,
+        "median_m": 264.9426902660633,
+        "p95_m": 1761.9793119999565,
+        "p99_m": 1968.6526521441585,
+        "max_m": 2038.06207886939,
+        "final_m": 2016.9200734295039
+      },
+      "Global": {
+        "rmse_m": 6.828697062062329,
+        "median_m": 4.167925464560639,
+        "p95_m": 13.526643045529024,
+        "p99_m": 21.987830287644016,
+        "max_m": 38.78417353107484,
+        "final_m": 22.51695855344694
+      }
+    },
+    "tail": {
+      "5": {
+        "percent_samples_over": 38.61361552567237,
+        "runs": 606,
+        "longest_sample_span_s": 1111.7999999999993
+      },
+      "10": {
+        "percent_samples_over": 10.342807660961695,
+        "runs": 216,
+        "longest_sample_span_s": 536.1999999999998
+      },
+      "20": {
+        "percent_samples_over": 1.5695038712306437,
+        "runs": 28,
+        "longest_sample_span_s": 157.19999999999982
+      },
+      "worst": {
+        "distance_m": 46975.188908554504,
+        "timestamp_s": 31316.8,
+        "error_m": 38.78417353107484
+      }
+    },
+    "segments": [
+      {
+        "start_km": 0.0,
+        "end_km": 4.711648901858927,
+        "samples": 15706,
+        "rmse_m": 4.10494205806045,
+        "median_m": 3.2684023636412785,
+        "p95_m": 7.842752922195846,
+        "p99_m": 8.928255274825343,
+        "max_m": 10.021089596255518,
+        "final_m": 4.686747161959627
+      },
+      {
+        "start_km": 4.711648901858927,
+        "end_km": 9.423297803717855,
+        "samples": 15706,
+        "rmse_m": 9.07099714157654,
+        "median_m": 3.6612888198195304,
+        "p95_m": 21.544660813924544,
+        "p99_m": 30.49832646419962,
+        "max_m": 33.464208265273946,
+        "final_m": 9.436134878022136
+      },
+      {
+        "start_km": 9.423297803717855,
+        "end_km": 14.134946705576784,
+        "samples": 15705,
+        "rmse_m": 6.322584407426919,
+        "median_m": 4.821285016748166,
+        "p95_m": 12.249382259058004,
+        "p99_m": 18.809843961799835,
+        "max_m": 20.118157232136113,
+        "final_m": 3.7499162085266287
+      },
+      {
+        "start_km": 14.134946705576784,
+        "end_km": 18.84659560743571,
+        "samples": 15706,
+        "rmse_m": 4.931635899746042,
+        "median_m": 4.053457740311098,
+        "p95_m": 9.490794769537152,
+        "p99_m": 11.066484810490186,
+        "max_m": 11.541359473316453,
+        "final_m": 2.7568377141997145
+      },
+      {
+        "start_km": 18.84659560743571,
+        "end_km": 23.558244509294635,
+        "samples": 15705,
+        "rmse_m": 6.3157948867111875,
+        "median_m": 4.664751235707583,
+        "p95_m": 11.768972658473409,
+        "p99_m": 18.643211070309484,
+        "max_m": 20.318027376348606,
+        "final_m": 2.2276714889542366
+      },
+      {
+        "start_km": 23.558244509294635,
+        "end_km": 28.269893411153568,
+        "samples": 15705,
+        "rmse_m": 4.895914193030906,
+        "median_m": 3.581928622352602,
+        "p95_m": 9.099348319761205,
+        "p99_m": 10.565753685988007,
+        "max_m": 13.009403429600006,
+        "final_m": 3.670446251088181
+      },
+      {
+        "start_km": 28.269893411153568,
+        "end_km": 32.98154231301249,
+        "samples": 15706,
+        "rmse_m": 6.413649188861006,
+        "median_m": 4.39643048487589,
+        "p95_m": 12.608966365832842,
+        "p99_m": 14.45752496517676,
+        "max_m": 15.641912692030703,
+        "final_m": 5.488425876015897
+      },
+      {
+        "start_km": 32.98154231301249,
+        "end_km": 37.69319121487142,
+        "samples": 15705,
+        "rmse_m": 5.189985555724362,
+        "median_m": 3.9443607007595394,
+        "p95_m": 9.410497789345861,
+        "p99_m": 12.845644073632833,
+        "max_m": 15.070270741351132,
+        "final_m": 0.9499685651742774
+      },
+      {
+        "start_km": 37.69319121487142,
+        "end_km": 42.40484011673034,
+        "samples": 15706,
+        "rmse_m": 5.866025994266569,
+        "median_m": 4.164646882207052,
+        "p95_m": 11.124565617689038,
+        "p99_m": 15.607860149460686,
+        "max_m": 19.339189150063095,
+        "final_m": 2.533784819491717
+      },
+      {
+        "start_km": 42.40484011673034,
+        "end_km": 47.11648901858927,
+        "samples": 15706,
+        "rmse_m": 11.684925901498989,
+        "median_m": 7.819200253664993,
+        "p95_m": 22.415758599461036,
+        "p99_m": 34.84648504593609,
+        "max_m": 38.78417353107484,
+        "final_m": 22.51695855344694
+      }
+    ],
+    "global_RMSE_reduction_vs_DR_percent": 99.07188656412205,
+    "local_RMSE_reduction_vs_DR_percent": 0.18629688898118557
+  },
+  "qiandao": {
+    "samples": 62458,
+    "distance_m": 16488.6441879272,
+    "board": "千岛湖 Orin NX Super",
+    "metrics": {
+      "DR": {
+        "rmse_m": 36.1964536050971,
+        "median_m": 33.23099343764926,
+        "p95_m": 55.44671072831972,
+        "p99_m": 76.09686518494549,
+        "max_m": 78.7600265136402,
+        "final_m": 67.82245527337794
+      },
+      "Local": {
+        "rmse_m": 34.53867637283969,
+        "median_m": 31.347798174854034,
+        "p95_m": 56.5431242884863,
+        "p99_m": 71.78369454982463,
+        "max_m": 76.27108632907175,
+        "final_m": 69.96948042680987
+      },
+      "Global": {
+        "rmse_m": 4.870919487986242,
+        "median_m": 2.48268941760898,
+        "p95_m": 10.46205874933685,
+        "p99_m": 16.001594337742475,
+        "max_m": 19.315121800945537,
+        "final_m": 5.6733297524897175
+      }
+    },
+    "tail": {
+      "5": {
+        "percent_samples_over": 20.620256812578052,
+        "runs": 134,
+        "longest_sample_span_s": 954.3597793580002
+      },
+      "10": {
+        "percent_samples_over": 5.691824906337058,
+        "runs": 32,
+        "longest_sample_span_s": 487.73988723799994
+      },
+      "20": {
+        "percent_samples_over": 0.0,
+        "runs": 0,
+        "longest_sample_span_s": 0.0
+      },
+      "worst": {
+        "distance_m": 1337.6876907352,
+        "timestamp_s": 1672.109613419,
+        "error_m": 19.315121800945537
+      }
+    },
+    "segments": [
+      {
+        "start_km": 0.0,
+        "end_km": 1.64886441879272,
+        "samples": 6246,
+        "rmse_m": 8.172390701971242,
+        "median_m": 4.400578004404986,
+        "p95_m": 16.50578587712187,
+        "p99_m": 18.867950037814502,
+        "max_m": 19.315121800945537,
+        "final_m": 7.093601944907183
+      },
+      {
+        "start_km": 1.64886441879272,
+        "end_km": 3.29772883758544,
+        "samples": 6246,
+        "rmse_m": 5.2662023433843785,
+        "median_m": 4.002092085764813,
+        "p95_m": 9.62527598765179,
+        "p99_m": 10.585086831149027,
+        "max_m": 11.312776689020538,
+        "final_m": 2.2555157976822766
+      },
+      {
+        "start_km": 3.29772883758544,
+        "end_km": 4.94659325637816,
+        "samples": 6246,
+        "rmse_m": 4.439453192718468,
+        "median_m": 3.192635641919778,
+        "p95_m": 9.622200184084505,
+        "p99_m": 10.962266111059833,
+        "max_m": 11.505503419357394,
+        "final_m": 11.081460679812889
+      },
+      {
+        "start_km": 4.94659325637816,
+        "end_km": 6.59545767517088,
+        "samples": 6245,
+        "rmse_m": 7.553600792482346,
+        "median_m": 1.7870812129554934,
+        "p95_m": 15.81490668635749,
+        "p99_m": 16.635056090146225,
+        "max_m": 17.676078353373324,
+        "final_m": 1.4270588857499826
+      },
+      {
+        "start_km": 6.59545767517088,
+        "end_km": 8.2443220939636,
+        "samples": 6246,
+        "rmse_m": 3.713667861077772,
+        "median_m": 2.773769447173515,
+        "p95_m": 6.86244256525242,
+        "p99_m": 9.048496593882284,
+        "max_m": 9.43021843917292,
+        "final_m": 2.9998703365653703
+      },
+      {
+        "start_km": 8.2443220939636,
+        "end_km": 9.89318651275632,
+        "samples": 6246,
+        "rmse_m": 2.31803437102547,
+        "median_m": 1.7617462060000024,
+        "p95_m": 4.248120205223999,
+        "p99_m": 5.191198934328093,
+        "max_m": 5.625266004531276,
+        "final_m": 1.2974895211515365
+      },
+      {
+        "start_km": 9.89318651275632,
+        "end_km": 11.542050931549038,
+        "samples": 6245,
+        "rmse_m": 3.5471076870866147,
+        "median_m": 2.17653332831957,
+        "p95_m": 7.371799625682144,
+        "p99_m": 9.117641520092567,
+        "max_m": 9.621161663993504,
+        "final_m": 1.3554205143650813
+      },
+      {
+        "start_km": 11.542050931549038,
+        "end_km": 13.19091535034176,
+        "samples": 6246,
+        "rmse_m": 2.3112780301415885,
+        "median_m": 1.5155385485521888,
+        "p95_m": 4.9289809760776775,
+        "p99_m": 6.215708996832978,
+        "max_m": 7.400147740774961,
+        "final_m": 3.278054868440084
+      },
+      {
+        "start_km": 13.19091535034176,
+        "end_km": 14.839779769134477,
+        "samples": 6246,
+        "rmse_m": 3.9689619891206007,
+        "median_m": 2.273019920222551,
+        "p95_m": 8.477712028061681,
+        "p99_m": 9.006131406230788,
+        "max_m": 9.357736693192166,
+        "final_m": 1.4661052025097527
+      },
+      {
+        "start_km": 14.839779769134477,
+        "end_km": 16.4886441879272,
+        "samples": 6246,
+        "rmse_m": 3.6241387440580515,
+        "median_m": 2.7137386451772048,
+        "p95_m": 6.790151766724624,
+        "p99_m": 8.59365563906033,
+        "max_m": 9.358087879686456,
+        "final_m": 5.6733297524897175
+      }
+    ],
+    "global_RMSE_reduction_vs_DR_percent": 86.54310297597682,
+    "local_RMSE_reduction_vs_DR_percent": 4.579943798759234,
+    "distance_definition": "recorded_constant_speed_smooth_route_arclength_parameter",
+    "sampled_truth_chord_sum_m": 16488.63655486191,
+    "sensor_period_s": 0.3299999239998215,
+    "end_to_end_wall_s": 20781.306282619946,
+    "simulated_span_s": 20610.805234909,
+    "diagnostics": {
+      "mode": "pure_side_scan_descriptor_features",
+      "feature_detector": "GFTT+subpixel",
+      "descriptor": "SIFT",
+      "matching": "mutual_ratio+scanline_RANSAC",
+      "optical_flow_calls": 0,
+      "DVL_altitude_observations": 0,
+      "MBES_points_consumed": 0,
+      "measured_height_likelihood_terms": 0,
+      "measured_height_graph_factors": 0,
+      "raw_intensity_correlation_calls": 0,
+      "frontend": {
+        "accepted": 62394,
+        "rejected": 63,
+        "updates": 20780
+      },
+      "feature_map": {
+        "attempts": 416,
+        "accepts": 381,
+        "graph_feature_priors": 352,
+        "last": {
+          "accepted": false,
+          "reason": "insufficient_mutual_feature_matches",
+          "matches": 11,
+          "inliers": 0,
+          "query_features": 11,
+          "map_features": 11,
+          "observable_rank": null,
+          "submap_assembly": {
+            "assembly": "ordinary_overlap_average_of_received_scans",
+            "canonical_port_starboard_and_plane_orientation": false,
+            "secondary_denoising_used": false,
+            "unknown_cells_filled": false
+          },
+          "status": "tracking",
+          "null_probability": 0.0811907983761841,
+          "cohorts": 1,
+          "feature_likelihood_only": true,
+          "measured_depth_likelihood_terms": 0,
+          "measured_depth_graph_factors": 0,
+          "DVL_altitude_used": false,
+          "optical_flow_used": false
+        }
+      },
+      "optimizer_backend": "gtsam_isam2_incremental_fixed_lag",
+      "backend_feature_matcher": {
+        "algorithm": "LoFTR_local_features_plus_scan_plane_geometry",
+        "checkpoint_SHA256": "21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec",
+        "kornia_version": "0.8.2",
+        "torch_version": "2.5.0a0+872d972e41.nv24.08",
+        "unmodified_public_outdoor_weights": true,
+        "sonar_specific_training": false,
+        "optical_flow": false,
+        "raw_intensity_correlation": false,
+        "input_images_uploaded": false,
+        "received_support_context_masks": false
+      },
+      "secondary_submap_denoising_used": false,
+      "scan_plane_registration": "rank2_baseline",
+      "canonical_submap_orientation": false,
+      "submap_representation": "adaptive_projected",
+      "projected_map": {
+        "attempts": 17,
+        "accepts": 17,
+        "projected_XY_used_as_measurement": false
+      },
+      "loop_closure": {
+        "enabled": true,
+        "historical_submaps": 416,
+        "candidate_attempts": 1147,
+        "historical_projected_submaps": 17,
+        "geometric_candidates": 593,
+        "independent_confirmations": 307,
+        "actual_loop_edges": 307,
+        "last": {
+          "accepted": false,
+          "reason": "no_historical_row_consensus",
+          "matches": 30,
+          "inliers": 7,
+          "typed_source_geometry": false,
+          "historical_tiling": null,
+          "appearance_warp_is_not_a_loop_pose_measurement": true,
+          "association_consensus_model": "legacy_scan_row_consensus"
+        },
+        "measured_heights_used": false,
+        "image_homography_used_as_pose": false,
+        "confirmations_require_disjoint_ping_windows": true,
+        "temporal_consistency_is_an_association_heuristic_not_a_truth_error_gate": true,
+        "caveat": "Conservative loop/map correlation handling; not a fully joint landmark graph.",
+        "map_priors_replaced_by_loop": 0,
+        "shared_current_windows": 265,
+        "shared_observation_policy": "half_information_each_for_loop_and_map_not_independent_full_factors"
+      },
+      "global_cohort_tracker_updates": 416,
+      "mapped_range_changes": {
+        "enabled": true,
+        "confirmed_windows": 352,
+        "factors": 331,
+        "unique_feature_pairs": 3988,
+        "used_received_range_tokens": 7976,
+        "ambiguous_associations_skipped": 0,
+        "original_range_sample_reused_in_multiple_new_factors": false,
+        "known_landmark_height_used": false,
+        "DEM_or_altitude_used": false,
+        "geometry": "mapped_XY_two_received_ranges_profiled_unknown_height_interval",
+        "correlation_policy": "new range precision budget .5; legacy policy reported separately; correlations remain approximate",
+        "last": {
+          "added_factors": 1,
+          "observation_id": 62250
+        },
+        "legacy_precision_policy": "preserve_legacy"
+      },
+      "map_to_odom": {
+        "timestamp_s": 20610.805234909,
+        "current_map_to_odom_pose2": [
+          -20.634935086778682,
+          -34.12383755644851,
+          0.0555047541700473
+        ],
+        "target_map_to_odom_pose2": [
+          -20.63493470577066,
+          -34.123844366820066,
+          0.055504746634707836
+        ],
+        "remaining_translation_m": 2.0910752428029012e-06,
+        "remaining_yaw_deg": 4.3174314845782995e-07,
+        "update_calls": 62458,
+        "positive_time_updates": 62457,
+        "translation_rate_limit_activations": 0,
+        "yaw_rate_limit_activations": 0
+      },
+      "observation_limit": "Scan-plane geometry plus two-reception range-change compatibility; unknown landmark height profiled over its physical interval. No measured bathymetry or altitude.",
+      "short_test_is_not_validated_whole_map_unknown_pose_relocalization": true
+    },
+    "events": {
+      "imu": 1030546,
+      "dvl": 103054,
+      "depth": 206109,
+      "sonar": 62458
+    }
+  }
+}

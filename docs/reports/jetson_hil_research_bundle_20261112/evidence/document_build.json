@@ -1,0 +1,416 @@
+{
+  "images": [
+    {
+      "file": "figures/HIL_information_flow.png",
+      "native_shape": [
+        1080,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 6.857142857142857,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/FIR_native_full_preview_only.png",
+      "native_shape": [
+        597,
+        1800
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 5.306666666666667,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/model_native_full_preview_only.png",
+      "native_shape": [
+        597,
+        1800
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 5.306666666666667,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_AGX_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/sea_AGX_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_AGX_board_position_errors.png",
+      "native_shape": [
+        1620,
+        2880
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.0,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/lake_AGX_board_3d_trajectories.png",
+      "native_shape": [
+        1800,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 11.428571428571429,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/NX_qiandao_position_errors.png",
+      "native_shape": [
+        1440,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.142857142857142,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/NX_qiandao_3D_trajectories.png",
+      "native_shape": [
+        1620,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 10.285714285714286,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/Global_empirical_CDF.png",
+      "native_shape": [
+        810,
+        2700
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 4.8,
+      "aspect_ratio_preserved": true
+    },
+    {
+      "file": "figures/Global_peaks_and_route.png",
+      "native_shape": [
+        1440,
+        2520
+      ],
+      "placed_width_cm": 16.0,
+      "placed_height_cm": 9.142857142857142,
+      "aspect_ratio_preserved": true
+    }
+  ],
+  "headings": [
+    {
+      "level": 1,
+      "text": "海底地形地貌匹配导航算法仿真与Jetson硬件在环验证报告"
+    },
+    {
+      "level": 2,
+      "text": "一、技术摘要与主要结论"
+    },
+    {
+      "level": 3,
+      "text": "1. 定位效果与成立条件"
+    },
+    {
+      "level": 3,
+      "text": "2. 板载实现与算法验证"
+    },
+    {
+      "level": 3,
+      "text": "3. 阶段结论"
+    },
+    {
+      "level": 2,
+      "text": "二、研究问题与验证目标"
+    },
+    {
+      "level": 3,
+      "text": "1. 水下传感器条件下的定位难点"
+    },
+    {
+      "level": 3,
+      "text": "2. 需要验证的技术假设"
+    },
+    {
+      "level": 3,
+      "text": "3. 与陆地融合算法的关系"
+    },
+    {
+      "level": 2,
+      "text": "三、系统结构与信息边界"
+    },
+    {
+      "level": 3,
+      "text": "1. 导航处理器在环结构"
+    },
+    {
+      "level": 3,
+      "text": "2. 两类Jetson数据的使用范围"
+    },
+    {
+      "level": 3,
+      "text": "3. 软件运行环境"
+    },
+    {
+      "level": 3,
+      "text": "4. 真值和参考地图的区别"
+    },
+    {
+      "level": 2,
+      "text": "四、实测来源数据与场景构建"
+    },
+    {
+      "level": 3,
+      "text": "1. Monterey海底场景"
+    },
+    {
+      "level": 3,
+      "text": "2. Chelan湖底场景"
+    },
+    {
+      "level": 3,
+      "text": "3. 千岛湖的完整实测来源场景"
+    },
+    {
+      "level": 3,
+      "text": "4. FIR与大模型去噪的部署结果"
+    },
+    {
+      "level": 3,
+      "text": "5. 数据分辨率与导航精度"
+    },
+    {
+      "level": 2,
+      "text": "五、声呐惯性前端与相对定位分析"
+    },
+    {
+      "level": 3,
+      "text": "1. 状态与基础量测"
+    },
+    {
+      "level": 3,
+      "text": "2. 同步波束与时间子帧"
+    },
+    {
+      "level": 3,
+      "text": "3. 声呐特征如何形成运动约束"
+    },
+    {
+      "level": 3,
+      "text": "4. Local误差与相对误差的关系"
+    },
+    {
+      "level": 2,
+      "text": "六、全局地形地貌匹配与后端技术"
+    },
+    {
+      "level": 3,
+      "text": "1. 从环境候选到地图约束"
+    },
+    {
+      "level": 3,
+      "text": "2. 多候选粒子跟踪的作用"
+    },
+    {
+      "level": 3,
+      "text": "3. GTSAM图优化与在线Global"
+    },
+    {
+      "level": 3,
+      "text": "4. 纯侧扫跨航线斜距变化约束"
+    },
+    {
+      "level": 4,
+      "text": "（1）量测关系"
+    },
+    {
+      "level": 4,
+      "text": "（2）未知高度与残差"
+    },
+    {
+      "level": 4,
+      "text": "（3）信息来源与约束边界"
+    },
+    {
+      "level": 3,
+      "text": "5. 回环与相关性控制"
+    },
+    {
+      "level": 2,
+      "text": "七、验证设计与评价方法"
+    },
+    {
+      "level": 3,
+      "text": "1. 输入、输出与完整性"
+    },
+    {
+      "level": 3,
+      "text": "2. 三维绝对位置误差"
+    },
+    {
+      "level": 3,
+      "text": "3. 固定时间窗SE3相对误差"
+    },
+    {
+      "level": 3,
+      "text": "4. 误差尾部与航程分段"
+    },
+    {
+      "level": 3,
+      "text": "5. 本报告能验证与不能归因的内容"
+    },
+    {
+      "level": 2,
+      "text": "八、完整硬件在环结果与算法有效性"
+    },
+    {
+      "level": 3,
+      "text": "1. 完整位置误差统计"
+    },
+    {
+      "level": 3,
+      "text": "2. Monterey海底的全程表现"
+    },
+    {
+      "level": 3,
+      "text": "3. Chelan湖底的全程表现"
+    },
+    {
+      "level": 3,
+      "text": "4. 千岛湖NX完整结果"
+    },
+    {
+      "level": 2,
+      "text": "九、数据分布、分段与误差机理"
+    },
+    {
+      "level": 3,
+      "text": "1. 均值之外的风险"
+    },
+    {
+      "level": 3,
+      "text": "2. Monterey航程分段"
+    },
+    {
+      "level": 3,
+      "text": "3. Chelan航程分段"
+    },
+    {
+      "level": 3,
+      "text": "4. 千岛湖航程分段"
+    },
+    {
+      "level": 3,
+      "text": "5. 地图质量与误差不能简单一一对应"
+    },
+    {
+      "level": 2,
+      "text": "十、相对定位验证与前端局限"
+    },
+    {
+      "level": 3,
+      "text": "1. Monterey的SE3相对误差"
+    },
+    {
+      "level": 3,
+      "text": "2. Chelan的SE3相对误差"
+    },
+    {
+      "level": 3,
+      "text": "3. 千岛湖的相对约束证据"
+    },
+    {
+      "level": 2,
+      "text": "十一、板载实现与实时性分析"
+    },
+    {
+      "level": 3,
+      "text": "1. 完成部署不等于满足截止时间"
+    },
+    {
+      "level": 3,
+      "text": "2. 海底记录的处理长尾"
+    },
+    {
+      "level": 3,
+      "text": "3. 千岛湖NX的时间解释"
+    },
+    {
+      "level": 3,
+      "text": "4. 原生全量模型推理的约束"
+    },
+    {
+      "level": 2,
+      "text": "十二、误差来源与技术风险"
+    },
+    {
+      "level": 3,
+      "text": "1. 声学建模误差"
+    },
+    {
+      "level": 3,
+      "text": "2. 先验地图与同源相关性"
+    },
+    {
+      "level": 3,
+      "text": "3. 跨体系结构数值差异"
+    },
+    {
+      "level": 3,
+      "text": "4. 系统资源与连续运行"
+    },
+    {
+      "level": 2,
+      "text": "十三、阶段成果与后续可检验问题"
+    },
+    {
+      "level": 3,
+      "text": "1. 已有数据能够支撑的成果"
+    },
+    {
+      "level": 3,
+      "text": "2. 下一阶段的技术验证设计"
+    },
+    {
+      "level": 2,
+      "text": "十四、结论"
+    },
+    {
+      "level": 2,
+      "text": "十五、参考文献与复现附录"
+    },
+    {
+      "level": 3,
+      "text": "1. 方法和数据来源"
+    },
+    {
+      "level": 3,
+      "text": "2. 结果文件与证据索引"
+    },
+    {
+      "level": 3,
+      "text": "3. 原报告与本报告的替换边界"
+    },
+    {
+      "level": 3,
+      "text": "4. 重算与成文规则"
+    }
+  ],
+  "tables": 14,
+  "editable_word_reopened": true,
+  "pdf_conversion_completed": true,
+  "libreoffice_output": "convert [local-path]/海底地形地貌匹配导航算法仿真与Jetson硬件在环验证报告.docx -> [local-path]/海底地形地貌匹配导航算法仿真与Jetson硬件在环验证报告.pdf using filter : writer_pdf_Export"
+}

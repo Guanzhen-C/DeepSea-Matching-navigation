@@ -1,0 +1,327 @@
+{
+  "schema": "oceansim.measured-acoustic-map/v2",
+  "title": "Lake Chelan measured multibeam bathymetry and backscatter",
+  "dataset_id": "lake_chelan_usgs_2023_3m",
+  "source_directory": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m",
+  "source_kind": "NORBIT WINGHEAD i67 multibeam bathymetry/backscatter",
+  "bathymetry_layers": [
+    {
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_A_3m_bathy_NAD83_NAVD88.tif",
+      "source_shape_pixels": [
+        5054,
+        3785
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "source_valid_samples": 2759691,
+      "registered_samples": 689836
+    },
+    {
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_B_3m_bathy_NAD83_NAVD88.tif",
+      "source_shape_pixels": [
+        4896,
+        3179
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "source_valid_samples": 3140945,
+      "registered_samples": 785228
+    },
+    {
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_C_3m_bathy_NAD83_NAVD88.tif",
+      "source_shape_pixels": [
+        2951,
+        5919
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "source_valid_samples": 3592299,
+      "registered_samples": 898057
+    },
+    {
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_D_3m_bathy_NAD83_NAVD88.tif",
+      "source_shape_pixels": [
+        3312,
+        925
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "source_valid_samples": 1412418,
+      "registered_samples": 353011
+    },
+    {
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_E_3m_bathy_NAD83_NAVD88.tif",
+      "source_shape_pixels": [
+        1978,
+        4092
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "source_valid_samples": 2868876,
+      "registered_samples": 717165
+    }
+  ],
+  "backscatter_layers": [
+    {
+      "label": "Chelan_A",
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_A_3m_backscatter_NAD83/Chelan_A_3m_backscatter.tif",
+      "source_shape_pixels": [
+        5312,
+        4430
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "registered_samples": 685196,
+      "native_units": "dB intensity (as documented by the source)",
+      "registered_reference_db": 36.25633430480957,
+      "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+      "radiometric_reference": "per-section median; unknown constant survey gain",
+      "percentile_clipping": false,
+      "registered_percentile_1_99": [
+        2.713524639606476,
+        61.20007629394536
+      ]
+    },
+    {
+      "label": "Chelan_B",
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_B_3m_backscatter_NAD83/Chelan_B_3m_backscatter.tif",
+      "source_shape_pixels": [
+        4924,
+        3217
+      ],
+      "source_resolution_m": [
+        3.0,
+        3.0
+      ],
+      "registered_samples": 777130,
+      "native_units": "dB intensity (as documented by the source)",
+      "registered_reference_db": 20.20786762237549,
+      "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+      "radiometric_reference": "per-section median; unknown constant survey gain",
+      "percentile_clipping": false,
+      "registered_percentile_1_99": [
+        -29.12476583480835,
+        45.533997650146475
+      ]
+    },
+    {
+      "label": "Chelan_C",
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_C_3m_backscatter_NAD83/Chelan_C_3m_backscatter.tif",
+      "source_shape_pixels": [
+        5776,
+        8005
+      ],
+      "source_resolution_m": [
+        3.0000000251,
+        3.0000000237
+      ],
+      "registered_samples": 959259,
+      "native_units": "dB intensity (as documented by the source)",
+      "registered_reference_db": 107.96981048583984,
+      "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+      "radiometric_reference": "per-section median; unknown constant survey gain",
+      "percentile_clipping": false,
+      "registered_percentile_1_99": [
+        91.75146942138672,
+        162.01824645996095
+      ]
+    },
+    {
+      "label": "Chelan_D",
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_D_3m_backscatter_NAD83/Chelan_D_3m_backscatter.tif",
+      "source_shape_pixels": [
+        3314,
+        926
+      ],
+      "source_resolution_m": [
+        3.0000001277,
+        3.0000000091
+      ],
+      "registered_samples": 350207,
+      "native_units": "dB intensity (as documented by the source)",
+      "registered_reference_db": -48.7464599609375,
+      "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+      "radiometric_reference": "per-section median; unknown constant survey gain",
+      "percentile_clipping": false,
+      "registered_percentile_1_99": [
+        -60.9020703125,
+        -26.423220443725583
+      ]
+    },
+    {
+      "label": "Chelan_E",
+      "file": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_E_3m_backscatter_NAD83/Chelan_E_3m_backscatter.tif",
+      "source_shape_pixels": [
+        1980,
+        4094
+      ],
+      "source_resolution_m": [
+        3.0000000338,
+        3.000000036
+      ],
+      "registered_samples": 667085,
+      "native_units": "dB intensity (as documented by the source)",
+      "registered_reference_db": -58.0456657409668,
+      "radiometric_conversion": "10 ** ((source_db - registered_reference_db) / 10)",
+      "radiometric_reference": "per-section median; unknown constant survey gain",
+      "percentile_clipping": false,
+      "registered_percentile_1_99": [
+        -68.35122131347656,
+        -43.5956425476074
+      ]
+    }
+  ],
+  "resolution_m": 6.0,
+  "source_shape_pixels": [
+    8558,
+    7974
+  ],
+  "scene_extent_m": [
+    47838.0,
+    51342.0
+  ],
+  "bounds_projected_m": {
+    "west": 672636.024,
+    "east": 720480.024,
+    "north": 5353615.243,
+    "south": 5302267.243
+  },
+  "vertical_transform": "NAVD88 elevation translated so highest valid seabed is -5 m",
+  "vertical_offset_m": -340.0400085449219,
+  "vertical_scale": 1.0,
+  "is_geographically_cropped": false,
+  "processing": "archived geometry/coverage/route unchanged; documented native intensity dB converted to relative linear power before interpolation; no percentile clipping or display contrast stretch; equal power averaging at overlaps",
+  "backscatter_mosaic_units": "relative linear acoustic power; per-section median power = 1 before overlap averaging",
+  "access": "public scientific data; not for navigation",
+  "source_doi": "https://doi.org/10.5066/P1GE3YDR",
+  "source_horizontal_crs": "NAD83(2011) / UTM zone 10N",
+  "source_vertical_datum": "NAVD88",
+  "output_resolution_note": "two-by-two reduction from native 3 m grids to a 6 m validation grid",
+  "bathymetry_valid_samples": 3393937,
+  "bathymetry_valid_fraction": 0.04973421448640074,
+  "backscatter_registered_samples": 3262216,
+  "backscatter_registered_fraction_of_bathymetry": 0.961189320838896,
+  "raw_elevation_range_m": [
+    -450.8179931640625,
+    -5.0
+  ],
+  "output_arrays": {
+    "elevation_m.npy": {
+      "sha256": "6b7025621589b1b0295af9af7f423d0af33e8a5cfc0ad8dc04ab4c5b06fda175",
+      "bytes": 272966096,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "float32"
+    },
+    "navigation_elevation_m.npy": {
+      "sha256": "fd48ff3fd96a77283aab0b940011812713ddea3adb7b85c182bc9656d655a826",
+      "bytes": 272966096,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "float32"
+    },
+    "bathymetry_valid_mask.npy": {
+      "sha256": "63fa865bc65101f54b8ded08727b475b51cc62f54d278e26f07069497058aa8b",
+      "bytes": 68241620,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "bool"
+    },
+    "backscatter.npy": {
+      "sha256": "ed702ae5128077cd4bc30c2824c7913eeef056d84c04e0fae8a39c60e8206067",
+      "bytes": 272966096,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "float32"
+    },
+    "backscatter_valid_mask.npy": {
+      "sha256": "03b63c633f9e9a927539ca06ce870a72574dc98d825283a2a476ec8e541054f7",
+      "bytes": 68241620,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "bool"
+    },
+    "backscatter_source_mask.npy": {
+      "sha256": "8e69e73e2ec6669cb4a478a43ed1d7f092004871411de2d8d59714e2d5fc198a",
+      "bytes": 136483112,
+      "shape": [
+        8558,
+        7974
+      ],
+      "dtype": "uint16"
+    }
+  },
+  "survey_route": {
+    "file": "full_map_traversal_route.json",
+    "sha256": "f3a1cce6d95935f60d3faf644db0465dca1a2eb37e2900050e9c499324dce7b5",
+    "validation": {
+      "sample_count": 8192,
+      "period_s": 31410.795057043008,
+      "path_length_m": 47116.19258556451,
+      "x_range_m": [
+        -22136.826923076922,
+        -10263.029836742353
+      ],
+      "y_range_m": [
+        5385.2899497922435,
+        22449.798353909468
+      ],
+      "auv_depth_range_m": [
+        71.18292874484177,
+        260.61507999216644
+      ],
+      "seabed_depth_range_m": [
+        112.29948936887855,
+        324.7480169865303
+      ],
+      "altitude_range_m": [
+        35.30905061773623,
+        114.22247784982648
+      ],
+      "pitch_range_deg": [
+        -11.717884208444387,
+        11.719395561366914
+      ],
+      "bathymetry_fully_valid": true,
+      "backscatter_fully_valid": true,
+      "bathymetry_min_clearance_m": 269.6267890818513,
+      "backscatter_min_clearance_m": 269.6267890818513,
+      "maximum_horizontal_curvature_per_m": 0.2776416916892503,
+      "validation_sample_count": 42928,
+      "validation_max_spacing_m": 1.5,
+      "waypoint_count": 199
+    }
+  },
+  "checksum_manifest": "sha256sums.txt",
+  "radiometry": {
+    "encoding": "relative_linear_power_from_documented_db",
+    "source_metadata": "data/underwater_terrain_datasets/lake_chelan_usgs_2023_3m/raw/Chelan_3m_backscatter_NAD83_metadata.txt",
+    "absolute_calibration": false,
+    "unknown_inter_section_gain": true,
+    "reference": "one constant median dB offset per source section",
+    "display_contrast_is_not_measurement": true,
+    "parent_map": "[local-path]/prepared"
+  }
+}

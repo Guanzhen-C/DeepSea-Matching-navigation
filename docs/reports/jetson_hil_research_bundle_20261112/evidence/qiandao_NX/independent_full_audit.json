@@ -1,0 +1,80 @@
+{
+  "status": "independent_full_actual_NX_Qiandao_recheck_passed",
+  "samples": 62458,
+  "events": {
+    "imu": 1030546,
+    "dvl": 103054,
+    "depth": 206109,
+    "sonar": 62458
+  },
+  "actual_last_sample_distance_m": 16488.6441879272,
+  "nominal_requested_route_m": 16488.743092729303,
+  "summary_progress_distance_field_m": 16486.532188415204,
+  "summary_progress_field_matches_one_based_sample": [
+    62450
+  ],
+  "authoritative_completed_distance_uses_final_NPZ_sample": true,
+  "CSV_NPZ_and_actual_board_positions_exactly_equal": true,
+  "all_events_and_PC_board_stream_hash_equal": true,
+  "recorded_input_files_full_SHA256_verified": {
+    "navigation_sensors.npy": "0e67031cb7fc51dd2fb6ff2c21429be6b90b406ef2ad57b7c41af50261fe8757",
+    "received_side_scan_amplitudes.npy": "481865cab59333a3705ea53b10b617997ff9eb65404617b12fa7cae62b5e3132",
+    "side_scan_timestamps_s.npy": "3661f0546374730ece92b20c72184b6d119836f8389fbe7bf63a2062ed8bd30f"
+  },
+  "all_3D_errors_recomputed_exactly_equal": true,
+  "metrics_recomputed": {
+    "DR": {
+      "RMSE_m": 36.1964536050971,
+      "P95_m": 55.44671072831972,
+      "max_m": 78.7600265136402,
+      "final_m": 67.82245527337794
+    },
+    "Local": {
+      "RMSE_m": 34.53867637283969,
+      "P95_m": 56.5431242884863,
+      "max_m": 76.27108632907175,
+      "final_m": 69.96948042680987
+    },
+    "Global": {
+      "RMSE_m": 4.870919487986242,
+      "P95_m": 10.46205874933685,
+      "max_m": 19.315121800945537,
+      "final_m": 5.6733297524897175
+    }
+  },
+  "metric_recalculation_difference_m": {
+    "DR": {
+      "RMSE_m": 0,
+      "P95_m": 0,
+      "max_m": 0,
+      "final_m": 0
+    },
+    "Local": {
+      "RMSE_m": 7.105427357601002e-15,
+      "P95_m": 0,
+      "max_m": 0,
+      "final_m": 0
+    },
+    "Global": {
+      "RMSE_m": -8.881784197001252e-16,
+      "P95_m": 0,
+      "max_m": 0,
+      "final_m": 0
+    }
+  },
+  "metric_review_original_rtol_and_atol": 1e-12,
+  "navigation_states_SHA256": "94cf0b4810a9029a9f7a4f2cfbd0a24dad0d4409a66c0daaa819a0f4279fca34",
+  "trajectory_csv_SHA256": "070fb738a439d0b946c6c534c9ea306129818d6aec839e19f6cd6d5c3019fa14",
+  "actual_board_pose_log_SHA256": "eb1c833c33db508936faad912aa522592bcfd1cd0e1dc4784e91c3494410bd64",
+  "source_summary_SHA256": "69b48e5687b1e8db2ff4938c2f30e444458a8281c875a022322b12206924ec7c",
+  "input_stream_SHA256": "5b56eb2bd6676332cb543cc1a03fd2ceaf150261d97a351e659f41daff633c22",
+  "no_alignment_or_smoothing": true,
+  "field_coordinates_nominal": true,
+  "physical_field_trial": false,
+  "end_to_end_source_wall_s": 20781.306282619946,
+  "virtual_time_span_s": 20610.805234909,
+  "plot_inputs_verified": true,
+  "actual_optimizer_backend": "gtsam_isam2_incremental_fixed_lag",
+  "actual_loop_edges": 307,
+  "all_five_experiments_complete": false
+}

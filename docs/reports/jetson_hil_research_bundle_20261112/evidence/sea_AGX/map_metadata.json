@@ -1,0 +1,200 @@
+{
+  "title": "Complete Monterey Canyon measured acoustic map",
+  "source_agency": "U.S. Geological Survey",
+  "source_product": "BathymetryB [5m] and Backscatter A/B/C/D measured mosaic",
+  "source_doi": "https://doi.org/10.5066/F7XD0ZQ4",
+  "bathymetry_source_download": "https://www.sciencebase.gov/catalog/file/get/556f8b8ae4b0d9246a9fd0b4",
+  "bathymetry_archive_sha256": "27ace539f00ccb45d2ba03e36328a5997d880a8ae849558d890717a5fc78a927",
+  "backscatter_layers": [
+    {
+      "label": "A_USGS_SWATH",
+      "archive_file": "BackscatterA_USGS_Swath_MontereyCanyon.zip",
+      "source_download": "https://cmgds.marine.usgs.gov/data/csmp/MontereyCanyon/data/BackscatterA_USGS_Swath_MontereyCanyon.zip",
+      "archive_sha256": "02e606091db782d8300425e7b51a8a595545b51aaf1858bf857e6d2e488f221b",
+      "source_shape_pixels": [
+        8836,
+        14607
+      ],
+      "source_resolution_m": 2.0,
+      "source_nodata": -3.402823e+38,
+      "source_valid_samples": 23972323,
+      "registered_samples": 1667998,
+      "raw_percentile_1_99": [
+        6849.743901367187,
+        64808.0878125
+      ],
+      "mosaic_normalization": "linear clip of native values between registered valid 1st and 99th percentiles",
+      "native_encoding": "gain-normalized 16-bit amplitude stored as float32",
+      "native_units": "normalized amplitude counts"
+    },
+    {
+      "label": "B_EM300",
+      "archive_file": "BackscatterB_EM300_MontereyCanyon.zip",
+      "source_download": "https://cmgds.marine.usgs.gov/data/csmp/MontereyCanyon/data/BackscatterB_EM300_MontereyCanyon.zip",
+      "archive_sha256": "57eaed7b66e2330c6699a77163c33bb7f277581ccb441002f2fc833eb10a899c",
+      "source_shape_pixels": [
+        3534,
+        5842
+      ],
+      "source_resolution_m": 5.0,
+      "source_nodata": -3.402823e+38,
+      "source_valid_samples": 11095546,
+      "registered_samples": 11094832,
+      "raw_percentile_1_99": [
+        -42.80308151245117,
+        -23.6549072265625
+      ],
+      "mosaic_normalization": "linear clip of native values between registered valid 1st and 99th percentiles",
+      "native_encoding": "EM-300 amplitude stored as negative float32 dB",
+      "native_units": "dB"
+    },
+    {
+      "label": "C_7125",
+      "archive_file": "BackscatterC_7125_MontereyCanyon.zip",
+      "source_download": "https://cmgds.marine.usgs.gov/data/csmp/MontereyCanyon/data/BackscatterC_7125_MontereyCanyon.zip",
+      "archive_sha256": "3bfe8652d1963ded1a235ef24096fb936af5f7409800303756b4916d8e3264b5",
+      "source_shape_pixels": [
+        8835,
+        14605
+      ],
+      "source_resolution_m": 2.0,
+      "source_nodata": 255.0,
+      "source_valid_samples": 12461562,
+      "registered_samples": 119777,
+      "raw_percentile_1_99": [
+        72.0,
+        219.0
+      ],
+      "mosaic_normalization": "linear clip of native values between registered valid 1st and 99th percentiles",
+      "native_encoding": "radiometrically corrected 8-bit grayscale",
+      "native_units": "grayscale intensity counts"
+    },
+    {
+      "label": "D_CSUMB_SWATH",
+      "archive_file": "BackscatterD_CSUMB_MontereyCanyon.zip",
+      "source_download": "https://cmgds.marine.usgs.gov/data/csmp/MontereyCanyon/data/BackscatterD_CSUMB_MontereyCanyon.zip",
+      "archive_sha256": "634e6563766c29887d87bdcb49d6fc21195026095731b35b38e16b0328e28767",
+      "source_shape_pixels": [
+        8835,
+        14605
+      ],
+      "source_resolution_m": 2.0,
+      "source_nodata": 0.0,
+      "source_valid_samples": 6926240,
+      "registered_samples": 26374,
+      "raw_percentile_1_99": [
+        43.0,
+        207.0
+      ],
+      "mosaic_normalization": "linear clip of native values between registered valid 1st and 99th percentiles",
+      "native_encoding": "gain-normalized SWATHplus 8-bit grayscale",
+      "native_units": "grayscale intensity counts"
+    }
+  ],
+  "survey_years": "1998-2014",
+  "sensors": [
+    "Simrad EM-300 multibeam echosounder",
+    "Reson 7125 multibeam echosounder",
+    "SEA SWATHplus bathymetric side-scan sonar"
+  ],
+  "bathymetry_crs": "NAD83 / UTM zone 10N",
+  "backscatter_crs": "WGS84 / UTM zone 10N",
+  "bounds_utm_m": {
+    "west": 583530.0,
+    "east": 612740.0,
+    "south": 4060670.0,
+    "north": 4078340.0
+  },
+  "source_shape_pixels": [
+    3534,
+    5842
+  ],
+  "resolution_m": 5.0,
+  "raster_footprint_m": [
+    29210.0,
+    17670.0
+  ],
+  "scene_extent_m": [
+    29205.0,
+    17665.0
+  ],
+  "is_geographically_cropped": false,
+  "bathymetry_valid_samples": 11296546,
+  "bathymetry_valid_fraction": 0.547164077547072,
+  "backscatter_registered_samples": 11145229,
+  "backscatter_registered_fraction_of_bathymetry": 0.9866050206850837,
+  "backscatter_layer_overlap_histogram": {
+    "1": 9384373,
+    "2": 1757960,
+    "3": 2896,
+    "4": 0
+  },
+  "backscatter_mosaic_units": "unitless normalized intensity [0, 1]",
+  "backscatter_mosaic_note": "Every valid registered source contributes with equal weight in overlap cells. Native values are heterogeneous and this mosaic is suitable as measured spatial texture, not as calibrated absolute target strength. The source bitmask preserves layer lineage for every mosaic cell.",
+  "raw_elevation_range_m": [
+    -1747.1834716796875,
+    -1.4500000476837158
+  ],
+  "vertical_offset_m": 0.0,
+  "vertical_scale": 1.0,
+  "processing": "complete source extent; no geographic crop or exaggeration; north-up row reversal; invalid cells retained as NaN; four measured backscatter layers independently linearly normalized between their 1st and 99th percentiles, nearest-registered to the 5 m bathymetry grid, and averaged only where measured layers overlap",
+  "datum_note": "The source publishes bathymetry in NAD83 and backscatter in WGS84. Their UTM grids are overlaid directly; this sub-cell difference is below the published >=2 m backscatter horizontal uncertainty and the 5 m output cell size.",
+  "access": "Public-domain USGS scientific data with attribution; not for navigation",
+  "output_arrays": {
+    "elevation_m.npy": {
+      "sha256": "4307f279f0b038ebf67e6c0e06ab357938c60e0fe0ae7988c163044468cd84fe",
+      "bytes": 82582640,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "float32"
+    },
+    "navigation_elevation_m.npy": {
+      "sha256": "735ee8554fc3e8983da13d3f29622b36a20f17ace2f10825464b5d6c2c986f0b",
+      "bytes": 82582640,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "float32"
+    },
+    "bathymetry_valid_mask.npy": {
+      "sha256": "ad40d701e52a31b7e6641cc268a7377ab2ed1c7daa4117915cf771a495a5c766",
+      "bytes": 20645756,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "bool"
+    },
+    "backscatter.npy": {
+      "sha256": "d897c1db7794ea583fc8b0ab03e24fbc708676bb481bf389638adc3d3f600544",
+      "bytes": 82582640,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "float32"
+    },
+    "backscatter_valid_mask.npy": {
+      "sha256": "fec207288400a6b52a6b98323c7d0fd61a36f44e44ff1913678d8817a5df0a6c",
+      "bytes": 20645756,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "bool"
+    },
+    "backscatter_source_mask.npy": {
+      "sha256": "5e07b0eb5acc3a3ddb15dc41e9cd1b893c979821480dfe6bde66dc2ec16136ec",
+      "bytes": 20645756,
+      "shape": [
+        3534,
+        5842
+      ],
+      "dtype": "uint8"
+    }
+  },
+  "checksum_manifest": "sha256sums.txt"
+}

@@ -1,0 +1,178 @@
+{
+  "status": "complete",
+  "sequence": 62458,
+  "events": {
+    "imu": 1030546,
+    "dvl": 103054,
+    "depth": 206109,
+    "sonar": 62458
+  },
+  "input_stream_SHA256": "5b56eb2bd6676332cb543cc1a03fd2ceaf150261d97a351e659f41daff633c22",
+  "estimator_wall_s": 0.006531167993671261,
+  "elapsed_s": 20769.440314904998,
+  "diagnostics": {
+    "mode": "pure_side_scan_descriptor_features",
+    "feature_detector": "GFTT+subpixel",
+    "descriptor": "SIFT",
+    "matching": "mutual_ratio+scanline_RANSAC",
+    "optical_flow_calls": 0,
+    "DVL_altitude_observations": 0,
+    "MBES_points_consumed": 0,
+    "measured_height_likelihood_terms": 0,
+    "measured_height_graph_factors": 0,
+    "raw_intensity_correlation_calls": 0,
+    "frontend": {
+      "accepted": 62394,
+      "rejected": 63,
+      "updates": 20780
+    },
+    "feature_map": {
+      "attempts": 416,
+      "accepts": 381,
+      "graph_feature_priors": 352,
+      "last": {
+        "accepted": false,
+        "reason": "insufficient_mutual_feature_matches",
+        "matches": 11,
+        "inliers": 0,
+        "query_features": 11,
+        "map_features": 11,
+        "observable_rank": null,
+        "submap_assembly": {
+          "assembly": "ordinary_overlap_average_of_received_scans",
+          "canonical_port_starboard_and_plane_orientation": false,
+          "secondary_denoising_used": false,
+          "unknown_cells_filled": false
+        },
+        "status": "tracking",
+        "null_probability": 0.0811907983761841,
+        "cohorts": 1,
+        "feature_likelihood_only": true,
+        "measured_depth_likelihood_terms": 0,
+        "measured_depth_graph_factors": 0,
+        "DVL_altitude_used": false,
+        "optical_flow_used": false
+      }
+    },
+    "optimizer_backend": "gtsam_isam2_incremental_fixed_lag",
+    "backend_feature_matcher": {
+      "algorithm": "LoFTR_local_features_plus_scan_plane_geometry",
+      "checkpoint_SHA256": "21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec",
+      "kornia_version": "0.8.2",
+      "torch_version": "2.5.0a0+872d972e41.nv24.08",
+      "unmodified_public_outdoor_weights": true,
+      "sonar_specific_training": false,
+      "optical_flow": false,
+      "raw_intensity_correlation": false,
+      "input_images_uploaded": false,
+      "received_support_context_masks": false
+    },
+    "secondary_submap_denoising_used": false,
+    "scan_plane_registration": "rank2_baseline",
+    "canonical_submap_orientation": false,
+    "submap_representation": "adaptive_projected",
+    "projected_map": {
+      "attempts": 17,
+      "accepts": 17,
+      "projected_XY_used_as_measurement": false
+    },
+    "loop_closure": {
+      "enabled": true,
+      "historical_submaps": 416,
+      "candidate_attempts": 1147,
+      "historical_projected_submaps": 17,
+      "geometric_candidates": 593,
+      "independent_confirmations": 307,
+      "actual_loop_edges": 307,
+      "last": {
+        "accepted": false,
+        "reason": "no_historical_row_consensus",
+        "matches": 30,
+        "inliers": 7,
+        "typed_source_geometry": false,
+        "historical_tiling": null,
+        "appearance_warp_is_not_a_loop_pose_measurement": true,
+        "association_consensus_model": "legacy_scan_row_consensus"
+      },
+      "measured_heights_used": false,
+      "image_homography_used_as_pose": false,
+      "confirmations_require_disjoint_ping_windows": true,
+      "temporal_consistency_is_an_association_heuristic_not_a_truth_error_gate": true,
+      "caveat": "Conservative loop/map correlation handling; not a fully joint landmark graph.",
+      "map_priors_replaced_by_loop": 0,
+      "shared_current_windows": 265,
+      "shared_observation_policy": "half_information_each_for_loop_and_map_not_independent_full_factors"
+    },
+    "global_cohort_tracker_updates": 416,
+    "mapped_range_changes": {
+      "enabled": true,
+      "confirmed_windows": 352,
+      "factors": 331,
+      "unique_feature_pairs": 3988,
+      "used_received_range_tokens": 7976,
+      "ambiguous_associations_skipped": 0,
+      "original_range_sample_reused_in_multiple_new_factors": false,
+      "known_landmark_height_used": false,
+      "DEM_or_altitude_used": false,
+      "geometry": "mapped_XY_two_received_ranges_profiled_unknown_height_interval",
+      "correlation_policy": "new range precision budget .5; legacy policy reported separately; correlations remain approximate",
+      "last": {
+        "added_factors": 1,
+        "observation_id": 62250
+      },
+      "legacy_precision_policy": "preserve_legacy"
+    },
+    "map_to_odom": {
+      "timestamp_s": 20610.805234909,
+      "current_map_to_odom_pose2": [
+        -20.634935086778682,
+        -34.12383755644851,
+        0.0555047541700473
+      ],
+      "target_map_to_odom_pose2": [
+        -20.63493470577066,
+        -34.123844366820066,
+        0.055504746634707836
+      ],
+      "remaining_translation_m": 2.0910752428029012e-06,
+      "remaining_yaw_deg": 4.3174314845782995e-07,
+      "update_calls": 62458,
+      "positive_time_updates": 62457,
+      "translation_rate_limit_activations": 0,
+      "yaw_rate_limit_activations": 0
+    },
+    "observation_limit": "Scan-plane geometry plus two-reception range-change compatibility; unknown landmark height profiled over its physical interval. No measured bathymetry or altitude.",
+    "short_test_is_not_validated_whole_map_unknown_pose_relocalization": true
+  },
+  "feature_matcher": {
+    "algorithm": "LoFTR_local_features_plus_scan_plane_geometry",
+    "checkpoint_SHA256": "21f5bec5968178e8bc8b7633441836fe5de4f47d861dd2cd7dc38e271b0479ec",
+    "kornia_version": "0.8.2",
+    "torch_version": "2.5.0a0+872d972e41.nv24.08",
+    "unmodified_public_outdoor_weights": true,
+    "sonar_specific_training": false,
+    "optical_flow": false,
+    "raw_intensity_correlation": false,
+    "input_images_uploaded": false,
+    "received_support_context_masks": false
+  },
+  "no_query_map_or_evaluation_truth_deployed": true,
+  "large_model_provenance": {
+    "model": "random_adapted_56M",
+    "parameters": 56083513,
+    "parent_checkpoint_SHA256": "5aeb71e0bf53c9adecfb461a6cfd1bfd119ac6d15c01c2821508b9bbb8df0ff6",
+    "parameter_tensor_SHA256": "b1cf0e8baaf5e7866494c17ac91206447d96dac3a84bfc871ca1030d34e402ac",
+    "gain_file_SHA256": "72c9c6873f458581e35d4d476c3c55386e35b3695b4fcec7f8feaa0f9e786685",
+    "model_report_SHA256": "25233f229a55be9910954e1b1fb30adb6bf680fdd8b5b9ec5e9238aa7378616a",
+    "original_model_bundle_manifest_SHA256": "a7676223c8a1ee7b5af9f6f63aed0fdcf39040ab9ed351ef4784629fec07750b",
+    "all_original_native_amplitudes_equal_actual_model_inputs": true,
+    "all16_numeric_gain_channels_verified": true,
+    "edge_repair_used": false,
+    "FIR_used": false,
+    "brightness_or_contrast_enhancement_used": false,
+    "RGB_or_PDF_input_used": false,
+    "native_amplitude_formula": "original_float64_amplitude * exp(model_float32_log_gain)",
+    "real_clean_truth": false
+  },
+  "pure_side_scan": true
+}

@@ -1,0 +1,119 @@
+{
+  "status": "completed_ALL2020_both_parts_joint_measured_scene",
+  "source_records": 2020,
+  "parts": [
+    {
+      "part": "Data01",
+      "parameters": {
+        "c": 1480.0,
+        "BeamSigFs": 37650.0,
+        "InstallAngle": 30.0,
+        "BeamSpacingAlongTrackDisRes": 0.15,
+        "BeamAlongTrackNum": 8.0
+      }
+    },
+    {
+      "part": "Data02",
+      "parameters": {
+        "c": 1480.0,
+        "BeamSigFs": 37650.0,
+        "InstallAngle": 30.0,
+        "BeamSpacingAlongTrackDisRes": 0.15,
+        "BeamAlongTrackNum": 8.0
+      }
+    }
+  ],
+  "grid_shape": [
+    1635,
+    4644
+  ],
+  "resolution_m": 0.3,
+  "source_nominal_along_track_extent_m": 1386.654133117464,
+  "duration_source_s": 673.8599998950958,
+  "reference_record_count": 1010,
+  "query_record_count": 1010,
+  "shared_record_IDs": 0,
+  "full_display_record_count": 2020,
+  "all_depth_side_identities_exact": true,
+  "all_physical_records_retained_in_index": true,
+  "original_native_array_shape": [
+    2,
+    8,
+    2020,
+    12189
+  ],
+  "per_side_retained_soundings": [
+    80557581,
+    96639013
+  ],
+  "retained_counts_are_native_bins_with_interpolated_geometry_not_independent_soundings": true,
+  "every_retained_intensity_is_an_actual_native_bin_after_frozen_gain": true,
+  "records_with_no_supported_soundings": 0,
+  "common_appearance_cells": 6041754,
+  "scene_valid_cells": 6041754,
+  "reference_query_elevation_shared": false,
+  "nominal_layout_not_recovered_survey_pose": true,
+  "depth_quality_policy": "original physical gates; .6m raster smoothing; no claim of calibrated absolute precision",
+  "measured_bottom_geometry_not_flat": true,
+  "GPS_file_opened": false,
+  "baseline_gain_SHA256": "72c9c6873f458581e35d4d476c3c55386e35b3695b4fcec7f8feaa0f9e786685",
+  "source_files": [
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data01/SysPara.mat",
+      "SHA256": "541f4f96c28c4f6621e7c0e8c79b6acdb9ecb844c7dde605728fb7ed0484a6ae"
+    },
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data01/PortNormalModeDepthTotal.mat",
+      "SHA256": "20eec497ebecf36dab09f9def78c78d357c27ddbf40c38a2af1c39104178e29a"
+    },
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data01/StbdNormalModeDepthTotal.mat",
+      "SHA256": "9b11e9b96781768c83189986981c87d9ee5f58f87c59207f270b0aaa28ecadd9"
+    },
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data02/SysPara.mat",
+      "SHA256": "92ae475189aefb2171246d1cd5695efc383ae2d859cf0f5e11b478f0a8a93f6a"
+    },
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data02/PortNormalModeDepthTotal.mat",
+      "SHA256": "a4e99f0fdcfee4bbf1e428fa81c04bf19bc9d8459c8b9f1cb7a26d8a7f300f1a"
+    },
+    {
+      "path": "[local-path]/20260924_下午返航测试参数及数据(含有噪声条纹)/数据/Data02/StbdNormalModeDepthTotal.mat",
+      "SHA256": "cf81fe06723dc34a2db0379242c2561131cef614df29d6d7888ec96cee2ec225"
+    }
+  ],
+  "source_index_SHA256": "abb025690d156933eb8bc0924ed331925e0468015afb5983da75ce9f33b46c0e",
+  "per_ping_index_SHA256": "dcaea6f3136807bee84fd1fa1f0ffae50515946cca614578ede4cddebcc45646",
+  "source_code_SHA256": {
+    "PrepareQiandaoFullFrameJointScene.py": "82a9d377f9678df0b549c035d88d7d94daa0a39946873276d6b517f34296ab42",
+    "QiandaoLocalScene.py": "01c073a5bdaf93289d833f1ee314b1cca72bea0b21bdb99ddfc1732eb28dbd9b",
+    "QiandaoCombTrajectory.py": "0756a86b1e8273ea4d7d6f52dfa04338fc1e997f43643595829677aa036a2bb8",
+    "QiandaoNativeBottomProjection.py": "61f89bc88982f15d28276fb16bdcb8a8b12f2d1fc0a80ebca383b8489b1876af",
+    "QiandaoLargeModelField.py": "24428ad92f4776380901ae83e1c34b94d222aabea014cd62124daa7355ea1706"
+  },
+  "old_denoising_weights_or_algorithm_changed": false,
+  "raw_MAT_modified": false,
+  "appearance_variant": "random_adapted_56M_direct_linear_amplitude_NO_edge_NO_enhancement",
+  "edge_gain_patch_SHA256": null,
+  "appearance_lut_SHA256": null,
+  "appearance_mapping_after_gain_before_grid_average": false,
+  "elapsed_s": 64.06204955594148,
+  "large_model_provenance": {
+    "model": "random_adapted_56M",
+    "parameters": 56083513,
+    "parent_checkpoint_SHA256": "5aeb71e0bf53c9adecfb461a6cfd1bfd119ac6d15c01c2821508b9bbb8df0ff6",
+    "parameter_tensor_SHA256": "b1cf0e8baaf5e7866494c17ac91206447d96dac3a84bfc871ca1030d34e402ac",
+    "gain_file_SHA256": "72c9c6873f458581e35d4d476c3c55386e35b3695b4fcec7f8feaa0f9e786685",
+    "model_report_SHA256": "25233f229a55be9910954e1b1fb30adb6bf680fdd8b5b9ec5e9238aa7378616a",
+    "original_model_bundle_manifest_SHA256": "a7676223c8a1ee7b5af9f6f63aed0fdcf39040ab9ed351ef4784629fec07750b",
+    "all_original_native_amplitudes_equal_actual_model_inputs": true,
+    "all16_numeric_gain_channels_verified": true,
+    "edge_repair_used": false,
+    "FIR_used": false,
+    "brightness_or_contrast_enhancement_used": false,
+    "RGB_or_PDF_input_used": false,
+    "native_amplitude_formula": "original_float64_amplitude * exp(model_float32_log_gain)",
+    "real_clean_truth": false
+  }
+}
