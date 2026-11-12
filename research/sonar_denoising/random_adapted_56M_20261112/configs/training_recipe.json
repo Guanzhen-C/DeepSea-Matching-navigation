@@ -1,0 +1,42 @@
+{
+  "model": "random_adapted_56M",
+  "class": "NoFIRSonarMWCNN",
+  "width": 96,
+  "parameters": 56083513,
+  "world_size": 4,
+  "per_rank_batch_samples": 1,
+  "seed": 20261108,
+  "core_max_height_width": [
+    96,
+    384
+  ],
+  "pretrain": {
+    "steps": 24000,
+    "global_examples": 96000,
+    "initial_lr": 0.0001,
+    "selected_checkpoint_SHA256": "fe8552500fcf16b5c981c0274606063da4cdf096532d048c81f9b29c8fdc0a5f"
+  },
+  "adapt": {
+    "steps": 8000,
+    "global_examples": 32000,
+    "initial_lr": 3e-05,
+    "native_public_cycle": [
+      4,
+      1
+    ],
+    "selected_checkpoint_SHA256": "5aeb71e0bf53c9adecfb461a6cfd1bfd119ac6d15c01c2821508b9bbb8df0ff6"
+  },
+  "optimizer": "AdamW",
+  "weight_decay": 1e-05,
+  "gradient_norm_clip": 1.0,
+  "scheduler": "CosineAnnealingLR eta_min=0.1*initial_lr",
+  "TF32": false,
+  "received_signal_FIR_pre_or_post": false,
+  "FIR_only_as_supervision_target": false,
+  "synthetic_noise_colour_kernel_taps": 33,
+  "feature_support_normalized_box_mean_shape": [
+    5,
+    65
+  ],
+  "reference_is_clean_truth": false
+}

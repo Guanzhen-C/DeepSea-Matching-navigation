@@ -1,0 +1,750 @@
+{
+  "status": "code_configs_and_training_records_only",
+  "original_sources_modified": false,
+  "training_or_inference_started": false,
+  "model_weights_uploaded": false,
+  "raw_measurements_uploaded": false,
+  "code_dependency_graph": {
+    "RandomRippleSonarData": [
+      "NoFIRSonarData",
+      "NoFIRSonarWavelet",
+      "RandomTriggeredSonarNoise"
+    ],
+    "RandomTriggeredSonarNoise": [
+      "MeasuredStripeNoiseModel"
+    ],
+    "MeasuredStripeNoiseModel": [
+      "CurvedSonarStripePhase",
+      "TriggeredSonarNoise"
+    ],
+    "CurvedSonarStripePhase": [],
+    "TriggeredSonarNoise": [
+      "MeasuredStripeNoiseModel"
+    ],
+    "NoFIRSonarWavelet": [
+      "LargeSonarMWCNN"
+    ],
+    "LargeSonarMWCNN": [
+      "BandAnchoredNativeSonarFeatures",
+      "NativeLocalSonarWavelet",
+      "PublicSonarWavelet"
+    ],
+    "PublicSonarWavelet": [],
+    "BandAnchoredNativeSonarFeatures": [
+      "LocalRelativeSonarFeatures"
+    ],
+    "LocalRelativeSonarFeatures": [],
+    "NativeLocalSonarWavelet": [
+      "LocalRelativeSonarFeatures",
+      "PhaseAwareSonarWavelet",
+      "PublicEnvelopeCoherentModel"
+    ],
+    "PhaseAwareSonarWavelet": [
+      "PublicEnvelopeCoherentModel"
+    ],
+    "PublicEnvelopeCoherentModel": [
+      "PublicSonarEnvelopeModel"
+    ],
+    "PublicSonarEnvelopeModel": [
+      "PublicSonarWavelet"
+    ],
+    "NoFIRSonarData": [
+      "NoFIRSonarWavelet"
+    ],
+    "TrainNoFIRSonarDistributed": [
+      "NoFIRSonarData",
+      "NoFIRSonarWavelet",
+      "RandomRippleSonarData",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "TrainNativeLocalSonarWavelet": [
+      "IrregularComplexSonarStripes",
+      "LocalRelativeSonarFeatures",
+      "NativeLocalSonarWavelet"
+    ],
+    "IrregularComplexSonarStripes": [],
+    "PackageAspectPreservingSonarPDF": [
+      "ExportPinnedFullSamplePortrait",
+      "PackageSonarNativePortraitPDF"
+    ],
+    "ExportPinnedFullSamplePortrait": [
+      "ExportNativeSonarPortraitPNG",
+      "NativeSonarPaletteStream",
+      "PackageSonarNativePortraitPDF"
+    ],
+    "NativeSonarPaletteStream": [],
+    "ExportNativeSonarPortraitPNG": [
+      "PackageSonarNativePortraitPDF"
+    ],
+    "PackageSonarNativePortraitPDF": [],
+    "RenderRandomRippleSonarComparison": [
+      "FullMeasuredSonarProtocol",
+      "NativeSonarPaletteStream",
+      "NoFIRSonarData",
+      "caris_orangecopper"
+    ],
+    "FullMeasuredSonarProtocol": [],
+    "caris_orangecopper": [],
+    "EvaluateNoFIRSonarTrial": [
+      "FullMeasuredSonarProtocol",
+      "InferFullMeasuredSonar172",
+      "NoFIRSonarData",
+      "NoFIRSonarWavelet",
+      "RandomRippleEvaluation",
+      "RenderNoFIRSonarComparison",
+      "RenderRandomRippleSonarComparison",
+      "TrainMatchedSonarFactorial",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "InferFullMeasuredSonar172": [
+      "FullMeasuredSonarProtocol",
+      "MatchedSonarWavelet",
+      "RecoveredMatchedSonarModels",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "MatchedSonarWavelet": [
+      "BandAnchoredNativeSonarFeatures",
+      "BandAnchoredNativeSonarWavelet",
+      "MatchedSonarSignal",
+      "NativeLocalSonarWavelet"
+    ],
+    "MatchedSonarSignal": [
+      "SonarRecordedSubbandHypothesis"
+    ],
+    "SonarRecordedSubbandHypothesis": [
+      "SonarCompressionHypothesis"
+    ],
+    "SonarCompressionHypothesis": [],
+    "BandAnchoredNativeSonarWavelet": [
+      "BandAnchoredNativeSonarFeatures",
+      "NativeLocalSonarWavelet"
+    ],
+    "RecoveredMatchedSonarModels": [
+      "AuditMatched172Validation",
+      "BandAnchoredNativeSonarFeatures",
+      "BandAnchoredNativeSonarWavelet",
+      "MatchedSonarSignal",
+      "MatchedSonarWavelet",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "AuditMatched172Validation": [],
+    "TrainMatchedSonarFactorial": [
+      "AuditBandAnchoredNativeSonar",
+      "BandAnchoredNativeSonarFeatures",
+      "MatchedSonarSignal",
+      "MatchedSonarWavelet",
+      "NativeLocalSonarWavelet",
+      "PublicEnvelopeCoherentModel",
+      "StreamNativeProcessedSide",
+      "TrainBandAnchoredNativeSonar",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "AuditBandAnchoredNativeSonar": [
+      "AuditNativeLocalSonarExperiment",
+      "BandAnchoredNativeSonarFeatures",
+      "BandAnchoredNativeSonarWavelet",
+      "StreamNativeProcessedSide",
+      "TrainBandAnchoredNativeSonar",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "AuditNativeLocalSonarExperiment": [
+      "LocalRelativeSonarFeatures",
+      "NativeLocalSonarWavelet",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "TrainBandAnchoredNativeSonar": [
+      "AuditNativeLocalSonarExperiment",
+      "BandAnchoredNativeSonarFeatures",
+      "BandAnchoredNativeSonarWavelet",
+      "LocalRelativeSonarFeatures",
+      "TrainNativeLocalSonarWavelet"
+    ],
+    "StreamNativeProcessedSide": [],
+    "RenderNoFIRSonarComparison": [
+      "FullMeasuredSonarProtocol",
+      "NativeSonarPaletteStream",
+      "NoFIRSonarData",
+      "ReviewFullMeasured172",
+      "caris_orangecopper"
+    ],
+    "ReviewFullMeasured172": [
+      "NativeSonarPaletteStream",
+      "TrainNativeLocalSonarWavelet",
+      "caris_orangecopper"
+    ],
+    "RandomRippleEvaluation": [
+      "MeasuredStripeNoiseModel",
+      "NoFIRSonarData",
+      "NoFIRSonarWavelet",
+      "RandomTriggeredSonarNoise"
+    ],
+    "QualifyRandomRippleTraining": [
+      "NoFIRSonarData",
+      "RandomTriggeredSonarNoise",
+      "caris_orangecopper"
+    ],
+    "EvaluateRandomRippleSonar": [
+      "EvaluateNoFIRSonarTrial"
+    ],
+    "RunRandomRippleSonarTrial": [
+      "MeasuredStripeNoiseModel",
+      "NoFIRSonarData",
+      "ObservedBottomSupportArtifacts",
+      "RandomTriggeredSonarNoise",
+      "RunNoFIRSonarTrial"
+    ],
+    "ObservedBottomSupportArtifacts": [
+      "FullMeasuredSonarProtocol",
+      "ObservedBottomSupportMetadata"
+    ],
+    "ObservedBottomSupportMetadata": [
+      "FullMeasuredSonarProtocol"
+    ],
+    "RunNoFIRSonarTrial": [
+      "NoFIRSonarData"
+    ],
+    "AuditRandomRippleLaunch": [
+      "NoFIRSonarData"
+    ],
+    "RunRippleTrainingRegression": [
+      "NoFIRSonarData",
+      "RunRandomRippleSonarTrial"
+    ],
+    "AuditCompletedRandomRippleTrial": [
+      "AuditRandomRippleProgress",
+      "MeasuredStripeNoiseModel",
+      "NativeSonarPaletteStream",
+      "NoFIRSonarData",
+      "NoFIRSonarWavelet",
+      "ObservedBottomSupportArtifacts",
+      "SonarNadirProtection",
+      "TrainNativeLocalSonarWavelet",
+      "caris_orangecopper"
+    ],
+    "SonarNadirProtection": [
+      "NativeSonarPaletteStream"
+    ],
+    "AuditRandomRippleProgress": [
+      "NoFIRSonarData",
+      "RandomTriggeredSonarNoise"
+    ]
+  },
+  "source_files": [
+    {
+      "path": "standalone/AuditBandAnchoredNativeSonar.py",
+      "original_SHA256": "71bb28a036664170f8bb3e3899e2830694b11e8f6be8322e556cda97ddda79c7",
+      "export_SHA256": "71bb28a036664170f8bb3e3899e2830694b11e8f6be8322e556cda97ddda79c7",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/AuditCompletedRandomRippleTrial.py",
+      "original_SHA256": "1f8b4ae82a00a465c3e43dd35ddceb72fe14538ac4c60fbcc5e2ba6faa487d15",
+      "export_SHA256": "1f8b4ae82a00a465c3e43dd35ddceb72fe14538ac4c60fbcc5e2ba6faa487d15",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/AuditMatched172Validation.py",
+      "original_SHA256": "b5012bdacb3cb820e0f74c2fe315575062e2681bc38a37acdf96c99cf5d4d483",
+      "export_SHA256": "b5012bdacb3cb820e0f74c2fe315575062e2681bc38a37acdf96c99cf5d4d483",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/AuditNativeLocalSonarExperiment.py",
+      "original_SHA256": "9480c1192269c5bf78449b0c715185cff549c8992f9fe837ab9b4eaaa6e5db30",
+      "export_SHA256": "9480c1192269c5bf78449b0c715185cff549c8992f9fe837ab9b4eaaa6e5db30",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/AuditRandomRippleLaunch.py",
+      "original_SHA256": "d5699824c5b449a7851f05fa8a408151cc56bb4d889e96940fb6fc6b1809ab8c",
+      "export_SHA256": "d5699824c5b449a7851f05fa8a408151cc56bb4d889e96940fb6fc6b1809ab8c",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "d5699824c5b449a7851f05fa8a408151cc56bb4d889e96940fb6fc6b1809ab8c"
+    },
+    {
+      "path": "standalone/AuditRandomRippleProgress.py",
+      "original_SHA256": "873c41e68fd5f3906b8debee0d1dd4a5d1e664abc32814b2f057a1eb0591b73b",
+      "export_SHA256": "873c41e68fd5f3906b8debee0d1dd4a5d1e664abc32814b2f057a1eb0591b73b",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/BandAnchoredNativeSonarFeatures.py",
+      "original_SHA256": "5f419841e06b2eaea91ac66c5aa790fae733edf2dbac734bc73de212ce968f54",
+      "export_SHA256": "5f419841e06b2eaea91ac66c5aa790fae733edf2dbac734bc73de212ce968f54",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/BandAnchoredNativeSonarWavelet.py",
+      "original_SHA256": "e19686db42e0a88bbfb874d681665e09d575a46b084554c2c5ff751a6eb1784b",
+      "export_SHA256": "e19686db42e0a88bbfb874d681665e09d575a46b084554c2c5ff751a6eb1784b",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/CurvedSonarStripePhase.py",
+      "original_SHA256": "1254a149ed15a33816ec78744e6ec987655ee246bc17a0d23db9297f90563480",
+      "export_SHA256": "1254a149ed15a33816ec78744e6ec987655ee246bc17a0d23db9297f90563480",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/EvaluateNoFIRSonarTrial.py",
+      "original_SHA256": "f021b9115fe155812282c120e88a491368e3564bc8501c1067a2cdeeccf540ea",
+      "export_SHA256": "f021b9115fe155812282c120e88a491368e3564bc8501c1067a2cdeeccf540ea",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "f021b9115fe155812282c120e88a491368e3564bc8501c1067a2cdeeccf540ea"
+    },
+    {
+      "path": "standalone/EvaluateRandomRippleSonar.py",
+      "original_SHA256": "2458c49c307f40b03235758eddc25dbab4243ecd89802043624200482622876a",
+      "export_SHA256": "2458c49c307f40b03235758eddc25dbab4243ecd89802043624200482622876a",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "2458c49c307f40b03235758eddc25dbab4243ecd89802043624200482622876a"
+    },
+    {
+      "path": "standalone/ExportNativeSonarPortraitPNG.py",
+      "original_SHA256": "686802a810d1a32db362a542e7c8f4ed276a1895b73ccad85b69273d3f13a1ff",
+      "export_SHA256": "686802a810d1a32db362a542e7c8f4ed276a1895b73ccad85b69273d3f13a1ff",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/ExportPinnedFullSamplePortrait.py",
+      "original_SHA256": "fd544564773d3836508a9d35206d24e3b6abe0a2cf0ce37d80b678ef35c26f96",
+      "export_SHA256": "fd544564773d3836508a9d35206d24e3b6abe0a2cf0ce37d80b678ef35c26f96",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/FullMeasuredSonarProtocol.py",
+      "original_SHA256": "05b97af287faa212e62f6d2f78dfac22ef1a9a50823a7f338e74492b2914fc31",
+      "export_SHA256": "05b97af287faa212e62f6d2f78dfac22ef1a9a50823a7f338e74492b2914fc31",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/InferFullMeasuredSonar172.py",
+      "original_SHA256": "12da4728cf99be983028e6760d7acda58b3ea9dc965a2f95afeb329f51722ac7",
+      "export_SHA256": "6fe73c81647814383b5629f9019b91fc49a9d920f10d145cc62d6d5814a28717",
+      "machine_location_redacted": true,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/IrregularComplexSonarStripes.py",
+      "original_SHA256": "d28184df7f944b85b6f1b5741d58979459d184915066fee451157234fc56911c",
+      "export_SHA256": "d28184df7f944b85b6f1b5741d58979459d184915066fee451157234fc56911c",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/LargeSonarMWCNN.py",
+      "original_SHA256": "4ccf6d85125ace33749ea2dd94c9b18e42f618a20c5d90636bdb4aa883a1c9d8",
+      "export_SHA256": "4ccf6d85125ace33749ea2dd94c9b18e42f618a20c5d90636bdb4aa883a1c9d8",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/LocalRelativeSonarFeatures.py",
+      "original_SHA256": "a67dea70f96a5ba03b648baafd8c4be0cd2cf90232b55aa5876e9d032af90ebf",
+      "export_SHA256": "a67dea70f96a5ba03b648baafd8c4be0cd2cf90232b55aa5876e9d032af90ebf",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/MatchedSonarSignal.py",
+      "original_SHA256": "c76f0aa699cc830c58ed56996fd514b37ca7d848229a971081c1dc0bb48011fa",
+      "export_SHA256": "c76f0aa699cc830c58ed56996fd514b37ca7d848229a971081c1dc0bb48011fa",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/MatchedSonarWavelet.py",
+      "original_SHA256": "7407c15da37469ab97584a4f09a092c84fe6a9e680f4a5032794b0b59e746abb",
+      "export_SHA256": "7407c15da37469ab97584a4f09a092c84fe6a9e680f4a5032794b0b59e746abb",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/MeasuredStripeNoiseModel.py",
+      "original_SHA256": "d7096a5a238c829ad23fe745d24c2a3069e242e747f2724d152e6555c6331e26",
+      "export_SHA256": "d7096a5a238c829ad23fe745d24c2a3069e242e747f2724d152e6555c6331e26",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "d7096a5a238c829ad23fe745d24c2a3069e242e747f2724d152e6555c6331e26"
+    },
+    {
+      "path": "standalone/NativeLocalSonarWavelet.py",
+      "original_SHA256": "6ecd99f24abeded37ab9b9a58eb251d73a4b9657fa6513da5469388e87de9b37",
+      "export_SHA256": "6ecd99f24abeded37ab9b9a58eb251d73a4b9657fa6513da5469388e87de9b37",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/NativeSonarPaletteStream.py",
+      "original_SHA256": "a2264168f4d023b6e1b9c06e0da5ce8c4a2ba756751e93d94abd8853a9239a91",
+      "export_SHA256": "a2264168f4d023b6e1b9c06e0da5ce8c4a2ba756751e93d94abd8853a9239a91",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/NoFIRSonarData.py",
+      "original_SHA256": "2581625a680f0e8edd67c757e342b919aaeda38d5ab90a6a1d8d718bb631c261",
+      "export_SHA256": "2581625a680f0e8edd67c757e342b919aaeda38d5ab90a6a1d8d718bb631c261",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/NoFIRSonarWavelet.py",
+      "original_SHA256": "a32cd259752d642924be89cd3cc4278d94d1cb419e03b976f0de945b56bd1ca2",
+      "export_SHA256": "a32cd259752d642924be89cd3cc4278d94d1cb419e03b976f0de945b56bd1ca2",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "a32cd259752d642924be89cd3cc4278d94d1cb419e03b976f0de945b56bd1ca2"
+    },
+    {
+      "path": "standalone/ObservedBottomSupportArtifacts.py",
+      "original_SHA256": "ed838cd15197389f9902f9e3e070bbd5e799dbfafb24491768df01344f2f7ecb",
+      "export_SHA256": "ed838cd15197389f9902f9e3e070bbd5e799dbfafb24491768df01344f2f7ecb",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/ObservedBottomSupportMetadata.py",
+      "original_SHA256": "79b7b972f30d8dc0bec580fbbb869359a9429fe4df07bcf984cf0a89f96e3763",
+      "export_SHA256": "79b7b972f30d8dc0bec580fbbb869359a9429fe4df07bcf984cf0a89f96e3763",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/PackageAspectPreservingSonarPDF.py",
+      "original_SHA256": "b9b901d1ed47f399c5400b70a01beec08d5f42d1492e929a2328b9ac25dd1c19",
+      "export_SHA256": "b9b901d1ed47f399c5400b70a01beec08d5f42d1492e929a2328b9ac25dd1c19",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "b9b901d1ed47f399c5400b70a01beec08d5f42d1492e929a2328b9ac25dd1c19"
+    },
+    {
+      "path": "standalone/PackageSonarNativePortraitPDF.py",
+      "original_SHA256": "202a2a9caf4f272d2c0c82fb9db06a881c0ace8be31af0b3f1bde2116a05fff8",
+      "export_SHA256": "202a2a9caf4f272d2c0c82fb9db06a881c0ace8be31af0b3f1bde2116a05fff8",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/PhaseAwareSonarWavelet.py",
+      "original_SHA256": "6e95347178dd180b911b3e328ddf35795e5c2d994081a03a939e44c9bc694648",
+      "export_SHA256": "6e95347178dd180b911b3e328ddf35795e5c2d994081a03a939e44c9bc694648",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/PublicEnvelopeCoherentModel.py",
+      "original_SHA256": "9902efff6f533647e8674a3bc126bf6039fa6c6f886e9f224c3890bcd2561208",
+      "export_SHA256": "9902efff6f533647e8674a3bc126bf6039fa6c6f886e9f224c3890bcd2561208",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/PublicSonarEnvelopeModel.py",
+      "original_SHA256": "d64bde7a21b62e5816dc8e08ebc4571557cf78308be53e2ac073ae12f8015478",
+      "export_SHA256": "d64bde7a21b62e5816dc8e08ebc4571557cf78308be53e2ac073ae12f8015478",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/PublicSonarWavelet.py",
+      "original_SHA256": "0d24bcb20704e33d2f0be0d3e4f0441455560eed9718eae1073c094d075d8fe7",
+      "export_SHA256": "0d24bcb20704e33d2f0be0d3e4f0441455560eed9718eae1073c094d075d8fe7",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/QualifyRandomRippleTraining.py",
+      "original_SHA256": "26a972b30bc132bd34980e1f2a85813f65018f7fee99e1bbcf35ef3f15a34510",
+      "export_SHA256": "26a972b30bc132bd34980e1f2a85813f65018f7fee99e1bbcf35ef3f15a34510",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "26a972b30bc132bd34980e1f2a85813f65018f7fee99e1bbcf35ef3f15a34510"
+    },
+    {
+      "path": "standalone/RandomRippleEvaluation.py",
+      "original_SHA256": "901807b6379867ac867820ef0ba6390a7df6720ff183020a12ee42fea2cbf742",
+      "export_SHA256": "901807b6379867ac867820ef0ba6390a7df6720ff183020a12ee42fea2cbf742",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "901807b6379867ac867820ef0ba6390a7df6720ff183020a12ee42fea2cbf742"
+    },
+    {
+      "path": "standalone/RandomRippleSonarData.py",
+      "original_SHA256": "ba461b48bc90a02442237aad7a2ce3a5a60b3500127ebbc5ba395ce342ce8b07",
+      "export_SHA256": "ba461b48bc90a02442237aad7a2ce3a5a60b3500127ebbc5ba395ce342ce8b07",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "ba461b48bc90a02442237aad7a2ce3a5a60b3500127ebbc5ba395ce342ce8b07"
+    },
+    {
+      "path": "standalone/RandomTriggeredSonarNoise.py",
+      "original_SHA256": "356d5ca48cb223a81ff5142d1e869464a7be032d73ca53ff3affa067e91a434d",
+      "export_SHA256": "356d5ca48cb223a81ff5142d1e869464a7be032d73ca53ff3affa067e91a434d",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "356d5ca48cb223a81ff5142d1e869464a7be032d73ca53ff3affa067e91a434d"
+    },
+    {
+      "path": "standalone/RecoveredMatchedSonarModels.py",
+      "original_SHA256": "f8e52747ad84495f65bde724f4f7fbdfa1470ff83b50d99b899ac7d574d8ed69",
+      "export_SHA256": "dc701062b9c2a29855b8ca84631954b9d0d67d37f6e8338348da7483980ee004",
+      "machine_location_redacted": true,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/RenderNoFIRSonarComparison.py",
+      "original_SHA256": "873fdcdae2a0f81af64801ce8d6be646ff48bfbc16584b63203dc146bf1e47f3",
+      "export_SHA256": "873fdcdae2a0f81af64801ce8d6be646ff48bfbc16584b63203dc146bf1e47f3",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/RenderRandomRippleSonarComparison.py",
+      "original_SHA256": "cc38067365a6e896db000233bc0bce7e76e572eb511d078efe6e8b24dc61ca6c",
+      "export_SHA256": "cc38067365a6e896db000233bc0bce7e76e572eb511d078efe6e8b24dc61ca6c",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "cc38067365a6e896db000233bc0bce7e76e572eb511d078efe6e8b24dc61ca6c"
+    },
+    {
+      "path": "standalone/ReviewFullMeasured172.py",
+      "original_SHA256": "6f414c6eb0642c8bddf91f74b0f95a5ef7a1f083baab3ba0691208e6eafa10ec",
+      "export_SHA256": "6f414c6eb0642c8bddf91f74b0f95a5ef7a1f083baab3ba0691208e6eafa10ec",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/RunNoFIRSonarTrial.py",
+      "original_SHA256": "ad2e530b7557837f2e8091fd4e04c92e129bd71507dd4c9930f81590a7e9305a",
+      "export_SHA256": "0f6eac31d4b8cfb117f30c3b412b44a39144ab130e2e3fcf4e7cabc59ac311a8",
+      "machine_location_redacted": true,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/RunRandomRippleSonarTrial.py",
+      "original_SHA256": "97ddbb2602b3c084c1ebaa194fc4081e540a7cd4781dbd8bdf8f4d18239d95f6",
+      "export_SHA256": "97ddbb2602b3c084c1ebaa194fc4081e540a7cd4781dbd8bdf8f4d18239d95f6",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "97ddbb2602b3c084c1ebaa194fc4081e540a7cd4781dbd8bdf8f4d18239d95f6"
+    },
+    {
+      "path": "standalone/RunRippleTrainingRegression.py",
+      "original_SHA256": "5bf9be529a793101d1c02b07c1ab1562a0f97bcab6a9062c6c901076f8e180d9",
+      "export_SHA256": "5bf9be529a793101d1c02b07c1ab1562a0f97bcab6a9062c6c901076f8e180d9",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "5bf9be529a793101d1c02b07c1ab1562a0f97bcab6a9062c6c901076f8e180d9"
+    },
+    {
+      "path": "standalone/SonarCompressionHypothesis.py",
+      "original_SHA256": "96b814a2b207abe38fc7503cd302856e5853d277f111c624fd21715cca3cdf42",
+      "export_SHA256": "96b814a2b207abe38fc7503cd302856e5853d277f111c624fd21715cca3cdf42",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/SonarNadirProtection.py",
+      "original_SHA256": "7895703825f5b5a2ea2a380e729b2a16784e71e6004f8f9198a9c39919e222a7",
+      "export_SHA256": "7895703825f5b5a2ea2a380e729b2a16784e71e6004f8f9198a9c39919e222a7",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/SonarRecordedSubbandHypothesis.py",
+      "original_SHA256": "1c30aba8873796f6038f811e902ebd54efade59d0e4cbca4509a92adb11a050f",
+      "export_SHA256": "1c30aba8873796f6038f811e902ebd54efade59d0e4cbca4509a92adb11a050f",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/StreamNativeProcessedSide.py",
+      "original_SHA256": "dec4a4fb2bf931e0e8b03e53b9f4d83233b49212bcfcb309cff1c0b90daf6056",
+      "export_SHA256": "dec4a4fb2bf931e0e8b03e53b9f4d83233b49212bcfcb309cff1c0b90daf6056",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/TrainBandAnchoredNativeSonar.py",
+      "original_SHA256": "fd12e0f5179be41ac8e8b098af61c35292f1a9a3838b98c4070cd466192fea3c",
+      "export_SHA256": "fd12e0f5179be41ac8e8b098af61c35292f1a9a3838b98c4070cd466192fea3c",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/TrainMatchedSonarFactorial.py",
+      "original_SHA256": "2ec6e15e8fb8a4b49814a401e8d1629f365225836b94ca3f12cdb12d25d1046b",
+      "export_SHA256": "2ec6e15e8fb8a4b49814a401e8d1629f365225836b94ca3f12cdb12d25d1046b",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/TrainNativeLocalSonarWavelet.py",
+      "original_SHA256": "91ac8f5820c5453a0586d02c83b45080d502d7826e74f2e50cb2c15f16358b36",
+      "export_SHA256": "91ac8f5820c5453a0586d02c83b45080d502d7826e74f2e50cb2c15f16358b36",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "standalone/TrainNoFIRSonarDistributed.py",
+      "original_SHA256": "3e053ee9f86228943e56582bfe66d02325b3b4f82eaead117c3b137bc9ef1036",
+      "export_SHA256": "3e053ee9f86228943e56582bfe66d02325b3b4f82eaead117c3b137bc9ef1036",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "3e053ee9f86228943e56582bfe66d02325b3b4f82eaead117c3b137bc9ef1036"
+    },
+    {
+      "path": "standalone/TriggeredSonarNoise.py",
+      "original_SHA256": "8316f9c0e93982205c06827220b251a7bef06f9b6708d9d006735cb0539ae67b",
+      "export_SHA256": "8316f9c0e93982205c06827220b251a7bef06f9b6708d9d006735cb0539ae67b",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": "8316f9c0e93982205c06827220b251a7bef06f9b6708d9d006735cb0539ae67b"
+    },
+    {
+      "path": "standalone/caris_orangecopper.py",
+      "original_SHA256": "b8b0ec694d6c65698b408022918771901e815f14607a0d2aaf46ff4fcd796397",
+      "export_SHA256": "b8b0ec694d6c65698b408022918771901e815f14607a0d2aaf46ff4fcd796397",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "tests/test_no_fir_sonar_trial.py",
+      "original_SHA256": "e025af2c047be11fbb834c4f3e3c94c37745f73944fc07009defa0c5afd96af5",
+      "export_SHA256": "e025af2c047be11fbb834c4f3e3c94c37745f73944fc07009defa0c5afd96af5",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "tests/test_random_triggered_sonar_noise.py",
+      "original_SHA256": "7e8953eaa8bb031f6aefd396f96fed8b8d34669f9e1a7274481d8d24f12dd34c",
+      "export_SHA256": "7e8953eaa8bb031f6aefd396f96fed8b8d34669f9e1a7274481d8d24f12dd34c",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "tests/test_random_ripple_progress_audit.py",
+      "original_SHA256": "93f22dcff415b0780c8e3fbf94f09d92796b896efdc8970958b55aaacaf22435",
+      "export_SHA256": "93f22dcff415b0780c8e3fbf94f09d92796b896efdc8970958b55aaacaf22435",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    },
+    {
+      "path": "tests/test_random_ripple_evaluation_flow.py",
+      "original_SHA256": "dc8c432031a5066411e652c58744b824f64dcfbd9f47ce709c2532d4d257a003",
+      "export_SHA256": "dc8c432031a5066411e652c58744b824f64dcfbd9f47ce709c2532d4d257a003",
+      "machine_location_redacted": false,
+      "same_executable_structure_except_location_strings": true,
+      "historical_training_manifest_SHA256": null
+    }
+  ],
+  "evidence_files": [
+    {
+      "path": "records/completed_run_summary.json",
+      "original_SHA256": "fc186f666a7268bbe24b557d275170e8ae4fd9abfd72451158ccec5a646a4a2c",
+      "export_SHA256": "fc186f666a7268bbe24b557d275170e8ae4fd9abfd72451158ccec5a646a4a2c",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/pretrain_completed_summary.json",
+      "original_SHA256": "4d42ced8d78ec379453aa6908c690dbbdb045015b0772feedbf1fbbf31612a1c",
+      "export_SHA256": "4d42ced8d78ec379453aa6908c690dbbdb045015b0772feedbf1fbbf31612a1c",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/adapt_completed_summary.json",
+      "original_SHA256": "5ada0dbaeaaceed18cbebc6fc2b16112a998b962a56d66ca3b3d77914b69b5c0",
+      "export_SHA256": "5ada0dbaeaaceed18cbebc6fc2b16112a998b962a56d66ca3b3d77914b69b5c0",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/audits/pretrain_completed_24000_inputs.json",
+      "original_SHA256": "42ecf8eef65e7e834220ec1aac639e3bfaf3ad808c7feaf49c1ed576ece60041",
+      "export_SHA256": "42ecf8eef65e7e834220ec1aac639e3bfaf3ad808c7feaf49c1ed576ece60041",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/audits/adapt_completed_8000_inputs.json",
+      "original_SHA256": "7113ca94e1e3da90cfab7ebb417cd881cb6565eeb973303801ff843cfa63c169",
+      "export_SHA256": "7113ca94e1e3da90cfab7ebb417cd881cb6565eeb973303801ff843cfa63c169",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/audits/completed_full_execution_audit.json",
+      "original_SHA256": "d690ddabc94ebd5350e85df8f3733bf6a4cd361a8c5ed7a55d41ebf36ed2d925",
+      "export_SHA256": "d690ddabc94ebd5350e85df8f3733bf6a4cd361a8c5ed7a55d41ebf36ed2d925",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/canonical_native_support_independent_audit.json",
+      "original_SHA256": "04dbed79aca5a728d59fab21e9c76a98b9307ddd1b673e885e6a6ec4faa52a1c",
+      "export_SHA256": "04dbed79aca5a728d59fab21e9c76a98b9307ddd1b673e885e6a6ec4faa52a1c",
+      "machine_locations_redacted": false
+    },
+    {
+      "path": "records/all64_canonical_native_context_qualification.json",
+      "original_SHA256": "ead6e6568226bbefcbc10339df0c8022cee0ef50ac67818e3714dacd1c7f6d8c",
+      "export_SHA256": "ead6e6568226bbefcbc10339df0c8022cee0ef50ac67818e3714dacd1c7f6d8c",
+      "machine_locations_redacted": false
+    }
+  ],
+  "completed_training_manifest_source_files_verified": 15,
+  "other_dependencies_have_current_file_fingerprints_not_independent_historical_training_hashes": true
+}
