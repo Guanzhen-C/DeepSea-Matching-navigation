@@ -1,0 +1,72 @@
+{
+  "schema": "ocean_m1_fixed_graph_replay_v3",
+  "scope": "archived_simulation_batch_graph_no_reassociation",
+  "factor_graph_sha256": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559",
+  "source_truth_sha256": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858",
+  "frozen_core_sha256": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+  "replay_code_sha256": "75dfecebc3c97bb3bafbb7c57cee664935cf51e6c8c7df6ec3ddf8b486c7da7f",
+  "counts": {
+    "odometry": 197,
+    "mapped_range_change": 19,
+    "loop": 47,
+    "priors": 88,
+    "nodes": 198
+  },
+  "range_pairs": 202,
+  "batches": {
+    "no_range": {
+      "status": "returned_estimate",
+      "raw_pair_rho_assumption": 0.0,
+      "graph_factors": 333,
+      "cost_initial": 205.2694100537565,
+      "cost_final": 19.86642023448281,
+      "iterations": 3,
+      "wall_ms": 64.09760799942887,
+      "RMSE_xy_m": 4.124853080494236,
+      "P95_xy_m": 10.023141710078121,
+      "final_xy_m": 10.930820231964788,
+      "max_xy_m": 11.28973010862424
+    },
+    "M0": {
+      "status": "returned_estimate",
+      "raw_pair_rho_assumption": 0.0,
+      "graph_factors": 352,
+      "cost_initial": 958.9697641768777,
+      "cost_final": 28.611316075674594,
+      "iterations": 4,
+      "wall_ms": 98.71973799818079,
+      "RMSE_xy_m": 1.3551762355995267,
+      "P95_xy_m": 2.121020247601314,
+      "final_xy_m": 1.3477257278516483,
+      "max_xy_m": 2.956706325370912
+    },
+    "M1_Gaussian": {
+      "status": "returned_estimate",
+      "raw_pair_rho_assumption": 0.25,
+      "graph_factors": 535,
+      "cost_initial": 2580.728519328002,
+      "cost_final": 36.18981717878789,
+      "iterations": 7,
+      "wall_ms": 1694.2993599986949,
+      "RMSE_xy_m": 1.4593291691166546,
+      "P95_xy_m": 2.432098819609638,
+      "final_xy_m": 1.1849593230568762,
+      "max_xy_m": 3.1912485412792555
+    },
+    "M1_Robust": {
+      "status": "returned_estimate",
+      "raw_pair_rho_assumption": 0.25,
+      "graph_factors": 535,
+      "cost_initial": 2183.0836928608396,
+      "cost_final": 36.189817178754986,
+      "iterations": 7,
+      "wall_ms": 1681.0364910015778,
+      "RMSE_xy_m": 1.459329274498978,
+      "P95_xy_m": 2.432099003176396,
+      "final_xy_m": 1.1849580773112498,
+      "max_xy_m": 3.191248970715525
+    }
+  },
+  "solver": "GTSAM batch LM max_iterations=60, all modes same initialization",
+  "range_covariance": "rho=0.25 assumed for M1; archived difference sigma matched algebraically, raw covariance unavailable"
+}
