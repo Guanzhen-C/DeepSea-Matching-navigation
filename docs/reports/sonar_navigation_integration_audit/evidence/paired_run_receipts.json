@@ -1,0 +1,360 @@
+{
+  "schema": "sonar_navigation_integration_review_redacted_v1",
+  "scope": "Selected counts and hashes. No original samples, positions, GNSS, timeseries or deployment parameters.",
+  "frozen_runtime": {
+    "manifest": {
+      "basename": "deployment_manifest.json",
+      "sha256": "7f3c8303e90fa43f7e4e1cf17a3d680078d80ca778849f7f9a9fe9f30d9931fd"
+    },
+    "runtime_files_verified": 61
+  },
+  "runs": {
+    "H0": {
+      "summary": {
+        "basename": "run_summary.json",
+        "sha256": "c36920a8232492f2e9ca89c855dd44408cb9131a2633eba17181631cce7aada0"
+      },
+      "trajectory": {
+        "basename": "trajectory.jsonl",
+        "sha256": "06e7dbb2f622c40b36161a168a66453d5d9ed4ec5985bfbc3ddbc3a6286f2943"
+      },
+      "engine_sha256": "b20daf8809e304ab9a8f2032c391284b3ef1c837277dd4f2b8bd876135603bbf",
+      "physical_pings": 62458,
+      "attested_navigation_modules": 10,
+      "optimizer": {
+        "raw": "gtsam_isam2_incremental_fixed_lag",
+        "student": "gtsam_isam2_incremental_fixed_lag"
+      },
+      "arm": {
+        "raw": {
+          "frontend": {
+            "accepted": 62390,
+            "rejected": 67,
+            "updates": 20774
+          },
+          "absolute_map": {
+            "attempts": 416,
+            "accepts": 384,
+            "graph_feature_priors": 356
+          },
+          "projected_map": {
+            "attempts": 17,
+            "accepts": 17
+          },
+          "historical_loop_edges": 322,
+          "mapped_range_factors": 312
+        },
+        "student": {
+          "frontend": {
+            "accepted": 62092,
+            "rejected": 365,
+            "updates": 20643
+          },
+          "absolute_map": {
+            "attempts": 416,
+            "accepts": 374,
+            "graph_feature_priors": 349
+          },
+          "projected_map": {
+            "attempts": 17,
+            "accepts": 16
+          },
+          "historical_loop_edges": 314,
+          "mapped_range_factors": 265
+        }
+      },
+      "audit_fields": {
+        "used_archived_motion_events": 1339709,
+        "archived_amplitude_reproduced_at_every_ping": 62458,
+        "historical_dr_bitwise_equal_at_every_ping": 62458,
+        "nonzero_denoise_pings": 62458,
+        "interrupted_prefix_equal_input_pings": 19499,
+        "interrupted_prefix_max_pose_component_difference_m": 0,
+        "rejected_loop_candidates_by_arm": {
+          "raw": 1,
+          "student": 0
+        }
+      },
+      "experiment_source_SHA256": "7bec4fdf69a946b6c0216187248157da97b12c007db830f46368beb527490a97",
+      "paired_counts": {
+        "record_rows": 62458,
+        "two_arm_DR_equal": 62458,
+        "map_epoch_both_accept": 368,
+        "map_epoch_raw_only": 16,
+        "map_epoch_student_only": 6,
+        "map_epoch_both_reject": 26
+      },
+      "map_epoch_medians": {
+        "raw_matches": 145,
+        "student_matches": 145,
+        "raw_inliers": 80.5,
+        "student_inliers": 77
+      }
+    },
+    "H5": {
+      "summary": {
+        "basename": "run_summary.json",
+        "sha256": "ed9321fae386536694076d4ea6e0f801d5c0aba952e6fad8a73e94f39f875531"
+      },
+      "trajectory": {
+        "basename": "trajectory.jsonl",
+        "sha256": "90214f2f7a869398be40fb6ef86713c9ae681c63c1839c2657d7bff51e87357a"
+      },
+      "engine_sha256": "b20daf8809e304ab9a8f2032c391284b3ef1c837277dd4f2b8bd876135603bbf",
+      "physical_pings": 103055,
+      "attested_navigation_modules": 9,
+      "optimizer": {
+        "raw": "gtsam_isam2_incremental_fixed_lag",
+        "student": "gtsam_isam2_incremental_fixed_lag"
+      },
+      "arm": {
+        "raw": {
+          "frontend": {
+            "accepted": 102768,
+            "rejected": 286,
+            "updates": 34200
+          },
+          "absolute_map": {
+            "attempts": 687,
+            "accepts": 314,
+            "graph_feature_priors": 280
+          },
+          "projected_map": {
+            "attempts": 21,
+            "accepts": 19
+          },
+          "historical_loop_edges": 257,
+          "mapped_range_factors": 56
+        },
+        "student": {
+          "frontend": {
+            "accepted": 102591,
+            "rejected": 463,
+            "updates": 34128
+          },
+          "absolute_map": {
+            "attempts": 687,
+            "accepts": 398,
+            "graph_feature_priors": 366
+          },
+          "projected_map": {
+            "attempts": 21,
+            "accepts": 20
+          },
+          "historical_loop_edges": 249,
+          "mapped_range_factors": 100
+        }
+      },
+      "audit_fields": {
+        "nonzero_denoise_pings": 103055,
+        "nonzero_noise_pings": 103055,
+        "sustained_wall_5Hz_certified": false
+      },
+      "experiment_source_SHA256": "4f9f42fd87bf439a104d0e6f35c8c7971a00350eddbc3b54f0519e4ec8bbd13a",
+      "paired_counts": {
+        "record_rows": 103055,
+        "two_arm_DR_equal": 103055,
+        "map_epoch_both_accept": 268,
+        "map_epoch_raw_only": 46,
+        "map_epoch_student_only": 130,
+        "map_epoch_both_reject": 243
+      },
+      "map_epoch_medians": {
+        "raw_matches": 41,
+        "student_matches": 50,
+        "raw_inliers": 21,
+        "student_inliers": 27
+      }
+    },
+    "R": {
+      "summary": {
+        "basename": "run_summary.json",
+        "sha256": "c3ed5603d6dddd673b7e836d0ac80ac6af73256797de0f312101a079cd54dbf9"
+      },
+      "trajectory": {
+        "basename": "trajectory.jsonl",
+        "sha256": "5efbff4bbe3568788a701bf54bcf6eaf7989da6e356a3e8059f52121c77cbc52"
+      },
+      "engine_sha256": "842d90945588a91c985e1db8402083aae0b1d933aaba324f3a49dce18585d587",
+      "physical_pings": 2020,
+      "attested_navigation_modules": 9,
+      "optimizer": {
+        "raw": "gtsam_isam2_incremental_fixed_lag",
+        "student": "gtsam_isam2_incremental_fixed_lag"
+      },
+      "arm": {
+        "raw": {
+          "frontend": {
+            "accepted": 892,
+            "rejected": 117,
+            "updates": 267
+          },
+          "absolute_map": {
+            "attempts": 6,
+            "accepts": 6,
+            "graph_feature_priors": 4
+          },
+          "projected_map": {
+            "attempts": 0,
+            "accepts": 0
+          },
+          "historical_loop_edges": 0,
+          "mapped_range_factors": 0
+        },
+        "student": {
+          "frontend": {
+            "accepted": 917,
+            "rejected": 92,
+            "updates": 281
+          },
+          "absolute_map": {
+            "attempts": 6,
+            "accepts": 6,
+            "graph_feature_priors": 4
+          },
+          "projected_map": {
+            "attempts": 0,
+            "accepts": 0
+          },
+          "historical_loop_edges": 0,
+          "mapped_range_factors": 0
+        }
+      },
+      "audit_fields": {
+        "query_pings": 1010,
+        "state_resets": 25,
+        "independent_truth": false
+      },
+      "paired_counts": {
+        "record_rows": 2020,
+        "two_arm_DR_equal": 1010,
+        "map_epoch_both_accept": 6,
+        "map_epoch_raw_only": 0,
+        "map_epoch_student_only": 0,
+        "map_epoch_both_reject": 0
+      },
+      "map_epoch_medians": {
+        "raw_matches": 1505,
+        "student_matches": 1612,
+        "raw_inliers": 956.5,
+        "student_inliers": 1017
+      },
+      "paired_accepted_frontend": {
+        "count": 838,
+        "matches_median_by_arm": [
+          38,
+          41
+        ],
+        "pairwise_student_minus_raw_median": 3
+      }
+    }
+  },
+  "source_excerpts": [
+    {
+      "source": "standalone/RunQiandaoRecordedLegacyNavAB.py",
+      "ranges": [
+        [
+          44,
+          59
+        ]
+      ],
+      "sha256": "ec779a875db55d90556cedf8be21218c4f8f76efdd30cdb9e5f79ef5f57d52da"
+    },
+    {
+      "source": "standalone/RunQiandaoRecordedTrackAB.py",
+      "ranges": [
+        [
+          46,
+          87
+        ]
+      ],
+      "sha256": "0fc5dd3a8ee8cdcbeb4a69b15f8873a3917c64f4bf5b3941bb7c5ab7b15e99c8"
+    },
+    {
+      "source": "standalone/SideScanIQHistory.py",
+      "ranges": [
+        [
+          69,
+          88
+        ]
+      ],
+      "sha256": "bfa0e9f4aff127f2a9952b8f64097a8da9ccdf5cda0f5056244dbe0ff6dc4c5c"
+    },
+    {
+      "source": "F/standalone/PureSideScanFeatures.py",
+      "ranges": [
+        [
+          14,
+          42
+        ],
+        [
+          139,
+          151
+        ]
+      ],
+      "sha256": "e551d3e54515921d0ebd77e3f86e9936e7ef7c2ff82c191778b8e876298b8255"
+    },
+    {
+      "source": "F/standalone/PureSideScanFeatureNavigation.py",
+      "ranges": [
+        [
+          205,
+          245
+        ],
+        [
+          273,
+          315
+        ]
+      ],
+      "sha256": "7e0ecb63139da121c0d03fa9b545ef9a41c89994ff346a0b7eb91aa17307a6da"
+    },
+    {
+      "source": "F/standalone/SideScanProjectedSubmap.py",
+      "ranges": [
+        [
+          29,
+          41
+        ],
+        [
+          83,
+          102
+        ]
+      ],
+      "sha256": "e9c1abb8572f16068b46aa0fabf861a731e770eb8d939c85eb21c7f6a5f74b4b"
+    },
+    {
+      "source": "F/standalone/SideScanLoopClosure.py",
+      "ranges": [
+        [
+          100,
+          136
+        ]
+      ],
+      "sha256": "0876e73fa4c83fddff66552b899d9a20e413bcc5ca020d2a5bb3edb5bcb63c6f"
+    },
+    {
+      "source": "F/standalone/SideScanMappedRangeBank.py",
+      "ranges": [
+        [
+          18,
+          41
+        ],
+        [
+          110,
+          132
+        ]
+      ],
+      "sha256": "906575f81b92605382b52de5a1d7963f5f2790847608cde21dce1770d11db460"
+    },
+    {
+      "source": "F/standalone/SideScanMappedRangeGraph.py",
+      "ranges": [
+        [
+          35,
+          61
+        ]
+      ],
+      "sha256": "c577a125bc684195e4f7c4fc8a9eb3d25e8b6a8ecbec9344d886005feb9b5a2c"
+    }
+  ]
+}
