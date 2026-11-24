@@ -1,0 +1,25 @@
+flowchart LR
+    A["原生一 ping 复回波<br/>2 舷 × 8 束 × R"] --> F["BaselineCueFeatureStream<br/>4 因果特征 + 独立有效掩码"]
+    A --> S["NativeLocalSpectralCue<br/>同 ping Hann FFT → 24 谱特征"]
+    A --> C["NativeCrossfitBeamCue<br/>同 ping 复数投影 → 6 cues"]
+    F --> E["BaselineAugmentedJointBeam<br/>按舷分组 / 3 次距离 Haar / 4 个尺度"]
+    H["前一 ping 的 4 组状态"] --> E
+    E --> HN["4 组 next_state"]
+    HN -->|"Runtime._step 回写"| H
+    E --> B["基础 log 增益"]
+    B --> L["LateSpectralJointBeam<br/>晚期谱残差，不写状态"]
+    F --> L
+    S --> L
+    L --> W["AmplitudeHead + WeakEchoVerifier"]
+    C --> W
+    W --> G["16 × R 原生 log 增益"]
+    A --> X["水柱保护下乘回原回波"]
+    G --> X
+    X --> N["实采恢复幅度 / 仿真恢复 I/Q 后脉压<br/>再进入既有导航"]
+    subgraph TRT["FP32LearnedStep / TensorRT / CUDA Graph"]
+        E
+        B
+        L
+        W
+        HN
+    end

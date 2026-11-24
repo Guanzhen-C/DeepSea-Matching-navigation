@@ -1,0 +1,493 @@
+{
+  "schema": "sonar_nx_review_redacted_v1",
+  "scope": "Allowlisted summaries of archived records and locally hashed artifacts, not original sensor data or binary distribution.",
+  "artifacts": [
+    {
+      "role": "torch_wavelet",
+      "bytes": 30077404,
+      "basename": "wavelet.pt",
+      "sha256": "76ac8d6792ef66cb402c86399cf0c2857469f563b3536df9b458be469d409723"
+    },
+    {
+      "role": "torch_spectral",
+      "bytes": 11444,
+      "basename": "spectral.pt",
+      "sha256": "2c3ac2842ca8726f7d08b37c7859bef8d5c554b3766a3feb2b809b88c6449302"
+    },
+    {
+      "role": "torch_protection",
+      "bytes": 23482,
+      "basename": "protection.pt",
+      "sha256": "3fbf8d28f67f7e3f6d818507fede12715c43e98909d681cc6a6f533cf6c7a5c6"
+    },
+    {
+      "role": "onnx_R12189",
+      "bytes": 31700000,
+      "basename": "full16_R12189_learned_fp32.onnx",
+      "sha256": "9d00f3bddb3268de014e02df865f050847876b1e8bdd3c0d1fcd412f4bc386c4"
+    },
+    {
+      "role": "onnx_R12721",
+      "bytes": 31768096,
+      "basename": "full16_R12721_learned_fp32.onnx",
+      "sha256": "9a2b1a4bcab4a21a4d90e3dba1f9c0a43f71a45314294da81648c6ad727da117"
+    },
+    {
+      "role": "plan_R12189",
+      "bytes": 32875676,
+      "basename": "full16_R12189_fp32_noTF32.plan",
+      "sha256": "842d90945588a91c985e1db8402083aae0b1d933aaba324f3a49dce18585d587"
+    },
+    {
+      "role": "plan_R12721",
+      "bytes": 32546500,
+      "basename": "full16_R12721_fp32_noTF32.plan",
+      "sha256": "b20daf8809e304ab9a8f2032c391284b3ef1c837277dd4f2b8bd876135603bbf"
+    },
+    {
+      "role": "offline_56M_torch",
+      "bytes": 224352756,
+      "basename": "model_inference_fp32.pt",
+      "sha256": "d33697c1d01a763477f024cb70a798614ba40149ff520c4e15a4b5e3e096c06f"
+    }
+  ],
+  "wavelet_training": {
+    "receipt": {
+      "basename": "小波骨干_signed_response_200.json",
+      "sha256": "1df8a2378065a1ac056c0697a1f100e834cd70c246715b44d045985f8400b40d"
+    },
+    "selected": {
+      "step": 200,
+      "arm": "signed_response",
+      "file": "research_signed_response_000200.pt",
+      "SHA256": "76ac8d6792ef66cb402c86399cf0c2857469f563b3536df9b458be469d409723"
+    },
+    "status": "complete_development_only",
+    "protocol": "native_signed_group_balanced_response_dev_v1",
+    "world_size": 4,
+    "steps_completed": 200,
+    "offline_teacher_training_weight": 0,
+    "automatic_export": false,
+    "eligible": {
+      "control": [],
+      "signed_response": []
+    },
+    "final_holdout_consumed": false
+  },
+  "spectral_training": {
+    "receipt": {
+      "basename": "频谱读出_range_balanced_identity.json",
+      "sha256": "e2409ca79326c534fd3fce137a05b4e1deb532435566392d9f99121d3316cba8"
+    },
+    "selected": {
+      "arm": "range_balanced_identity",
+      "file": "research_head_range_balanced_identity.pt",
+      "SHA256": "2c3ac2842ca8726f7d08b37c7859bef8d5c554b3766a3feb2b809b88c6449302"
+    },
+    "status": "complete_development_only",
+    "protocol": "late_native_same_noise_range_balanced_identity_DEV_ONLY_v1",
+    "per_arm_steps": 128,
+    "automatic_export": false,
+    "final_holdout_consumed": false
+  },
+  "protection_selection": {
+    "receipt": {
+      "basename": "弱回波保护_开发集对照.json",
+      "sha256": "4156ce48d8519724b48ab6730bdea65386987aed796238a7da9536caf2d31a1e"
+    },
+    "selected": {
+      "method": "weak_verifier_original",
+      "file": "weak_verifier_original.pt",
+      "SHA256": "3fbf8d28f67f7e3f6d818507fede12715c43e98909d681cc6a6f533cf6c7a5c6"
+    },
+    "status": "complete_development_only",
+    "protocol": "native_split_range_flanks_complex_estimation_development_v1",
+    "fit_windows": 52,
+    "guard_windows": 24,
+    "parent_checkpoint_SHA256": "76ac8d6792ef66cb402c86399cf0c2857469f563b3536df9b458be469d409723",
+    "parent_head_SHA256": "2c3ac2842ca8726f7d08b37c7859bef8d5c554b3766a3feb2b809b88c6449302",
+    "automatic_export": false,
+    "final_holdout_consumed": false
+  },
+  "pc_preflight": {
+    "receipt": {
+      "basename": "pc_recorded_preflight.json",
+      "sha256": "2b2022f3fb8207fe50fa2f740bc2d76820a66f7305aebfa1b2c8586ddc515056"
+    },
+    "pings": 32,
+    "parameters": 7518563,
+    "range_samples": 12189,
+    "shape": [
+      2,
+      8,
+      12189
+    ],
+    "ort_provider": "CPUExecutionProvider",
+    "board_executed": false,
+    "actual_pings_checked_against_onnx": 3,
+    "max_onnx_gain_delta": 0.000019073486328125,
+    "max_onnx_state_delta": 0.000014141201972961426
+  },
+  "recorded_pilot": {
+    "receipt": {
+      "basename": "wired_ab_pilot.json",
+      "sha256": "4d04b2ffe6bd7b988c50c587dcc552cbd9fb18f229d8ec422c710cc40bfcae1f"
+    },
+    "status": "completed_wired_NX_original_iq_and_relative_AB_pilot",
+    "pings": 32,
+    "rate": "original",
+    "not_a_sustained_5Hz_qualification": true,
+    "max_gain_difference": 0.000034332275390625,
+    "paired_gain_checks": [
+      {
+        "seq": 0,
+        "original_fp32_gain_max_difference": 0.00002765655517578125
+      },
+      {
+        "seq": 1,
+        "original_fp32_gain_max_difference": 0.000034332275390625
+      },
+      {
+        "seq": 2,
+        "original_fp32_gain_max_difference": 0.00003147125244140625
+      }
+    ],
+    "latency_ms": {
+      "model_ms": {
+        "samples": 32,
+        "mean": 113.231085,
+        "p50": 114.138863,
+        "p95": 116.094219,
+        "p99": 123.682089,
+        "maximum": 126.990685,
+        "count_gt_200_ms": 0
+      },
+      "full_denoise_ms": {
+        "samples": 32,
+        "mean": 178.975534,
+        "p50": 168.378058,
+        "p95": 197.099816,
+        "p99": 402.489709,
+        "maximum": 492.843116,
+        "count_gt_200_ms": 2
+      },
+      "host_ack_roundtrip_ms": {
+        "samples": 32,
+        "mean": 354.513208,
+        "p50": 337.269276,
+        "p95": 434.870745,
+        "p99": 640.300319,
+        "maximum": 730.015441,
+        "count_gt_200_ms": 32
+      }
+    },
+    "matching": {
+      "scope": "same_survey_even_reference_odd_query_RootSIFT_relative_image_match_ONLY",
+      "raw": {
+        "query_keypoints": 2160,
+        "ratio_matches": 83,
+        "inliers": 17,
+        "inlier_median_pixels": 0.9467546493870177
+      },
+      "denoised": {
+        "query_keypoints": 1428,
+        "ratio_matches": 21,
+        "inliers": 8,
+        "inlier_median_pixels": 0.5964809741805635
+      }
+    }
+  },
+  "H0": {
+    "definition": {
+      "basename": "run_definition.json",
+      "sha256": "f532c4f82bf8d3ff327270dd1bd93b4fa81e0a53d7335350d13207b97e9ec762"
+    },
+    "summary": {
+      "basename": "run_summary.json",
+      "sha256": "c36920a8232492f2e9ca89c855dd44408cb9131a2633eba17181631cce7aada0"
+    },
+    "interval_s": 0.3299999239998215,
+    "experiment_source_SHA256": "7bec4fdf69a946b6c0216187248157da97b12c007db830f46368beb527490a97",
+    "model_SHA256": "b20daf8809e304ab9a8f2032c391284b3ef1c837277dd4f2b8bd876135603bbf",
+    "ground_truth_sent_to_board": false,
+    "pings": 62458,
+    "status": "completed_full_historical_clock_AB",
+    "elapsed_s": 47705.095616799,
+    "nonzero_denoise_pings": 62458,
+    "trajectory_receipt": {
+      "basename": "trajectory.jsonl",
+      "sha256": "06e7dbb2f622c40b36161a168a66453d5d9ed4ec5985bfbc3ddbc3a6286f2943"
+    },
+    "latency_ms": {
+      "model_ms": {
+        "samples": 62458,
+        "mean": 125.573787,
+        "p50": 125.584862,
+        "p95": 130.020797,
+        "p99": 132.846421,
+        "maximum": 140.541565,
+        "count_gt_200_ms": 0
+      }
+    }
+  },
+  "H5": {
+    "summary": {
+      "basename": "run_summary.json",
+      "sha256": "ed9321fae386536694076d4ea6e0f801d5c0aba952e6fad8a73e94f39f875531"
+    },
+    "engine_sha256": "b20daf8809e304ab9a8f2032c391284b3ef1c837277dd4f2b8bd876135603bbf",
+    "range_samples": 12721,
+    "pings": 103055,
+    "status": "completed_NX_noisy_full_comb_AB_NOT_field_test",
+    "elapsed_wall_s": 80053.46028412902,
+    "simulated_hz": 5,
+    "sustained_wall_5Hz_certified": false,
+    "trajectory_receipt": {
+      "basename": "trajectory.jsonl",
+      "sha256": "90214f2f7a869398be40fb6ef86713c9ae681c63c1839c2657d7bff51e87357a"
+    },
+    "latency_ms": {
+      "model_ms": {
+        "samples": 103055,
+        "mean": 126.981344,
+        "p50": 126.512512,
+        "p95": 129.313063,
+        "p99": 130.783409,
+        "maximum": 262.037964,
+        "count_gt_200_ms": 371
+      },
+      "denoise_ms": {
+        "samples": 103055,
+        "mean": 227.977345,
+        "p50": 227.692672,
+        "p95": 237.732953,
+        "p99": 239.999512,
+        "maximum": 421.958199,
+        "count_gt_200_ms": 102448
+      }
+    }
+  },
+  "real_track": {
+    "summary": {
+      "basename": "run_summary.json",
+      "sha256": "c3ed5603d6dddd673b7e836d0ac80ac6af73256797de0f312101a079cd54dbf9"
+    },
+    "pings": 2020,
+    "query_pings": 1010,
+    "status": "completed_gps_motion_aided_actual_sonar_route_AB_NOT_independent_position_truth",
+    "elapsed_wall_s": 1000.5094139578287,
+    "state_resets": 25,
+    "independent_truth": false,
+    "engine_sha256": "842d90945588a91c985e1db8402083aae0b1d933aaba324f3a49dce18585d587",
+    "platform": "NX_FP32_CUDA_Graph",
+    "native": [
+      2,
+      8,
+      12189
+    ],
+    "trajectory_receipt": {
+      "basename": "trajectory.jsonl",
+      "sha256": "5efbff4bbe3568788a701bf54bcf6eaf7989da6e356a3e8059f52121c77cbc52"
+    },
+    "latency_ms": {
+      "model_ms": {
+        "samples": 2020,
+        "mean": 130.841747,
+        "p50": 104.74152,
+        "p95": 221.828102,
+        "p99": 231.585891,
+        "maximum": 236.80249,
+        "count_gt_200_ms": 306
+      },
+      "full_denoise_ms": {
+        "samples": 2020,
+        "mean": 187.749614,
+        "p50": 156.90574,
+        "p95": 308.248027,
+        "p99": 330.539934,
+        "maximum": 387.297811,
+        "count_gt_200_ms": 629
+      }
+    }
+  },
+  "source_excerpts": [
+    {
+      "path": "standalone/PrepareQiandaoRecordedSmallModelAB.py",
+      "ranges": [
+        [
+          21,
+          55
+        ],
+        [
+          74,
+          91
+        ]
+      ],
+      "sha256": "19b682c17e4cad7f699bdee9a13ea362b4dfd9771ead3134467fcdb80a9ce4a5"
+    },
+    {
+      "path": "standalone/CausalSonarWavelet.py",
+      "ranges": [
+        [
+          17,
+          73
+        ]
+      ],
+      "sha256": "6f4d1eaa8ab7ddfca822dca76c047d641d40cad86c183245aa1720125dd2e1b5"
+    },
+    {
+      "path": "standalone/BaselineAugmentedJointBeam.py",
+      "ranges": [
+        [
+          48,
+          76
+        ]
+      ],
+      "sha256": "3a21e37a34a56b7493041825952c9bb36ed5b03e80562295f33888d2ef76f00b"
+    },
+    {
+      "path": "standalone/LateSpectralJointBeam.py",
+      "ranges": [
+        [
+          11,
+          36
+        ]
+      ],
+      "sha256": "b5fca0f1527c5d0bbed386fe4da641fd31ed7838e9b3643ba6a7fc6db29eeb98"
+    },
+    {
+      "path": "standalone/NativeWeakEchoVerifier.py",
+      "ranges": [
+        [
+          10,
+          31
+        ]
+      ],
+      "sha256": "280e1797c8a38e23cd75240b4df526b3ec697cede2d93ed3285a47951fc7a8ce"
+    },
+    {
+      "path": "standalone/RunQiandaoRecordedSmallBoardPilot.py",
+      "ranges": [
+        [
+          56,
+          113
+        ],
+        [
+          128,
+          152
+        ],
+        [
+          225,
+          235
+        ],
+        [
+          248,
+          278
+        ],
+        [
+          341,
+          350
+        ]
+      ],
+      "sha256": "fed90e744eca7f10f6eb319dacf7706826783414eda3adaa167069bf5bbe61ad"
+    },
+    {
+      "path": "standalone/RunQiandaoHistoricalClockAB.py",
+      "ranges": [
+        [
+          21,
+          29
+        ],
+        [
+          84,
+          92
+        ],
+        [
+          153,
+          162
+        ]
+      ],
+      "sha256": "7bec4fdf69a946b6c0216187248157da97b12c007db830f46368beb527490a97"
+    },
+    {
+      "path": "standalone/RunQiandaoNoisyCombBoardAB.py",
+      "ranges": [
+        [
+          95,
+          109
+        ]
+      ],
+      "sha256": "4f9f42fd87bf439a104d0e6f35c8c7971a00350eddbc3b54f0519e4ec8bbd13a"
+    },
+    {
+      "path": "standalone/CausalSonarFeatures.py",
+      "ranges": [
+        [
+          48,
+          85
+        ]
+      ],
+      "sha256": "08e2e509a565eff3696f321938e7cb2350f2ffbbf31cdbf21965b609f0f6aad7"
+    },
+    {
+      "path": "standalone/NativeLocalSpectralCue.py",
+      "ranges": [
+        [
+          7,
+          12
+        ],
+        [
+          28,
+          47
+        ]
+      ],
+      "sha256": "aa6ebeeb6ac1b213b7ac2dd915ed56a9f129ec187a91e574844e57c79816eb9b"
+    },
+    {
+      "path": "standalone/TrainNativeSignedResponse172.py",
+      "ranges": [
+        [
+          28,
+          37
+        ],
+        [
+          111,
+          119
+        ],
+        [
+          152,
+          171
+        ]
+      ],
+      "sha256": "fd8af929b8f9dada3453befba1cf11d47775a8053f5defd50fc7af9312531ea2"
+    },
+    {
+      "path": "standalone/TrainLateSpectralRangeBalance172.py",
+      "ranges": [
+        [
+          22,
+          26
+        ],
+        [
+          58,
+          74
+        ]
+      ],
+      "sha256": "f912e0bf35063d6b02f5b46b54ac409b1d661208a7da1c383e0865f560f89f45"
+    },
+    {
+      "path": "standalone/TrialNativeSplitFlankProjection172.py",
+      "ranges": [
+        [
+          26,
+          29
+        ],
+        [
+          129,
+          166
+        ]
+      ],
+      "sha256": "b9b060f8dab1fb8484fdec7dc31a7d3f1487ca5b4b0e40685c2f929a9c0bb781"
+    }
+  ]
+}

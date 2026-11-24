@@ -1,0 +1,19 @@
+flowchart TD
+    A["受限原生 I/Q + 公开授权训练源"] --> D["JointBeamSonarData.grouped_example<br/>保留真实同步束及支持"]
+    N["RandomTriggeredSonarNoise<br/>draw_scenario / apply_scenario"] --> D
+    D --> S["TrainNativeSignedResponse172<br/>骨干：signed_response@200"]
+    S --> B["TrainLateSpectralRangeBalance172<br/>晚期头：range_balanced_identity"]
+    S --> C["保护头迭代与冻结对照<br/>选 weak_verifier_original"]
+    B --> C
+    S --> W["load_model<br/>三件权重逐一校验"]
+    B --> W
+    C --> W
+    W --> V["PyTorch 同权重整段可视化<br/>非板端"]
+    W --> O["FP32LearnedStep.export<br/>opset 17 / R12189、R12721"]
+    O -.-> P["PC preflight：ORT 比对 3 ping"]
+    O -.->|"目标板实际计划已取证；完整构建命令缺档"| J["NX 两份 FP32 目标计划<br/>按 SHA 校验"]
+    J --> T["RunQiandaoRecordedSmallBoardPilot.Runtime<br/>NativeLearnedGain"]
+    T --> R["R12189 实采：32 ping 小试与 2020 ping 重放"]
+    T --> H["R12721 仿真：62,458 / 103,055 ping"]
+    R --> N1["幅度恢复 → 既有实采侧扫匹配"]
+    H --> N2["复回波恢复 → 脉压 → 既有导航"]
