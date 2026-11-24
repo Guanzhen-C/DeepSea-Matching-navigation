@@ -1,0 +1,149 @@
+{
+  "schema": "ocean_range_v4_reference_validation",
+  "scalar_v3": {
+    "qiandao2": {
+      "arms": {
+        "M1_Gaussian": {
+          "status": "failed",
+          "reason": "Competing minima or unresolved profile; derivatives not certified",
+          "fallback": null,
+          "wall_ms": 205.06880000175443
+        },
+        "M1_Robust_loop": {
+          "factors": 162,
+          "iterations": 5,
+          "cost_before": 2218.891971318636,
+          "cost_after": 15.187587233171463,
+          "status": "returned_estimate",
+          "fallback": null,
+          "wall_ms": 648.8246970002365,
+          "rmse_m": 2.0553307222782973,
+          "p95_m": 3.9672522510580457,
+          "last_m": 4.662505581314477,
+          "max_m": 6.782310297463891
+        }
+      },
+      "hashes": {
+        "graph": "70b26f3bb9930a08f3915be4e2e5f4c6c581ca23e49db47ef7be71811530fc6f",
+        "trace": "438359a490824a07e39fcf8954359abbff9e68bee162f7466640b4de22b3eebd",
+        "truth": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4"
+      },
+      "nodes": 99,
+      "range_pairs": 110
+    },
+    "qiandao4": {
+      "arms": {
+        "M1_Gaussian": {
+          "factors": 305,
+          "iterations": 7,
+          "cost_before": 2562.880859604971,
+          "cost_after": 33.237124002825446,
+          "status": "returned_estimate",
+          "fallback": null,
+          "wall_ms": 1587.537572999281,
+          "rmse_m": 1.5613953296643375,
+          "p95_m": 2.5768341945861284,
+          "last_m": 1.2359667069384133,
+          "max_m": 3.473375354920585
+        },
+        "M1_Robust_loop": {
+          "factors": 352,
+          "iterations": 7,
+          "cost_before": 2183.0836928608396,
+          "cost_after": 36.18981717875497,
+          "status": "returned_estimate",
+          "fallback": null,
+          "wall_ms": 1639.8898079969513,
+          "rmse_m": 1.4593292744989803,
+          "p95_m": 2.432099003176423,
+          "last_m": 1.1849580773112498,
+          "max_m": 3.191248970715539
+        }
+      },
+      "hashes": {
+        "graph": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559",
+        "trace": "995dd80cd0310365294534fad0fb7da851750e337b20d9df1a50842a8ac9bd57",
+        "truth": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858"
+      },
+      "nodes": 198,
+      "range_pairs": 202
+    }
+  },
+  "coverage": {
+    "seed": 724334,
+    "n_per_stratum": 64,
+    "result": {
+      "large_dz_unknown": {
+        "modes": {
+          "M1": 64
+        },
+        "reasons": {
+          "m1_unknown_association_tempered": 64
+        }
+      },
+      "small_dz_unknown": {
+        "modes": {
+          "M0": 64
+        },
+        "reasons": {
+          "m0_narrow_deadband": 64
+        }
+      },
+      "verified_low_association": {
+        "modes": {
+          "reject": 64
+        },
+        "reasons": {
+          "low_association": 64
+        }
+      },
+      "gross_incompatibility": {
+        "modes": {
+          "M0": 64
+        },
+        "reasons": {
+          "outside_noise_tube": 64
+        }
+      }
+    }
+  },
+  "archive_inventory": {
+    "Monterey": {
+      "relative_archive": "demo/hil/jetson_20261021/sea_live_5km_canonical_v3/native_reference/native_metrics_pose_graph_factors.json",
+      "sha256": "1441fe5d029cef13ad6c351c8d92119ccb01c4d814f1a082e2734ff1a903487b",
+      "nodes": 123,
+      "edges": {
+        "odometry": 122,
+        "intensity": 11
+      },
+      "has_original_dual_ranges": false,
+      "source_trace_present": false,
+      "paired_replay_ready": false
+    },
+    "Chelan": {
+      "relative_archive": "demo/generalization/final_improved_multiterrain_20261015/chelan_full_route_seed31_confirmed_output_fix_20261016_pose_graph_factors.json",
+      "sha256": "7bad7dd0268df7b31f5a0670689cef76af0a753542bca5802500367d16135818",
+      "nodes": 1111,
+      "edges": {
+        "odometry": 1110,
+        "intensity": 62
+      },
+      "has_original_dual_ranges": false,
+      "source_trace_present": false,
+      "paired_replay_ready": false
+    }
+  },
+  "pc_fixed_lag_probe": {
+    "active_counts": [
+      1,
+      2,
+      3,
+      3
+    ],
+    "expired_first": true,
+    "latest_present": true,
+    "expired_edge_allowed": false
+  },
+  "policy_sha256": "f3d41cae07e75dbd4c65acf9587a2200cce7816e0b6e2edb062a74eb5af2da85",
+  "code_sha256": "442afc21b216b705cff62f588d16213e27126428f59909c935aa787b2d8b11ad"
+}

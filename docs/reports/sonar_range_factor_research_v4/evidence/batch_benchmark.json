@@ -1,0 +1,85 @@
+{
+  "schema": "ocean_range_v4_benchmark",
+  "seeds": [
+    61500,
+    61501,
+    61502,
+    61503,
+    61504,
+    61505,
+    61506,
+    61507,
+    61508,
+    61509,
+    61510,
+    61511,
+    61512,
+    61513,
+    61514,
+    61515,
+    61516,
+    61517,
+    61518,
+    61519,
+    61520,
+    61521,
+    61522,
+    61523
+  ],
+  "platform": "Linux-6.8.0-149-generic-x86_64-with-glibc2.35",
+  "numpy": "2.2.6",
+  "profiles": {
+    "valid": 144,
+    "failed_match": 0,
+    "disagreements": 0,
+    "reference_rows": 0,
+    "strict_bad": 0,
+    "strict_examined": 24
+  },
+  "max_abs": {
+    "height": 1.255884285455977e-12,
+    "cost": 1.8474111129762605e-13,
+    "residual": 5.409006575973763e-13,
+    "jacobian": 1.2470025012589758e-12,
+    "hessian": 3.586819730116986e-11
+  },
+  "latency": {
+    "original_48": {
+      "median_ms": 18.217831498986925,
+      "p95_ms": 38.13071514923649,
+      "samples": 24
+    },
+    "batch_cold_48": {
+      "median_ms": 1.949046500158147,
+      "p95_ms": 2.7344447000359646,
+      "samples": 24
+    },
+    "batch_moved_48": {
+      "median_ms": 1.6822194993437734,
+      "p95_ms": 2.451405098872783,
+      "samples": 24
+    },
+    "batch_cache_hit_48": {
+      "median_ms": 0.007692500730627216,
+      "p95_ms": 0.009068600775208322,
+      "samples": 24
+    },
+    "original_graph": {
+      "median_ms": 74.37290499910887,
+      "p95_ms": 146.44545380197084,
+      "samples": 24
+    },
+    "batch_graph": {
+      "median_ms": 35.48960949956381,
+      "p95_ms": 68.15190320066904,
+      "samples": 24
+    }
+  },
+  "speedup_48": 9.347048157911429,
+  "speedup_graph": 2.095624777162537,
+  "max_fit_error_difference": 6.217248937900877e-14,
+  "code_sha256": {
+    "benchmark.py": "64c3470b0fdca1bf3ba71ca2b0da7db2eb01dcded59b0b4fb77f2a360342f1c5",
+    "batch.py": "7c04cd4043f4c95ff10d6dbf54e79a10db41a45954e11bcaf29c78bc9ad92918"
+  }
+}

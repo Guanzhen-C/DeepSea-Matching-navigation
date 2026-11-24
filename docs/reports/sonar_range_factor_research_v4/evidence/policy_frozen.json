@@ -1,0 +1,47 @@
+{
+  "schema": "ocean_adaptive_range_policy_v1",
+  "seed": 792043,
+  "pairs": 240,
+  "profiles": 240,
+  "nominal_tube_coverage": [
+    [
+      2.0,
+      1.0
+    ],
+    [
+      2.5,
+      1.0
+    ],
+    [
+      3.0,
+      1.0
+    ],
+    [
+      3.5,
+      1.0
+    ],
+    [
+      4.0,
+      1.0
+    ],
+    [
+      4.5,
+      1.0
+    ]
+  ],
+  "policy": {
+    "tolerance_sigma": 2.0,
+    "radius_limit": 2.31129730693928,
+    "deadband_min_sigma": 4.236185989196441,
+    "min_curvature": 0.015625,
+    "min_bound_margin_m": 0.5,
+    "accept_confidence": 0.8,
+    "reject_confidence": 0.35,
+    "max_boxes": 128,
+    "m1_info_known": 1.0,
+    "m1_info_unknown": 0.5,
+    "weak_m0_info": 0.5
+  },
+  "confidence_note": "engineering thresholds; historical archives supply no calibrated probability",
+  "no_navigation_truth_used": true
+}

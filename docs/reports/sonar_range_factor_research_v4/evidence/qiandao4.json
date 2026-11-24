@@ -1,0 +1,167 @@
+{
+  "schema": "ocean_range_v4_frozen_graph",
+  "scene": "qiandao4",
+  "seed": 33,
+  "distance_m": 3999.8630752560002,
+  "hashes": {
+    "graph": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559",
+    "trace": "995dd80cd0310365294534fad0fb7da851750e337b20d9df1a50842a8ac9bd57",
+    "truth": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858"
+  },
+  "policy_sha256": "f3d41cae07e75dbd4c65acf9587a2200cce7816e0b6e2edb062a74eb5af2da85",
+  "frozen_core_sha256": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+  "code_sha256": {
+    "batch.py": "7c04cd4043f4c95ff10d6dbf54e79a10db41a45954e11bcaf29c78bc9ad92918",
+    "adaptive.py": "b96c79a7090b134eed887867279dba7d76d92726d49d094831f13800b4f2f917",
+    "graph.py": "045a15bda6819b14ab24a9f459baa821eafc918bdfb320e2ba093b398f9c5732",
+    "replay.py": "3342e1fc59f5f942e8878f91752c97ec648cc6e701745adc5bb3bb6d0081cf2c"
+  },
+  "nodes": 198,
+  "range_pairs": 202,
+  "range_batches": 19,
+  "loop_edges": 47,
+  "map_priors": 88,
+  "association_confidence": "unknown; accepted historical pairs with unique token trace",
+  "archived_covariance_assumption": "rho=0.25, equal raw marginals matching frozen M0 scalar difference variance",
+  "adaptive_initial_modes": {
+    "M0": 202
+  },
+  "adaptive_reasons": {
+    "outside_noise_tube": 147,
+    "m0_narrow_deadband": 55
+  },
+  "gate_median_ms": 2.02622600045288,
+  "gate_p95_ms": 3.180530499594169,
+  "arms": {
+    "no_range": {
+      "factors": 286,
+      "iterations": 4,
+      "cost_before": 187.42175033072442,
+      "cost_after": 16.35339000129195,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 64.22181499874569,
+      "rmse_m": 6.541114801419348,
+      "p95_m": 15.64825589029299,
+      "last_m": 16.888237381642295,
+      "max_m": 17.186928265109156
+    },
+    "M0": {
+      "factors": 305,
+      "iterations": 4,
+      "cost_before": 941.1221044538459,
+      "cost_after": 25.687270991526663,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 83.04585400037467,
+      "rmse_m": 1.4670228113652184,
+      "p95_m": 2.280668544356826,
+      "last_m": 1.4090971401329568,
+      "max_m": 2.9606275323311464
+    },
+    "M1_Gaussian": {
+      "factors": 305,
+      "iterations": 7,
+      "cost_before": 2562.8808596049707,
+      "cost_after": 33.237124002825404,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 382.4824630028161,
+      "rmse_m": 1.5613953296643488,
+      "p95_m": 2.5768341945861284,
+      "last_m": 1.2359667069384512,
+      "max_m": 3.4733753549206137
+    },
+    "M1_Robust": {
+      "factors": 305,
+      "iterations": 7,
+      "cost_before": 2165.236033137808,
+      "cost_after": 33.23712400063032,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 379.28715700036264,
+      "rmse_m": 1.5613948796966923,
+      "p95_m": 2.5768234677520896,
+      "last_m": 1.2359647388779256,
+      "max_m": 3.4733774498954135
+    },
+    "Adaptive": {
+      "factors": 305,
+      "iterations": 4,
+      "cost_before": 941.1221044538459,
+      "cost_after": 25.687270991526663,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 86.9223840018094,
+      "rmse_m": 1.4670228113652184,
+      "p95_m": 2.280668544356826,
+      "last_m": 1.4090971401329568,
+      "max_m": 2.9606275323311464
+    },
+    "no_range_loop": {
+      "factors": 333,
+      "iterations": 3,
+      "cost_before": 205.2694100537565,
+      "cost_after": 19.86642023448281,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 63.251432999095414,
+      "rmse_m": 4.124853080494236,
+      "p95_m": 10.023141710078121,
+      "last_m": 10.930820231964788,
+      "max_m": 11.28973010862424
+    },
+    "M0_loop": {
+      "factors": 352,
+      "iterations": 4,
+      "cost_before": 958.9697641768777,
+      "cost_after": 28.611316075674594,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 96.35489299762412,
+      "rmse_m": 1.3551762355995267,
+      "p95_m": 2.121020247601314,
+      "last_m": 1.3477257278516483,
+      "max_m": 2.956706325370912
+    },
+    "M1_Gaussian_loop": {
+      "factors": 352,
+      "iterations": 7,
+      "cost_before": 2580.7285193280018,
+      "cost_after": 36.18981717878796,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 396.9466870003089,
+      "rmse_m": 1.4593291691166579,
+      "p95_m": 2.432098819609634,
+      "last_m": 1.184959323056864,
+      "max_m": 3.191248541279284
+    },
+    "M1_Robust_loop": {
+      "factors": 352,
+      "iterations": 7,
+      "cost_before": 2183.083692860839,
+      "cost_after": 36.189817178755,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 405.9135919997061,
+      "rmse_m": 1.4593292744989699,
+      "p95_m": 2.432099003176396,
+      "last_m": 1.1849580773112622,
+      "max_m": 3.1912489707154807
+    },
+    "Adaptive_loop": {
+      "factors": 352,
+      "iterations": 4,
+      "cost_before": 958.9697641768777,
+      "cost_after": 28.611316075674594,
+      "status": "returned_estimate",
+      "fallback": null,
+      "wall_ms": 100.46316099760588,
+      "rmse_m": 1.3551762355995267,
+      "p95_m": 2.121020247601314,
+      "last_m": 1.3477257278516483,
+      "max_m": 2.956706325370912
+    }
+  }
+}
