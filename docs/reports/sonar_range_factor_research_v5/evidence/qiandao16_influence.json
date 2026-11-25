@@ -1,0 +1,86 @@
+{
+  "schema": "ocean_range_v5_factor_descriptive",
+  "scene": "qiandao16",
+  "pairs_read": 3119,
+  "models": {
+    "M0": {
+      "n": 277,
+      "stats": {
+        "full_graph_residual_rms": {
+          "signed": 0.05341311631278872,
+          "magnitude": 0.41266067353306174
+        },
+        "full_graph_information_trace": {
+          "signed": 0.015604656441225924,
+          "magnitude": 0.1599192157810402
+        },
+        "avg_abs_height_difference_m": {
+          "signed": 0.08135447379029753,
+          "magnitude": 0.08516163054488132
+        }
+      },
+      "largest_residual": {
+        "edge": 580,
+        "delta_rmse_m": -0.0002996074428189832,
+        "full_graph_residual_rms": 1.6070104804118417,
+        "full_graph_information_trace": 269.2197733916146,
+        "avg_abs_height_difference_m": 0.006040848164380701
+      },
+      "most_helpful_batch": {
+        "edge": 337,
+        "delta_rmse_m": 0.10843787519939818,
+        "full_graph_residual_rms": 0.8702195354902237,
+        "full_graph_information_trace": 945.2398153873924,
+        "avg_abs_height_difference_m": 0.01309297028361543
+      },
+      "most_harmful_batch": {
+        "edge": 950,
+        "delta_rmse_m": -0.03293253165936094,
+        "full_graph_residual_rms": 0.5575854014197831,
+        "full_graph_information_trace": 705.2884414528767,
+        "avg_abs_height_difference_m": 0.007348077329361737
+      }
+    },
+    "M1_Robust": {
+      "n": 277,
+      "stats": {
+        "full_graph_residual_rms": {
+          "signed": 0.024195743075920678,
+          "magnitude": 0.37812412132764356
+        },
+        "full_graph_information_trace": {
+          "signed": 0.029329730376740828,
+          "magnitude": 0.15945736582920134
+        },
+        "avg_abs_height_difference_m": {
+          "signed": 0.11049844789056526,
+          "magnitude": 0.06899914066549304
+        }
+      },
+      "largest_residual": {
+        "edge": 580,
+        "delta_rmse_m": -0.004557081082540826,
+        "full_graph_residual_rms": 1.7833564782573466,
+        "full_graph_information_trace": 561.0140134965512,
+        "avg_abs_height_difference_m": 0.006040848164380701
+      },
+      "most_helpful_batch": {
+        "edge": 926,
+        "delta_rmse_m": 0.09750903857680582,
+        "full_graph_residual_rms": 0.4195711235398254,
+        "full_graph_information_trace": 2198.6217839975784,
+        "avg_abs_height_difference_m": 0.019592944146007492
+      },
+      "most_harmful_batch": {
+        "edge": 950,
+        "delta_rmse_m": -0.04023810250870263,
+        "full_graph_residual_rms": 0.5206565732415177,
+        "full_graph_information_trace": 1505.399103775284,
+        "avg_abs_height_difference_m": 0.007348077329361737
+      }
+    }
+  },
+  "raw_detail_sha256": "500a9d6b3b63be3ab2db67008ec0427a89d0c84560ae2c8275cca2e9b46fcb8b",
+  "loo_sha256": "691358a5c153418422b5470ebb0b35004ac4763a6ce972d17910fc4b00f38a86",
+  "code_sha256": "8084b59b9c785966ec069b99371e84c4723ebb853bf072f75ad0e87bf2585554"
+}

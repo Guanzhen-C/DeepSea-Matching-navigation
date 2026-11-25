@@ -1,0 +1,151 @@
+{
+  "schema": "ocean_range_v5_archive_inventory",
+  "code_sha256": "136800c7862ceeef3e5175995e1e8a1fe28fa6a0a95a6914ddb6cea728852e8d",
+  "historical": {
+    "Monterey": {
+      "representative": "demo/hil/jetson_20261021/sea_live_5km_canonical_v3/native_reference/native_metrics_pose_graph_factors.json",
+      "sha256": "1441fe5d029cef13ad6c351c8d92119ccb01c4d814f1a082e2734ff1a903487b",
+      "nodes": 123,
+      "kind": {
+        "odometry": 122,
+        "intensity": 11
+      },
+      "node_timestamps_present": true,
+      "any_raw_local_keyframe_vertical_values": true,
+      "original_paired_ranges": false,
+      "pair_source_tokens": false,
+      "pair_phase_centres_and_acquisition_pressure_linked": false,
+      "independent_field_truth_verified": false,
+      "ready": false
+    },
+    "Chelan": {
+      "representative": "demo/generalization/final_improved_multiterrain_20261015/chelan_full_route_seed31_confirmed_output_fix_20261016_pose_graph_factors.json",
+      "sha256": "7bad7dd0268df7b31f5a0670689cef76af0a753542bca5802500367d16135818",
+      "nodes": 1111,
+      "kind": {
+        "odometry": 1110,
+        "intensity": 62
+      },
+      "node_timestamps_present": true,
+      "any_raw_local_keyframe_vertical_values": true,
+      "original_paired_ranges": false,
+      "pair_source_tokens": false,
+      "pair_phase_centres_and_acquisition_pressure_linked": false,
+      "independent_field_truth_verified": false,
+      "ready": false
+    },
+    "Jenkinson": {
+      "representative": "demo/generalization/final_improved_multiterrain_20261015/jenkinson_full_route_seed31_confirmed_output_fix_20261016_pose_graph_factors.json",
+      "sha256": "f6dd6d89c8400cc6713154b11cf9bd27fdf2be086f41b8ef2618233f7ea76f5c",
+      "nodes": 39,
+      "kind": {
+        "odometry": 38,
+        "intensity": 4
+      },
+      "node_timestamps_present": true,
+      "any_raw_local_keyframe_vertical_values": true,
+      "original_paired_ranges": false,
+      "pair_source_tokens": false,
+      "pair_phase_centres_and_acquisition_pressure_linked": false,
+      "independent_field_truth_verified": false,
+      "ready": false
+    },
+    "Sheboygan": {
+      "representative": "demo/generalization/final_improved_multiterrain_20261015/sheboygan_full_route_seed31_confirmed_output_fix_20261016_pose_graph_factors.json",
+      "sha256": "802f5f60459e7f0cc35c4327fc871945757eb6acc82e6b345a47a6305aaf340e",
+      "nodes": 31,
+      "kind": {
+        "odometry": 30,
+        "intensity": 1
+      },
+      "node_timestamps_present": true,
+      "any_raw_local_keyframe_vertical_values": true,
+      "original_paired_ranges": false,
+      "pair_source_tokens": false,
+      "pair_phase_centres_and_acquisition_pressure_linked": false,
+      "independent_field_truth_verified": false,
+      "ready": false
+    }
+  },
+  "qiandao_simulation": {
+    "qiandao16": {
+      "graph_hashes": {
+        "graph": "2628dd9f6217a13e5829fd8a88f6173562479d1d2da7a714bd7ade77ccfc45ca",
+        "trace": "f749e8c0312cc5423d260815a1f2c2c324455b2e67fd077b85bf0d3da98ff199",
+        "truth": "a70a0f03e1b23ad87ab8d3ccdc95cd84b792cc1051f05e5304ec084f7836b4ca"
+      },
+      "seed": 31,
+      "range_batches": 277,
+      "original_pair_fields": [
+        "origin_a",
+        "origin_b",
+        "range_a",
+        "range_b",
+        "sensor_z_a",
+        "sensor_z_b"
+      ],
+      "tokens_verified_in_replay": true,
+      "mapped_factor_times_and_node_times": true,
+      "absolute_ping_clock_must_bind_with_original_receiver_log": true,
+      "independent_field_truth_verified": false,
+      "simulator_truth_present": true,
+      "ready": true
+    },
+    "qiandao4": {
+      "graph_hashes": {
+        "graph": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559",
+        "trace": "995dd80cd0310365294534fad0fb7da851750e337b20d9df1a50842a8ac9bd57",
+        "truth": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858"
+      },
+      "seed": 33,
+      "range_batches": 19,
+      "original_pair_fields": [
+        "origin_a",
+        "origin_b",
+        "range_a",
+        "range_b",
+        "sensor_z_a",
+        "sensor_z_b"
+      ],
+      "tokens_verified_in_replay": true,
+      "mapped_factor_times_and_node_times": true,
+      "absolute_ping_clock_must_bind_with_original_receiver_log": true,
+      "independent_field_truth_verified": false,
+      "simulator_truth_present": true,
+      "ready": true
+    },
+    "qiandao2": {
+      "graph_hashes": {
+        "graph": "70b26f3bb9930a08f3915be4e2e5f4c6c581ca23e49db47ef7be71811530fc6f",
+        "trace": "438359a490824a07e39fcf8954359abbff9e68bee162f7466640b4de22b3eebd",
+        "truth": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4"
+      },
+      "seed": 32,
+      "range_batches": 8,
+      "original_pair_fields": [
+        "origin_a",
+        "origin_b",
+        "range_a",
+        "range_b",
+        "sensor_z_a",
+        "sensor_z_b"
+      ],
+      "tokens_verified_in_replay": true,
+      "mapped_factor_times_and_node_times": true,
+      "absolute_ping_clock_must_bind_with_original_receiver_log": true,
+      "independent_field_truth_verified": false,
+      "simulator_truth_present": true,
+      "ready": true
+    }
+  },
+  "qiandao_local_field": {
+    "metadata_directory_found": true,
+    "port_beamformed_mat_files": 6,
+    "starboard_beamformed_mat_files": 6,
+    "system_config_mat_files": 6,
+    "GNSS_mat_files": 3,
+    "calibrated_surveyed_target_pairs_verified": false,
+    "independent_field_truth_verified": false,
+    "note": "native complex beamformed data are documented in stage two; filename counts do not certify synchronization"
+  }
+}

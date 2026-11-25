@@ -1,0 +1,99 @@
+{
+  "schema": "ocean_range_v5_manifest",
+  "base_git": "67c5f8fc38f6acd58c4d57c856386618979c4417",
+  "environment": {
+    "python": "3.12.14",
+    "numpy": "2.2.6",
+    "scipy": "1.13.1",
+    "gtsam": "4.3a2",
+    "blas_threads": 1
+  },
+  "scope": "fixed archived simulator graph, controlled synthetic studies; no online deployment or field accuracy",
+  "counts": {
+    "attempted_single_batch_ablations": 608,
+    "failed_single_batch_ablations": 5,
+    "received_pairs": 3431,
+    "tests_passed": 123
+  },
+  "thresholds": "unchanged Stage 6 policy; structural masks defined in diagnostics.py before outcome scoring",
+  "recorded": {
+    "qiandao16": {
+      "seed": 31,
+      "nodes": 813,
+      "pairs": 3119,
+      "batches": 277,
+      "inputs": {
+        "graph": "2628dd9f6217a13e5829fd8a88f6173562479d1d2da7a714bd7ade77ccfc45ca",
+        "trace": "f749e8c0312cc5423d260815a1f2c2c324455b2e67fd077b85bf0d3da98ff199",
+        "truth": "a70a0f03e1b23ad87ab8d3ccdc95cd84b792cc1051f05e5304ec084f7836b4ca"
+      },
+      "private_pair_detail_sha256": "500a9d6b3b63be3ab2db67008ec0427a89d0c84560ae2c8275cca2e9b46fcb8b"
+    },
+    "qiandao4": {
+      "seed": 33,
+      "nodes": 198,
+      "pairs": 202,
+      "batches": 19,
+      "inputs": {
+        "graph": "46efebbdd574f630a55a5e0f1433b27fef1fe5fbccd74dce4b5d69516f929559",
+        "trace": "995dd80cd0310365294534fad0fb7da851750e337b20d9df1a50842a8ac9bd57",
+        "truth": "b867d1870edff77dea0d069e0a2dcee79d1c2fec788d93f4a7cbaf9f8e8b9858"
+      },
+      "private_pair_detail_sha256": "4e72608fb6b32b7361b5809fd7cf5a02f06be01e2f98940027130aff317b2d7f"
+    },
+    "qiandao2": {
+      "seed": 32,
+      "nodes": 99,
+      "pairs": 110,
+      "batches": 8,
+      "inputs": {
+        "graph": "70b26f3bb9930a08f3915be4e2e5f4c6c581ca23e49db47ef7be71811530fc6f",
+        "trace": "438359a490824a07e39fcf8954359abbff9e68bee162f7466640b4de22b3eebd",
+        "truth": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4"
+      },
+      "private_pair_detail_sha256": "f74b5e14a648ab5d028c5ec48931dfbfbea575017c8b40bbdd2c72f4311076e4"
+    }
+  },
+  "frozen_policy": "docs/reports/sonar_range_factor_research_v4/evidence/policy_frozen.json",
+  "evidence_sha256": {
+    "archive_inventory.json": "e6d9d644477efc3e473a3b3ce5bba37f7d75e5dd5375e5f72625548d40491b5a",
+    "calibration_selfcheck.json": "e80641ffad955d47e10c38e928e0d46acfee786fe71e7c268f74593113ebe705",
+    "gate_study.json": "812eb51daeaf40ee27f1dd8622bc6246c65f122b4acce851242c9b7396e7a370",
+    "geometry_stress.json": "76df4ae8ba8ba064292bad16bc4f2190f0c4ecc574418cb351f627cb2431a230",
+    "qiandao16_ablations.json": "a7f6266bdff480100edee4919c78c76dfe8b2da12710a95c06104a7572a67f00",
+    "qiandao16_diagnostic.json": "6ea1f3fe81023fc8261e3614423665302a90c6b875d8c4649f0e6b9134a4e3c1",
+    "qiandao16_influence.json": "4addc0996685b0299db48298b61cd61d506fe70c37354cb6891b6be5f4238088",
+    "qiandao16_loo.json": "691358a5c153418422b5470ebb0b35004ac4763a6ce972d17910fc4b00f38a86",
+    "qiandao2_ablations.json": "ba77fa7db96f5926e171e1246e31e97cbd1a2a6ce20350a2379273fa910c3500",
+    "qiandao2_diagnostic.json": "4b8111e2ffc454470768999e69d4f4f27f51d50b3a971ce826b829e11c349d14",
+    "qiandao2_influence.json": "aa3e454ed0ba5f042d83f8ef818eb397f5732cacef52268977307172f0c0cc26",
+    "qiandao2_loo.json": "806d14890371d38eee1ab0c27dc0730582069a20e036ceded68924705fc333b2",
+    "qiandao4_ablations.json": "2618c4da8e73e127bd339c137475393266b9ad4c20260adb853b8ba49f17708d",
+    "qiandao4_diagnostic.json": "c3756ae0f80a54553ad6d02194466364a24f8dc3a2b2eb1796e22c2528beb607",
+    "qiandao4_influence.json": "84eed54843c37dcb74d232106293e43a33f6820912fba6cb5314d5a532342c99",
+    "qiandao4_loo.json": "c811fa74add59fd7368e365e0857519e6556415c30d688611b9b15f932341d4c"
+  },
+  "source_sha256": {
+    "research/sonar_range_factor_v5/ablations.py": "557f98c690b97c45155019782c34be57729d285842f5d9e0fa2d8159098eddde",
+    "research/sonar_range_factor_v5/calibration.py": "d1a80fb903839ad33a81fb6de8393bef5faf6ced69db52f3836346344ceb8806",
+    "research/sonar_range_factor_v5/diagnostics.py": "188780b30791e843c3559d23075373a7d41c61d99b45cb12868812a1df26abdc",
+    "research/sonar_range_factor_v5/gate_study.py": "1bf57a0e6e1a6d2fbe4c464f9fa196f578ab653af425123691f3e15c063b3005",
+    "research/sonar_range_factor_v5/geometry_study.py": "09c861d800ee1b45337f20b4483a80103a1d8bd3bb674a56dd37dc65d098cd8c",
+    "research/sonar_range_factor_v5/influence_summary.py": "8084b59b9c785966ec069b99371e84c4723ebb853bf072f75ad0e87bf2585554",
+    "research/sonar_range_factor_v5/inventory.py": "136800c7862ceeef3e5175995e1e8a1fe28fa6a0a95a6914ddb6cea728852e8d",
+    "research/sonar_range_factor_v5/replay.py": "fe5a4732738df047b466fdf147386cf19af0f418a88f1fa231e3fd9f9f44722a",
+    "tests/test_sonar_range_factor_research_v5.py": "4d9f825008dd2027b7ab657000dac65a564b1861b5847e69de57677b7e5c12d2",
+    "standalone/SideScanMappedRangeChange.py": "a5f3640b954547669aa5ce01f3c2ea34110267e7baee2b16f4568006ca3bef42",
+    "standalone/SideScanMappedRangeBank.py": "906575f81b92605382b52de5a1d7963f5f2790847608cde21dce1770d11db460",
+    "standalone/SideScanMappedRangeGraph.py": "c577a125bc684195e4f7c4fc8a9eb3d25e8b6a8ecbec9344d886005feb9b5a2c",
+    "research/sonar_range_factor_v2/models.py": "1b522014421a603b3bc7e1121646f52246675b31f6dba41874b6c152a9935240",
+    "research/sonar_range_factor_v3/adapter.py": "8dca75deb3887e84eba711e8af52aaffa3a1136810bdefecae238b5eb3548f73",
+    "research/sonar_range_factor_v3/likelihood.py": "5a580e1f60d7f18ef72bd12d32933a3c10abe0abb9b229699250b4831ae26c74",
+    "research/sonar_range_factor_v3/experiment.py": "0c4f12b1bfe66ec107a8569095d83eb2b6214c0cbbd721aac498f3e97aada435",
+    "research/sonar_range_factor_v4/batch.py": "7c04cd4043f4c95ff10d6dbf54e79a10db41a45954e11bcaf29c78bc9ad92918",
+    "research/sonar_range_factor_v4/benchmark.py": "64c3470b0fdca1bf3ba71ca2b0da7db2eb01dcded59b0b4fb77f2a360342f1c5",
+    "research/sonar_range_factor_v4/adaptive.py": "b96c79a7090b134eed887867279dba7d76d92726d49d094831f13800b4f2f917",
+    "research/sonar_range_factor_v4/replay.py": "3342e1fc59f5f942e8878f91752c97ec648cc6e701745adc5bb3bb6d0081cf2c",
+    "docs/reports/sonar_range_factor_research_v4/evidence/policy_frozen.json": "f3d41cae07e75dbd4c65acf9587a2200cce7816e0b6e2edb062a74eb5af2da85"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "ocean_range_v5_calibration_selfcheck",
+  "seed": 64040,
+  "scope": "synthetic estimator validation only",
+  "fit": {
+    "offset_m": 0.1800000000000009,
+    "fractional_scale": 0.0017000000000000446,
+    "time_zero_s": 0.00024324324324324448,
+    "n": 120,
+    "ref_span_m": 135.0
+  },
+  "reference_covariance_m2": [
+    [
+      0.24,
+      -0.12
+    ],
+    [
+      -0.12,
+      0.36
+    ]
+  ],
+  "known_expected_rho": -0.408248290463863,
+  "heldout": {
+    "n": 2048,
+    "bias_m": [
+      0.01920219591851299,
+      0.010433972365507166
+    ],
+    "covariance_m2": [
+      [
+        0.23911956633801099,
+        -0.11706097888820849
+      ],
+      [
+        -0.11706097888820849,
+        0.34915385316104774
+      ]
+    ],
+    "rho": -0.4051316517592039,
+    "blocks": 32,
+    "rho_ci95_block": [
+      -0.4421441166048394,
+      -0.3707639083731019
+    ],
+    "bootstrap_seed": 64051
+  },
+  "code_sha256": "d1a80fb903839ad33a81fb6de8393bef5faf6ced69db52f3836346344ceb8806"
+}

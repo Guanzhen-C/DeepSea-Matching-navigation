@@ -1,0 +1,836 @@
+{
+  "scene": "qiandao2",
+  "seed": 32,
+  "distance_m": 1999.7995376584001,
+  "nodes": 99,
+  "batches": 8,
+  "pairs": 110,
+  "archive_hashes": {
+    "graph": "70b26f3bb9930a08f3915be4e2e5f4c6c581ca23e49db47ef7be71811530fc6f",
+    "trace": "438359a490824a07e39fcf8954359abbff9e68bee162f7466640b4de22b3eebd",
+    "truth": "ab614fff345a0b4a6b90804eb51bc46afbe7e6197464327e298f2e8f1e07d0d4"
+  },
+  "frozen_core_sha256": "be41f57113291f3da1e79774b306dac5b0feebe4d1a37229e41aa9e3f3092b46",
+  "code_sha256": "188780b30791e843c3559d23075373a7d41c61d99b45cb12868812a1df26abdc",
+  "rho_assumed": 0.25,
+  "scope": "archived simulation batch LM; geometry and associations fixed",
+  "schema": "ocean_range_v5_pair_diagnostics",
+  "detail_local": "output/sonar_range_factor_research_v5/qiandao2_pair_detail.jsonl.gz",
+  "detail_sha256": "f74b5e14a648ab5d028c5ec48931dfbfbea575017c8b40bbdd2c72f4311076e4",
+  "loop_trace_sha256": "3926f2628c02ec220b5e9dad4f7ab4e6cb5018c98cf39fe4b1c72d97846901b5",
+  "gate_policy_sha256": "f3d41cae07e75dbd4c65acf9587a2200cce7816e0b6e2edb062a74eb5af2da85",
+  "decisions_initial": {
+    "outside_noise_tube": 108,
+    "m0_narrow_deadband": 2
+  },
+  "decisions_prefix": {
+    "m0_narrow_deadband": 110
+  },
+  "counts": {
+    "narrow_deadband": 110,
+    "profile_not_stable": 0,
+    "low_curvature": 0,
+    "near_boundary": 0,
+    "large_radius": 0,
+    "tube_fail": 0,
+    "initial_tube": 2,
+    "causal_tube": 110,
+    "marginal_shadow_tube": 110,
+    "shadow_geometry_only_m1": 0,
+    "initial_m1": 0,
+    "causal_m1": 0,
+    "marginals_both_pairs": 110
+  },
+  "masks": {
+    "D_q1": [],
+    "D_q2": [],
+    "D_q3": [
+      70,
+      73
+    ],
+    "D_q4": [
+      77,
+      81,
+      90,
+      94,
+      98,
+      102
+    ],
+    "E_overlap_risk": [
+      77,
+      81,
+      94,
+      98,
+      102
+    ],
+    "F_weak_geometry": [
+      70,
+      73,
+      77,
+      81,
+      90,
+      94,
+      98,
+      102
+    ],
+    "G_only_high_quality": [
+      70,
+      73,
+      77,
+      81,
+      90,
+      94,
+      98,
+      102
+    ]
+  },
+  "geometry_thresholds": {
+    "absolute": 0.1,
+    "ratio": 0.1,
+    "quality_tube": 0.6,
+    "yaw_lever_m": 20.0
+  },
+  "predictor_shift_m": {
+    "median": 6.453966305812145,
+    "p95": 15.894434869503854,
+    "max": 16.015940657724958
+  },
+  "predictor_shift_heading_deg_p95": 0.2658546535379029,
+  "budget": {
+    "median_boxes": 13.0,
+    "max_boxes": 13
+  },
+  "solver_reference": {
+    "M0": {
+      "status": "returned",
+      "ms": 49.51500500101247,
+      "objective_before": 895.0676969127015,
+      "objective_after": 11.72462098856246,
+      "iterations": 5,
+      "factors": 162,
+      "mse_m2": 3.6878955934171356,
+      "rmse_m": 1.9203894379570867,
+      "p95_m": 3.8012109482519483,
+      "last_m": 4.345723595073885
+    },
+    "M1_Robust": {
+      "status": "returned",
+      "ms": 145.7531240012031,
+      "objective_before": 2218.8919713186356,
+      "objective_after": 15.187587233171467,
+      "iterations": 5,
+      "factors": 162,
+      "mse_m2": 4.224384377941058,
+      "rmse_m": 2.055330722278305,
+      "p95_m": 3.9672522510580492,
+      "last_m": 4.6625055813145195
+    }
+  },
+  "association_exact_token_overlap_identifiable": false,
+  "batches_detail": [
+    {
+      "edge_id": 70,
+      "features": 6,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": false,
+        "identical_loop_endpoints": false,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              1.4240194401661252,
+              0.23977895718776795,
+              0.0223669705833195,
+              0.002694066643448828,
+              0.0018910761687809703,
+              0.0004071812425259675
+            ],
+            "rank": 6,
+            "condition": 3497.2618859654617,
+            "right_strongest": [
+              -0.002007543094054173,
+              -0.5554581696091877,
+              0.6446449679566542,
+              -0.004179035553791111,
+              -0.3849026497706553,
+              0.35738990295567835
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              0.5510995949724572,
+              0.001717225747489988
+            ],
+            "rank": 2,
+            "condition": 320.92437221954145,
+            "right_strongest": [
+              0.010735312531768154,
+              0.9999423748720951
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              2.029433969103638,
+              0.3414093781294802,
+              0.031866990450048295,
+              0.0038434282003454094,
+              0.0026858191153077042,
+              0.0005841645974513003
+            ],
+            "rank": 6,
+            "condition": 3474.0790146441977,
+            "right_strongest": [
+              -0.0020166358714216485,
+              -0.5552578412160982,
+              0.6458119242054811,
+              -0.004184411048568444,
+              -0.38447801479703453,
+              0.35604882859479026
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              0.7845467566174629,
+              0.002458829031377097
+            ],
+            "rank": 2,
+            "condition": 319.0733258009679,
+            "right_strongest": [
+              0.010761423756180454,
+              0.9999420942028294
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        15.806128346544536,
+        0.25403102107073255
+      ]
+    },
+    {
+      "edge_id": 73,
+      "features": 13,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": false,
+        "identical_loop_endpoints": false,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              2.240156163823383,
+              0.3515940270538816,
+              0.07068925921747074,
+              0.01243703251236708,
+              0.006068139000860857,
+              0.0017860544315855807
+            ],
+            "rank": 6,
+            "condition": 1254.2485403620487,
+            "right_strongest": [
+              -0.0016923162027193631,
+              -0.5491972647173251,
+              0.6227040156464926,
+              -0.0035466484311742798,
+              -0.4057247015101659,
+              0.3820917393244771
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              0.9108794248109116,
+              0.005231853807895454
+            ],
+            "rank": 2,
+            "condition": 174.10261415108585,
+            "right_strongest": [
+              0.008590654234706088,
+              0.999963099649092
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              3.1756286621385854,
+              0.498750750014244,
+              0.10001659854228782,
+              0.017609249989522596,
+              0.008586785028257386,
+              0.0025248648502284787
+            ],
+            "rank": 6,
+            "condition": 1257.7420378960949,
+            "right_strongest": [
+              -0.0016965455530643316,
+              -0.549339493059961,
+              0.6225030761458419,
+              -0.003547221006662682,
+              -0.40563907213216316,
+              0.38230553706382975
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.2909797829316934,
+              0.007398057297840735
+            ],
+            "rank": 2,
+            "condition": 174.50253910692075,
+            "right_strongest": [
+              0.008594852194034623,
+              0.9999630635757315
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        16.015940657724958,
+        0.44979150594215483
+      ]
+    },
+    {
+      "edge_id": 77,
+      "features": 31,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": true,
+        "identical_loop_endpoints": true,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              3.217559180090912,
+              0.8045954252507229,
+              0.049630623125381336,
+              0.01566464715746471,
+              0.004851323173064934,
+              0.0011951140614459095
+            ],
+            "rank": 6,
+            "condition": 2692.261168944951,
+            "right_strongest": [
+              0.00011047515002684936,
+              0.5418636122072603,
+              -0.49119239235019907,
+              0.004690192010439796,
+              0.43728308949823663,
+              -0.5233310128360557
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.4079747840677654,
+              0.004272307388662122
+            ],
+            "rank": 2,
+            "condition": 329.5583992397781,
+            "right_strongest": [
+              0.010668067142825059,
+              0.9999430945526032
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              5.264454268440153,
+              1.2959547992067932,
+              0.08022772716436889,
+              0.025257159376569603,
+              0.00784754184181932,
+              0.0019515163228104645
+            ],
+            "rank": 6,
+            "condition": 2697.6224625467553,
+            "right_strongest": [
+              0.00013044687072778175,
+              0.5420351176998631,
+              -0.49041982136127615,
+              0.004709985876046079,
+              0.43719286279204966,
+              -0.5239527934236268
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              2.3031451316118097,
+              0.006907119280968088
+            ],
+            "rank": 2,
+            "condition": 333.4451075657413,
+            "right_strongest": [
+              0.010717140405909754,
+              0.9999425698016459
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        15.853932940096819,
+        0.39582968311019817
+      ]
+    },
+    {
+      "edge_id": 81,
+      "features": 10,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": true,
+        "identical_loop_endpoints": true,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              1.8209809003134723,
+              0.4765001639433204,
+              0.12570755934278138,
+              0.02111209179934113,
+              0.003552356431538026,
+              0.00131274430783676
+            ],
+            "rank": 6,
+            "condition": 1387.155815068224,
+            "right_strongest": [
+              -0.00019168305413232395,
+              0.5442103249900079,
+              -0.5377186384798774,
+              0.005351775120124517,
+              0.4366256266658569,
+              -0.4733108618074745
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              0.8009615253703601,
+              0.011196072300378382
+            ],
+            "rank": 2,
+            "condition": 71.53950991753518,
+            "right_strongest": [
+              0.010679208963317489,
+              0.9999429756220691
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              2.5860540664632365,
+              0.6762032727649475,
+              0.17821067706487712,
+              0.02996672750780821,
+              0.005045693479946926,
+              0.0018520266685034714
+            ],
+            "rank": 6,
+            "condition": 1396.33738025646,
+            "right_strongest": [
+              -0.0001965307136521817,
+              0.5441506046922449,
+              -0.5380770468039019,
+              0.005345555264825777,
+              0.43662626298717244,
+              -0.47297156785614664
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.1374598326716812,
+              0.015867581257728827
+            ],
+            "rank": 2,
+            "condition": 71.68451285652903,
+            "right_strongest": [
+              0.010670441112975299,
+              0.9999430692226705
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        15.387468752846377,
+        0.397728569586022
+      ]
+    },
+    {
+      "edge_id": 90,
+      "features": 10,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": false,
+        "identical_loop_endpoints": false,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              1.9929032409336374,
+              0.5264202469537593,
+              0.04749330691415147,
+              0.010040249899436427,
+              0.001907708083413517,
+              0.0008016909067508278
+            ],
+            "rank": 6,
+            "condition": 2485.874823017106,
+            "right_strongest": [
+              -0.001522537245140693,
+              -0.5409686189935677,
+              0.4402402163388691,
+              -0.002687160412385716,
+              -0.44333261773902927,
+              0.5630170124250358
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              0.8839407601481994,
+              0.004340167049637001
+            ],
+            "rank": 2,
+            "condition": 203.66514699523597,
+            "right_strongest": [
+              0.005929028717940328,
+              0.9999824231547583
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              2.901645614888587,
+              0.7577331845656281,
+              0.06876124260363234,
+              0.014501354021047535,
+              0.00276508828282104,
+              0.0011638328240718202
+            ],
+            "rank": 6,
+            "condition": 2493.1807686406396,
+            "right_strongest": [
+              -0.0015212282308296645,
+              -0.5408353217356694,
+              0.43744635560811945,
+              -0.0026778634247463127,
+              -0.443309421665291,
+              0.5653362824931584
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.286936169128376,
+              0.006322310496273048
+            ],
+            "rank": 2,
+            "condition": 203.55472416089256,
+            "right_strongest": [
+              0.005909478922781181,
+              0.9999825388769852
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        13.833051330376547,
+        0.6166554105214288
+      ]
+    },
+    {
+      "edge_id": 94,
+      "features": 15,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": true,
+        "identical_loop_endpoints": true,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              2.404922690912401,
+              0.6194902620507842,
+              0.07579178718045007,
+              0.018305389183158664,
+              0.003435719948289754,
+              0.0015532696079483726
+            ],
+            "rank": 6,
+            "condition": 1548.2970107738925,
+            "right_strongest": [
+              0.003312461674019675,
+              0.543987552211336,
+              -0.5020383690573962,
+              0.004284846935934009,
+              0.43270850254344945,
+              -0.514557128552611
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.0428358390066885,
+              0.00791447062373238
+            ],
+            "rank": 2,
+            "condition": 131.76318273007857,
+            "right_strongest": [
+              0.00946515769042635,
+              0.9999552043916243
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              3.4336053216662457,
+              0.8858456203450786,
+              0.1083155153901161,
+              0.026084858323853252,
+              0.004895487983042567,
+              0.002211081674417301
+            ],
+            "rank": 6,
+            "condition": 1552.9075028723773,
+            "right_strongest": [
+              0.0033200734472058494,
+              0.5440072243301037,
+              -0.5015408747459947,
+              0.004291531311736906,
+              0.4327835539546664,
+              -0.5149581013377239
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.489120207896202,
+              0.011273439037936485
+            ],
+            "rank": 2,
+            "condition": 132.09103299225131,
+            "right_strongest": [
+              0.009482836850438324,
+              0.9999550368917933
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        12.664442919494753,
+        0.5203693105897883
+      ]
+    },
+    {
+      "edge_id": 98,
+      "features": 14,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": true,
+        "identical_loop_endpoints": true,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              2.4135687600071356,
+              0.49629312452103636,
+              0.11203762666527523,
+              0.025995496817525558,
+              0.003518239443112704,
+              0.0013175933096839453
+            ],
+            "rank": 6,
+            "condition": 1831.8010134599765,
+            "right_strongest": [
+              -0.0013690138172879848,
+              -0.5219482827774955,
+              0.47879855725092973,
+              -0.006695343811607148,
+              -0.45704275699600927,
+              0.5379471610947966
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.1066187901902724,
+              0.011578468798863041
+            ],
+            "rank": 2,
+            "condition": 95.57557302386459,
+            "right_strongest": [
+              0.013851863985838207,
+              0.9999040583296569
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              3.5274967593735984,
+              0.714730311505322,
+              0.17202247048652214,
+              0.03912150805159554,
+              0.005150707963048834,
+              0.0019079294877242666
+            ],
+            "rank": 6,
+            "condition": 1848.8611775590898,
+            "right_strongest": [
+              -0.0013542967980810575,
+              -0.5210242195895592,
+              0.48013801458938987,
+              -0.006534199768482284,
+              -0.45819694524691423,
+              0.5366677547861567
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.6219143872496278,
+              0.017816415289101724
+            ],
+            "rank": 2,
+            "condition": 91.03483281744957,
+            "right_strongest": [
+              0.013381433859992752,
+              0.9999104646056319
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        12.27319282896676,
+        0.5189033328000768
+      ]
+    },
+    {
+      "edge_id": 102,
+      "features": 11,
+      "association": {
+        "range_association_via_confirmed_map": true,
+        "map_prior_at_target_node": true,
+        "identical_loop_current_window": true,
+        "identical_loop_endpoints": true,
+        "exact_map_token_overlap": null,
+        "exact_loop_token_overlap": null
+      },
+      "observability_causal": {
+        "M0": {
+          "both_scaled": {
+            "singular": [
+              2.4447378565578144,
+              0.5692403119081617,
+              0.00866313993027393,
+              0.006112627574726243,
+              0.001811360778525835,
+              0.00023640842158726409
+            ],
+            "rank": 6,
+            "condition": 10341.162299310909,
+            "right_strongest": [
+              -0.002183441421109318,
+              -0.5205265401012726,
+              0.5979718959498254,
+              -0.005291157531311444,
+              -0.44643412570107605,
+              0.4149042544364001
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.0925128309673373,
+              0.002029578705535096
+            ],
+            "rank": 2,
+            "condition": 538.2953752854328,
+            "right_strongest": [
+              0.011826314454113817,
+              0.999930066697883
+            ]
+          }
+        },
+        "M1_Robust": {
+          "both_scaled": {
+            "singular": [
+              3.464701171159587,
+              0.8057764986011638,
+              0.012396143199373889,
+              0.00864696451352577,
+              0.002566001231246513,
+              0.00035207058395852445
+            ],
+            "rank": 6,
+            "condition": 9840.92772592369,
+            "right_strongest": [
+              -0.0021820741886933916,
+              -0.5205676927378101,
+              0.5978454079295689,
+              -0.005292065491891437,
+              -0.4464406708911351,
+              0.41502783697542256
+            ]
+          },
+          "conditional_target_xy": {
+            "singular": [
+              1.5483286739707645,
+              0.002877802683727469
+            ],
+            "rank": 2,
+            "condition": 538.0246125718719,
+            "right_strongest": [
+              0.011828254912305424,
+              0.999930043745926
+            ]
+          }
+        }
+      },
+      "causal_tube_fraction": 1.0,
+      "batch_cov_endpoints": 2,
+      "initial_to_causal_shift_m": [
+        12.299317282445438,
+        0.6347397826575292
+      ]
+    }
+  ]
+}
