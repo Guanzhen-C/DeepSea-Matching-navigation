@@ -42,4 +42,4 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv-sonar-denoise/bin/python -m pytest -q -p 
   tests/test_sonar_range_factor_research_v5.py
 ~~~
 
-新增 13 项测试与前序 110 项合跑，**123 项全部通过**。本轮仅新研究目录、新报告、新本地输出；没有修改历史数据、正式 M0 或冻结运行时，未运行实时闭环/Jetson，也未向远端上传。
+新增 13 项测试与前序 110 项合跑，**123 项全部通过**。本轮没有修改历史数据、正式 M0 或冻结运行时，未运行实时闭环/Jetson。GitHub 仅发布报告、研究代码、测试及可公开的证据；原始数据和逐对诊断明细保留本地。
